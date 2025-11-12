@@ -1,36 +1,45 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## Riwayyaat (A project by UA)
 
-## Getting Started
+Next.js 16 + React 19 entry point for Riwayyaat — a research surface focused on isnad graphs, matn analysis, and waitlist onboarding. The UI currently ships a timed splash that transitions into the chat surface.
 
-First, run the development server:
+### Tech Stack
+
+- **Next.js App Router** in `src/app`
+- **TypeScript** + absolute imports via `@/*`
+- **Tailwind CSS v4** (utility-first, no config file required)
+- **Component directories** under `src/components` and shared data in `src/lib`
+
+### Local Development
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install              # already run once, repeats are safe
+npm run dev              # launch http://localhost:3000 with Turbopack
+npm run lint             # eslint -- respects next lint rules
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Project Structure
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+src/
+  app/                   # Next.js routes, layouts, and global styles
+    page.tsx             # Splash screen route
+    layout.tsx           # Root metadata + fonts
+    globals.css          # Tailwind + custom animations
+  components/
+    sections/            # Page-level sections (splash hero, etc.)
+    ui/                  # Reusable UI atoms
+  lib/                   # Site-wide config/constants
+public/                  # Static assets
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### UI Notes
 
-## Learn More
+- Branded aurora splash shows for 3 seconds then reveals the chat canvas.
+- Chat panel includes Riwayyaat logo, descriptive copy, input, and example prompts.
+- Responsive layout + soft-glass surfaces tuned for both dark and light modes via CSS custom properties.
 
-To learn more about Next.js, take a look at the following resources:
+### Next Steps
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Wire the chat input + prompt shortcuts to backend endpoints.
+- Capture waitlist submissions or integrate an auth flow.
+- Expand marketing sections (roadmap, partners, data sources) once content is ready.
