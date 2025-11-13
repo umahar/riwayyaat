@@ -162,7 +162,7 @@ const hadithInsights: HadithInsight[] = [
       { name: "Muhammad ibn Ibrahim al-Taymi", descriptor: "Medinese scholar" },
       { name: "Alqamah ibn Waqqas", descriptor: "Companion student" },
       { name: "Umar ibn al-Khattab", descriptor: "Companion" },
-      { name: "Muhammad ibn Abdullah ﷺ", descriptor: "Messenger of Allah", type: "prophet" },
+      { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
   },
   {
@@ -184,7 +184,7 @@ const hadithInsights: HadithInsight[] = [
       { name: "Abu Zinad", descriptor: "Medinese jurist" },
       { name: "Al-A'raj", descriptor: "Tabi'i" },
       { name: "Abu Huraira", descriptor: "Companion" },
-      { name: "Muhammad ibn Abdullah ﷺ", descriptor: "Messenger of Allah", type: "prophet" },
+      { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
   },
   {
@@ -206,7 +206,7 @@ const hadithInsights: HadithInsight[] = [
       { name: "Qatadah ibn Di'ama", descriptor: "Exegete" },
       { name: "Abu Salih", descriptor: "Narrator" },
       { name: "Abu Sa'id al-Khudri", descriptor: "Companion" },
-      { name: "Muhammad ibn Abdullah ﷺ", descriptor: "Messenger of Allah", type: "prophet" },
+      { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
   },
   {
@@ -227,7 +227,7 @@ const hadithInsights: HadithInsight[] = [
       { name: "Hisham ibn Sa'd", descriptor: "Medinese narrator" },
       { name: "'Ata ibn Yasar", descriptor: "Scholar of Madinah" },
       { name: "Zayd ibn Khalid al-Juhani", descriptor: "Companion" },
-      { name: "Muhammad ibn Abdullah ﷺ", descriptor: "Messenger of Allah", type: "prophet" },
+      { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
   },
   {
@@ -248,7 +248,7 @@ const hadithInsights: HadithInsight[] = [
       { name: "Abdullah ibn 'Awn", descriptor: "Basran narrator" },
       { name: "Abu Qilabah", descriptor: "Follower" },
       { name: "Anas ibn Malik", descriptor: "Companion" },
-      { name: "Muhammad ibn Abdullah ﷺ", descriptor: "Messenger of Allah", type: "prophet" },
+      { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
   },
   {
@@ -268,7 +268,7 @@ const hadithInsights: HadithInsight[] = [
       { name: "Muhammad ibn al-Fadl", descriptor: "Severely weak narrator" },
       { name: "Nafi' ibn al-Harith", descriptor: "Unknown narrator" },
       { name: "Ibn 'Umar", descriptor: "Companion" },
-      { name: "Muhammad ibn Abdullah ﷺ", descriptor: "Messenger of Allah", type: "prophet" },
+      { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
   },
   {
@@ -288,7 +288,7 @@ const hadithInsights: HadithInsight[] = [
       { name: "Abd al-Rahman ibn Ziyad al-Afrīqi", descriptor: "Weak narrator" },
       { name: "Salim ibn 'Atiyah", descriptor: "Narrator" },
       { name: "Anas ibn Malik", descriptor: "Companion" },
-      { name: "Muhammad ibn Abdullah ﷺ", descriptor: "Messenger of Allah", type: "prophet" },
+      { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
   },
   {
@@ -308,7 +308,7 @@ const hadithInsights: HadithInsight[] = [
       { name: "Isma'il ibn Yahya al-Madani", descriptor: "Identified fabricator" },
       { name: "Muhammad ibn al-Hajjaj al-Lakhmi", descriptor: "Accused narrator" },
       { name: "Abu Musa al-Ash'ari", descriptor: "Companion" },
-      { name: "Muhammad ibn Abdullah ﷺ", descriptor: "Messenger of Allah", type: "prophet" },
+      { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
   },
 ];
@@ -316,7 +316,7 @@ const hadithInsights: HadithInsight[] = [
 const ICON_BUTTON_CLASSES =
   "inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-soft)] bg-[var(--surface-card)] text-base text-[var(--text-secondary)] shadow-sm transition hover:-translate-y-0.5 hover:text-[var(--accent-emerald)]";
 const FILTER_BUTTON_BASE =
-  "inline-flex h-10 items-center gap-2 rounded-full border border-[var(--border-soft)] bg-[var(--surface-card)] px-4 text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)] shadow-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-emerald)]";
+  "inline-flex h-9 items-center gap-1.5 rounded-full border border-[var(--border-soft)] bg-[var(--surface-card)] px-3 text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)] shadow-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-emerald)]";
 
 type ChatWorkspaceProps = {
   initialPrompt: string;
@@ -647,7 +647,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
           : undefined
       }
     >
-      <aside className="relative flex max-h-svh flex-col gap-7 overflow-y-auto border-r border-[var(--border-soft)] bg-transparent px-6 py-8">
+      <aside className="scrollbar-hide relative flex max-h-svh flex-col gap-7 overflow-y-auto border-r border-[var(--border-soft)] bg-transparent px-6 py-8">
         <div className="flex items-center justify-between gap-3">
           {!leftCollapsed && (
               <div className="flex flex-1 items-center justify-between gap-3">
@@ -925,7 +925,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
             real time.
           </p>
         </header>
-        <div className="flex-1 space-y-5 overflow-y-auto px-8 py-6">
+        <div className="scrollbar-hide flex-1 space-y-5 overflow-y-auto px-8 py-6">
           {messages.map((message) => (
             <article
               key={message.id}
@@ -988,7 +988,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
         )}
       </div>
 
-      <aside className="relative flex max-h-svh flex-col overflow-y-auto bg-[var(--background-alt)] px-6 py-8">
+      <aside className="scrollbar-hide relative flex max-h-svh flex-col overflow-y-auto bg-[var(--background-alt)] px-6 py-8">
         <header className="flex items-center justify-between gap-2">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[var(--tracking-wide)] text-[var(--text-muted)]">
@@ -1022,7 +1022,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
         </header>
 
         {currentHadith ? (
-          <div className="mt-6 space-y-6 overflow-y-auto pr-2">
+          <div className="scrollbar-hide mt-6 space-y-6 overflow-y-auto pr-2">
             <div className="flex flex-col items-center gap-2 text-center">
               <span
                 className="rounded-full px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em]"
@@ -1059,8 +1059,12 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                       : "border-[var(--border-soft)] bg-[var(--background)]";
                   return (
                     <li key={node.name} className="relative pl-6">
-                      {index !== 0 && (
-                        <span className="absolute -left-2 top-0 h-full w-px bg-[var(--border-soft)]" />
+                      {!isProphet && (
+                        <span
+                          className={`absolute -left-2 w-px bg-[var(--border-soft)] ${
+                            index === 0 ? "top-[-0.5rem] h-[calc(100%+0.5rem)]" : "top-0 h-[calc(100%+0.5rem)]"
+                          }`}
+                        />
                       )}
                       <button
                         type="button"
@@ -1070,7 +1074,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                         }}
                         className={`w-full rounded-2xl border px-4 py-3 text-left shadow-sm transition ${baseClasses}`}
                       >
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between gap-3">
                           <div>
                             <p className="text-sm font-semibold text-[color:inherit]">
                               {node.name}
@@ -1079,7 +1083,11 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                               {node.descriptor}
                             </p>
                           </div>
-                          {!isProphet && (
+                          {isProphet ? (
+                            <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/30 text-xl text-white shadow-[0_8px_25px_rgba(255,255,255,0.35)] ring-2 ring-white/40 animate-pulse">
+                              ﷺ
+                            </span>
+                          ) : (
                             <span className="text-lg">
                               {isExpanded ? "−" : "+"}
                             </span>
