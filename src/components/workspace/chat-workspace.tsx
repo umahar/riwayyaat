@@ -1269,6 +1269,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
   const bookMenuRef = useRef<HTMLDivElement | null>(null);
   const sourceMenuRef = useRef<HTMLDivElement | null>(null);
   const leftWidthInitialized = useRef(false);
+  const rightWidthInitialized = useRef(false);
   useEffect(() => {
     const mediaQuery = window.matchMedia("(min-width: 1024px)");
     const setMatch = () => setIsDesktop(mediaQuery.matches);
@@ -1402,6 +1403,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
   const LEFT_DEFAULT_RATIO = 0.3;
   const RIGHT_MIN = 360;
   const RIGHT_MAX = 520;
+  const RIGHT_DEFAULT_RATIO = 0.35;
   const COLLAPSED_WIDTH = 72;
 
   const clamp = (value: number, min: number, max: number) =>
@@ -1421,6 +1423,17 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
     previousLeftWidth.current = idealWidth;
     leftWidthInitialized.current = true;
   }, [isDesktop, leftCollapsed]);
+
+  useEffect(() => {
+    if (!isDesktop || rightWidthInitialized.current) return;
+    const idealWidth = clamp(
+      window.innerWidth * RIGHT_DEFAULT_RATIO,
+      RIGHT_MIN,
+      RIGHT_MAX,
+    );
+    setRightWidth(idealWidth);
+    rightWidthInitialized.current = true;
+  }, [isDesktop]);
 
   const dragState = useRef<{
     panel: "left" | "right";
@@ -1924,7 +1937,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
           <>
             <div className="my-4 h-px w-full bg-[var(--border-soft)]" />
             <div className="scrollbar-hide mt-4 space-y-6 overflow-y-auto pr-2">
-              <section className="grid gap-4 text-left text-xs text-[var(--text-secondary)] sm:grid-cols-2">
+              <section className="grid gap-4 text-left text-xs text-[var(--text-secondary)] sm:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-3 rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-4 py-3">
                   <p className="text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
                     Attribution Type
@@ -1950,6 +1963,19 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                       </div>
                     ),
                   )}
+                </div>
+                <div className="space-y-3 rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-4 py-3">
+                  <p className="text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                    Narration Level
+                  </p>
+                  <div>
+                    <p className="font-semibold text-[var(--text-primary)]">
+                      {formatGradingLabel(currentHadith.details.grading)}
+                    </p>
+                    <p className="text-[var(--text-secondary)]">
+                      {currentGradingStyle?.description || "Classification pending detailed analysis."}
+                    </p>
+                  </div>
                 </div>
               </section>
               <div className="flex flex-col items-center gap-2 text-center">
