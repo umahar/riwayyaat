@@ -9,6 +9,8 @@
   --surface-card: rgba(255, 255, 255, 0.08);
   --surface-input: rgba(0, 0, 0, 0.35);
   --surface-popover: rgba(3, 7, 18, 0.9);
+  --workspace-card-bg: rgba(255, 255, 255, 0.08);
+  --workspace-card-border: rgba(255, 255, 255, 0.18);
   --chip-bg: rgba(255, 255, 255, 0.08);
   --chip-border: rgba(255, 255, 255, 0.18);
   --border-soft: rgba(255, 255, 255, 0.18);
@@ -45,6 +47,8 @@
   --surface-card: rgba(15, 23, 42, 0.06);
   --surface-input: rgba(255, 255, 255, 0.94);
   --surface-popover: rgba(255, 255, 255, 0.96);
+  --workspace-card-bg: #ffffff;
+  --workspace-card-border: rgba(15, 23, 42, 0.08);
   --chip-bg: rgba(15, 23, 42, 0.05);
   --chip-border: rgba(15, 23, 42, 0.12);
   --border-soft: rgba(15, 23, 42, 0.12);
@@ -82,6 +86,8 @@
     --surface-card: rgba(15, 23, 42, 0.06);
     --surface-input: rgba(255, 255, 255, 0.94);
     --surface-popover: rgba(255, 255, 255, 0.96);
+    --workspace-card-bg: #ffffff;
+    --workspace-card-border: rgba(15, 23, 42, 0.08);
     --chip-bg: rgba(15, 23, 42, 0.05);
     --chip-border: rgba(15, 23, 42, 0.12);
     --border-soft: rgba(15, 23, 42, 0.12);

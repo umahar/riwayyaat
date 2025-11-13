@@ -736,10 +736,10 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                     <article
                       key={hadith.id}
                       onClick={() => handleCardClick(hadith.id)}
-                      className={`cursor-pointer rounded-3xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-5 py-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+                      className={`cursor-pointer rounded-3xl border bg-[var(--workspace-card-bg)] px-5 py-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
                         isActive
                           ? "border-[var(--accent-emerald)] shadow-lg"
-                          : ""
+                          : "border-[var(--workspace-card-border)]"
                       }`}
                     >
                       <div className="flex items-start justify-between gap-4">
@@ -751,7 +751,13 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                             {hadith.details.book}
                           </p>
                         </div>
-                        <span className="rounded-full bg-[var(--surface-panel)] px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                        <span
+                          className={`rounded-full border border-[var(--chip-border)] bg-[var(--chip-bg)] px-3 py-1 text-xs font-semibold uppercase tracking-wide ${
+                            isActive
+                              ? "text-[#1fb276]"
+                              : "text-[var(--text-secondary)]"
+                          }`}
+                        >
                           {hadith.details.source}
                         </span>
                       </div>
@@ -761,10 +767,10 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                         </p>
                       </div>
                       <div className="mt-4 flex flex-wrap gap-2">
-                        <span className="rounded-full bg-[var(--surface-panel)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)]">
+                        <span className="rounded-full border border-[var(--chip-border)] bg-[var(--chip-bg)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)]">
                           {hadith.details.grading}
                         </span>
-                        <span className="rounded-full bg-[var(--surface-panel)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)]">
+                        <span className="rounded-full border border-[var(--chip-border)] bg-[var(--chip-bg)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)]">
                           {hadith.details.chapter}
                         </span>
                       </div>
@@ -883,6 +889,16 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
               </h3>
             )}
           </div>
+          {currentHadith && (
+            <div className="flex flex-col items-end gap-1 text-xs font-semibold text-[var(--text-secondary)]">
+              <span className="rounded-full border border-[var(--border-soft)] bg-[var(--surface-card)] px-3 py-1">
+                {currentHadith.details.grading}
+              </span>
+              <span className="rounded-full border border-[var(--border-soft)] bg-[var(--surface-card)] px-3 py-1">
+                {currentHadith.chain.length} narrators
+              </span>
+            </div>
+          )}
         </header>
 
         {currentHadith ? (
