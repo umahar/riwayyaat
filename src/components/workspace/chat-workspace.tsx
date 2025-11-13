@@ -19,6 +19,13 @@ type Message = {
   timestamp: string;
 };
 
+type NarrationLevel =
+  | "mutawatir"
+  | "mashhur"
+  | "aziz"
+  | "gharib"
+  | "fard";
+
 type HadithInsight = {
   id: string;
   matn: string;
@@ -40,6 +47,7 @@ type HadithInsight = {
   }>;
   sourceTypes: string[];
   chainTypes: string[];
+  narrationLevel: NarrationLevel;
 };
 
 type GradingStyle = {
@@ -197,6 +205,32 @@ const chainTypeInfo = [
   { key: "mursal-jali", title: "Mursal Jali (مرسل جلي)", description: "Clear disconnection." },
   { key: "mursal-khafi", title: "Mursal Khafi (مرسل خفي)", description: "Hidden disconnection." },
 ];
+
+const narrationLevelInfo: Record<
+  NarrationLevel,
+  { title: string; description: string }
+> = {
+  mutawatir: {
+    title: "Mutawātir (متواتر)",
+    description: "Reported by many; impossible to fabricate.",
+  },
+  mashhur: {
+    title: "Mashhūr (مشهور)",
+    description: "Narrated by 3+ in every generation.",
+  },
+  aziz: {
+    title: "ʿAzīz (عزيز)",
+    description: "Narrated by at least 2 at each level.",
+  },
+  gharib: {
+    title: "Gharīb (غريب)",
+    description: "Single narrator at one stage.",
+  },
+  fard: {
+    title: "Fard (فرد)",
+    description: "Unique chain; only one path.",
+  },
+};
 const hadithInsights: HadithInsight[] = [
   {
     id: "niyyah-musnad",
@@ -223,6 +257,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["musnad", "muannan"],
+    narrationLevel: "gharib",
   },
   {
     id: "tirmidhi-knowledge",
@@ -248,6 +283,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["musnad", "mudallas"],
+    narrationLevel: "aziz",
   },
   {
     id: "umar-mawquf",
@@ -272,6 +308,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["mawquf"],
     chainTypes: ["musnad"],
+    narrationLevel: "fard",
   },
   {
     id: "hasan-maqtu",
@@ -295,6 +332,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["maqtu"],
     chainTypes: ["musnad"],
+    narrationLevel: "fard",
   },
   {
     id: "athar-ibnabbas",
@@ -318,6 +356,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["athar"],
     chainTypes: ["musnad"],
+    narrationLevel: "aziz",
   },
   {
     id: "mursal-hasan",
@@ -340,6 +379,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["mursal"],
+    narrationLevel: "fard",
   },
   {
     id: "munqati-sighting",
@@ -363,6 +403,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["munqati"],
+    narrationLevel: "gharib",
   },
   {
     id: "muadal-qatada",
@@ -386,6 +427,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["muadal"],
+    narrationLevel: "fard",
   },
   {
     id: "muallaq-bukhari",
@@ -408,6 +450,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["muallaq"],
+    narrationLevel: "gharib",
   },
   {
     id: "mudallas-sighting",
@@ -432,6 +475,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["mudallas"],
+    narrationLevel: "aziz",
   },
   {
     id: "mursal-jali",
@@ -454,6 +498,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["mursal-jali"],
+    narrationLevel: "fard",
   },
   {
     id: "mursal-khafi",
@@ -477,6 +522,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["mursal-khafi", "muannan"],
+    narrationLevel: "gharib",
   },
   {
     id: "pillars-sahih",
@@ -502,6 +548,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["musnad", "muannan"],
+    narrationLevel: "mutawatir",
   },
   {
     id: "love-for-brother",
@@ -527,6 +574,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["musnad", "muannan"],
+    narrationLevel: "mashhur",
   },
   {
     id: "religion-sincere-counsel",
@@ -552,6 +600,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["musnad", "muannan"],
+    narrationLevel: "gharib",
   },
   {
     id: "ihsan-sahih-lighayrih",
@@ -576,6 +625,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["musnad"],
+    narrationLevel: "aziz",
   },
   {
     id: "mercy-sahih-lighayrih",
@@ -600,6 +650,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["musnad", "muannan"],
+    narrationLevel: "mashhur",
   },
   {
     id: "revive-sunnah-sahih-lighayrih",
@@ -624,6 +675,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["musnad"],
+    narrationLevel: "gharib",
   },
   {
     id: "concern-hasan-lidhatih",
@@ -649,6 +701,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["musnad"],
+    narrationLevel: "mashhur",
   },
   {
     id: "no-harm-hasan",
@@ -674,6 +727,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["musnad"],
+    narrationLevel: "mashhur",
   },
   {
     id: "believer-mixes-hasan",
@@ -698,6 +752,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["musnad"],
+    narrationLevel: "aziz",
   },
   {
     id: "tie-camel-hasan-lighayrih",
@@ -723,6 +778,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["musnad"],
+    narrationLevel: "mashhur",
   },
   {
     id: "supplication-worship-hasan-lighayrih",
@@ -746,6 +802,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["musnad", "muannan"],
+    narrationLevel: "aziz",
   },
   {
     id: "relieve-distress-hasan-lighayrih",
@@ -770,6 +827,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["musnad", "muannan"],
+    narrationLevel: "mutawatir",
   },
   {
     id: "china-knowledge-daif",
@@ -794,6 +852,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["musnad"],
+    narrationLevel: "gharib",
   },
   {
     id: "difference-mercy-daif",
@@ -818,6 +877,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["musnad"],
+    narrationLevel: "gharib",
   },
   {
     id: "twelve-rakah-jumua-daif",
@@ -842,6 +902,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["musnad"],
+    narrationLevel: "aziz",
   },
   {
     id: "yasin-grave-daif-jiddan",
@@ -865,6 +926,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["musnad"],
+    narrationLevel: "fard",
   },
   {
     id: "rajab-fast-daif-jiddan",
@@ -889,6 +951,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["musnad"],
+    narrationLevel: "fard",
   },
   {
     id: "sadaqah-protects-daif-jiddan",
@@ -913,6 +976,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["musnad"],
+    narrationLevel: "fard",
   },
   {
     id: "six-rakats-munkar",
@@ -937,6 +1001,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["musnad"],
+    narrationLevel: "gharib",
   },
   {
     id: "visit-parents-grave-munkar",
@@ -961,6 +1026,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["musnad"],
+    narrationLevel: "gharib",
   },
   {
     id: "rajab-umrah-munkar",
@@ -985,6 +1051,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["musnad"],
+    narrationLevel: "gharib",
   },
   {
     id: "maymuna-marriage-shadh",
@@ -1009,6 +1076,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["musnad"],
+    narrationLevel: "aziz",
   },
   {
     id: "saturday-fast-shadh",
@@ -1033,6 +1101,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["musnad"],
+    narrationLevel: "gharib",
   },
   {
     id: "wudu-each-prayer-shadh",
@@ -1057,6 +1126,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["musnad"],
+    narrationLevel: "fard",
   },
   {
     id: "basmala-audible-muallal",
@@ -1082,6 +1152,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["musnad", "muannan"],
+    narrationLevel: "gharib",
   },
   {
     id: "double-adhan-muallal",
@@ -1106,6 +1177,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["musnad"],
+    narrationLevel: "gharib",
   },
   {
     id: "raising-between-sujud-muallal",
@@ -1130,6 +1202,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["musnad"],
+    narrationLevel: "aziz",
   },
   {
     id: "rajab-night-mawdu",
@@ -1154,6 +1227,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["musnad"],
+    narrationLevel: "fard",
   },
   {
     id: "mawlid-reward-mawdu",
@@ -1178,6 +1252,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["musnad"],
+    narrationLevel: "fard",
   },
   {
     id: "specific-dua-mawdu",
@@ -1202,6 +1277,7 @@ const hadithInsights: HadithInsight[] = [
     ],
     sourceTypes: ["marfu"],
     chainTypes: ["musnad"],
+    narrationLevel: "fard",
   },
 ];
 
@@ -1334,6 +1410,9 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
   const activeChainTypes = currentHadith
     ? chainTypeInfo.filter((item) => currentHadith.chainTypes.includes(item.key))
     : [];
+  const currentNarrationLevelInfo = currentHadith
+    ? narrationLevelInfo[currentHadith.narrationLevel]
+    : null;
 
   const hadithIndexById = useMemo(() => {
     return hadithInsights.reduce<Record<string, number>>((acc, hadith, index) => {
@@ -1970,10 +2049,10 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                   </p>
                   <div>
                     <p className="font-semibold text-[var(--text-primary)]">
-                      {formatGradingLabel(currentHadith.details.grading)}
+                      {currentNarrationLevelInfo?.title ?? "Not classified"}
                     </p>
                     <p className="text-[var(--text-secondary)]">
-                      {currentGradingStyle?.description || "Classification pending detailed analysis."}
+                      {currentNarrationLevelInfo?.description || "Narration level pending further review."}
                     </p>
                   </div>
                 </div>
