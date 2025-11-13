@@ -316,7 +316,7 @@ const hadithInsights: HadithInsight[] = [
 const ICON_BUTTON_CLASSES =
   "inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-soft)] bg-[var(--surface-card)] text-base text-[var(--text-secondary)] shadow-sm transition hover:-translate-y-0.5 hover:text-[var(--accent-emerald)]";
 const FILTER_BUTTON_BASE =
-  "inline-flex h-9 items-center gap-1.5 rounded-full border border-[var(--border-soft)] bg-[var(--surface-card)] px-3 text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)] shadow-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-emerald)]";
+  "inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[0.65rem] font-semibold uppercase tracking-[0.18em] shadow-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-emerald)]";
 
 type ChatWorkspaceProps = {
   initialPrompt: string;
@@ -693,8 +693,8 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                       onClick={() => setIsGradingMenuOpen((open) => !open)}
                       className={`${FILTER_BUTTON_BASE} ${
                         selectedGradings.size > 0
-                          ? "border-[var(--accent-emerald)] text-[var(--accent-emerald)]"
-                          : "text-[var(--text-muted)]"
+                          ? "border-[var(--accent-emerald)] bg-[var(--accent-emerald)]/15 text-[var(--accent-emerald)]"
+                          : "border-[var(--border-soft)] bg-[var(--surface-card)] text-[var(--text-muted)]"
                       }`}
                     >
                       <span>Grade</span>
@@ -741,8 +741,8 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                       onClick={() => setIsBookMenuOpen((open) => !open)}
                       className={`${FILTER_BUTTON_BASE} ${
                         selectedBooks.size > 0
-                          ? "border-[var(--accent-emerald)] text-[var(--accent-emerald)]"
-                          : "text-[var(--text-muted)]"
+                          ? "border-[var(--accent-emerald)] bg-[var(--accent-emerald)]/15 text-[var(--accent-emerald)]"
+                          : "border-[var(--border-soft)] bg-[var(--surface-card)] text-[var(--text-muted)]"
                       }`}
                     >
                       <span>Book</span>
@@ -789,8 +789,8 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                       onClick={() => setIsSourceMenuOpen((open) => !open)}
                       className={`${FILTER_BUTTON_BASE} ${
                         selectedSources.size > 0
-                          ? "border-[var(--accent-emerald)] text-[var(--accent-emerald)]"
-                          : "text-[var(--text-muted)]"
+                          ? "border-[var(--accent-emerald)] bg-[var(--accent-emerald)]/15 text-[var(--accent-emerald)]"
+                          : "border-[var(--border-soft)] bg-[var(--surface-card)] text-[var(--text-muted)]"
                       }`}
                     >
                       <span>Source</span>
