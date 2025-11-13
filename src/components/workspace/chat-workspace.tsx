@@ -59,7 +59,7 @@ const gradingPalette: GradingPaletteEntry[] = [
     style: {
       background: "#065f46",
       color: "#ecfdf5",
-      description: "Fully authentic; strongest type of hadith.",
+      description: "Fully authentic; narrators are strong and reliable.",
     },
   },
   {
@@ -67,7 +67,7 @@ const gradingPalette: GradingPaletteEntry[] = [
     style: {
       background: "#15803d",
       color: "#ecfdf5",
-      description: "Authentic due to supporting chains.",
+      description: "Became authentic due to supporting chains filling minor gaps.",
     },
   },
   {
@@ -75,7 +75,7 @@ const gradingPalette: GradingPaletteEntry[] = [
     style: {
       background: "#65a30d",
       color: "#041b11",
-      description: "Reliable though narrators have slightly weaker memory.",
+      description: "Reliable overall but narrators have lighter memory weaknesses.",
     },
   },
   {
@@ -83,7 +83,7 @@ const gradingPalette: GradingPaletteEntry[] = [
     style: {
       background: "#ca8a04",
       color: "#041b11",
-      description: "Weak alone but strengthened by other chains.",
+      description: "Originally weak, strengthened by additional supporting chains.",
     },
   },
   {
@@ -91,7 +91,7 @@ const gradingPalette: GradingPaletteEntry[] = [
     style: {
       background: "#c2410c",
       color: "#fff7ed",
-      description: "Very weak; serious problems in the chain.",
+      description: "Very weak because one or more narrators are extremely unreliable.",
     },
   },
   {
@@ -99,15 +99,31 @@ const gradingPalette: GradingPaletteEntry[] = [
     style: {
       background: "#ea580c",
       color: "#fff7ed",
-      description: "Weak due to memory issues or disconnections.",
+      description: "Weak due to memory issues, a missing link, or a weak narrator.",
     },
   },
   {
-    keywords: ["munkar", "shadh", "shadhdh", "maqlub"],
+    keywords: ["munkar"],
     style: {
       background: "#991b1b",
       color: "#fee2e2",
-      description: "Rejected because it contradicts stronger reports.",
+      description: "Rejected because a weak narrator contradicts stronger narrators.",
+    },
+  },
+  {
+    keywords: ["shadh", "shadhdh", "maqlub"],
+    style: {
+      background: "#7f1d1d",
+      color: "#fee2e2",
+      description: "Irregular because a reliable narrator contradicts stronger narrators.",
+    },
+  },
+  {
+    keywords: ["muallal", "muʿallal", "hidden defect"],
+    style: {
+      background: "#3f3d56",
+      color: "#f4f4ff",
+      description: "Has a subtle hidden flaw discovered by experts.",
     },
   },
   {
@@ -115,7 +131,7 @@ const gradingPalette: GradingPaletteEntry[] = [
     style: {
       background: "#111827",
       color: "#f8fafc",
-      description: "Fabricated or invented; not from the Prophet.",
+      description: "Fabricated and proven to be falsely attributed to the Prophet ﷺ.",
     },
   },
 ];
@@ -244,7 +260,7 @@ const hadithInsights: HadithInsight[] = [
       book: "Knowledge",
       bookNumber: 38,
       chapter: "Learning before authority",
-      grading: "Mawqūf - authentic",
+      grading: "Ṣaḥīḥ li-dhātih",
       hadithNumber: 25009,
       location: "Report 25009",
     },
@@ -268,7 +284,7 @@ const hadithInsights: HadithInsight[] = [
       book: "Sayings of the Tābi'īn",
       bookNumber: 7,
       chapter: "Detachment",
-      grading: "Maqṭūʿ",
+      grading: "Ḥasan li-dhātih",
       hadithNumber: 1345,
       location: "Report 1345",
     },
@@ -291,7 +307,7 @@ const hadithInsights: HadithInsight[] = [
       book: "Remembrance",
       bookNumber: 2,
       chapter: "Dhikr in Mina",
-      grading: "Athar Hasan",
+      grading: "Ḥasan li-ghayrih",
       hadithNumber: 3435,
       location: "Report 3435",
     },
@@ -314,7 +330,7 @@ const hadithInsights: HadithInsight[] = [
       book: "Prayer",
       bookNumber: 2,
       chapter: "Brevity of the khutbah",
-      grading: "Mursal",
+      grading: "Ḍaʿīf",
       hadithNumber: 1107,
       location: "Hadith 1107",
     },
@@ -336,7 +352,7 @@ const hadithInsights: HadithInsight[] = [
       book: "Fasting",
       bookNumber: 14,
       chapter: "Virtues of Laylat al-Qadr",
-      grading: "Munqaṭiʿ",
+      grading: "Ḍaʿīf",
       hadithNumber: 2180,
       location: "Report 2180",
     },
@@ -359,7 +375,7 @@ const hadithInsights: HadithInsight[] = [
       book: "Virtues",
       bookNumber: 8,
       chapter: "Gratitude",
-      grading: "Muʿḍal",
+      grading: "Ḍaʿīf",
       hadithNumber: 5127,
       location: "Hadith 5127",
     },
@@ -382,7 +398,7 @@ const hadithInsights: HadithInsight[] = [
       book: "Fasting",
       bookNumber: 30,
       chapter: "Deeds presented",
-      grading: "Ṣaḥīḥ (Muʿallaq)",
+      grading: "Ṣaḥīḥ li-dhātih",
       hadithNumber: 1899,
       location: "Hadith 1899",
     },
@@ -404,7 +420,7 @@ const hadithInsights: HadithInsight[] = [
       book: "Fasting",
       bookNumber: 8,
       chapter: "Virtues of Ramadan",
-      grading: "Mudallas chain",
+      grading: "Ḍaʿīf",
       hadithNumber: 3437,
       location: "Hadith 3437",
     },
@@ -428,7 +444,7 @@ const hadithInsights: HadithInsight[] = [
       book: "Commerce",
       bookNumber: 30,
       chapter: "Levying fees",
-      grading: "Mursal Jali",
+      grading: "Ḍaʿīf",
       hadithNumber: 4679,
       location: "Hadith 4679",
     },
@@ -450,7 +466,7 @@ const hadithInsights: HadithInsight[] = [
       book: "Transactions",
       bookNumber: 5,
       chapter: "Sale of fruits",
-      grading: "Mursal Khafi",
+      grading: "Ḍaʿīf",
       hadithNumber: 10841,
       location: "Hadith 10841",
     },
