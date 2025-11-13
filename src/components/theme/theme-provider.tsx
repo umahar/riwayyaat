@@ -1,9 +1,11 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
 import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -33,16 +35,15 @@ function applyTheme(value: Theme) {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    if (typeof window === "undefined") {
-      return "dark";
-    }
+  const [theme, setThemeState] = useState<Theme>("dark");
+
+  useEffect(() => {
     const stored = localStorage.getItem(THEME_STORAGE_KEY);
     const nextTheme =
       stored === "light" || stored === "dark" ? stored : getPreferredTheme();
+    setThemeState(nextTheme);
     applyTheme(nextTheme);
-    return nextTheme;
-  });
+  }, []);
 
   const setTheme = useCallback((value: Theme) => {
     setThemeState(value);

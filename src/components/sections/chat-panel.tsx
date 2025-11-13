@@ -1,12 +1,16 @@
 "use client";
 
-import { useMemo } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { Logo } from "@/components/ui/logo";
 import { siteConfig } from "@/lib/site";
 import { AuroraBackground } from "@/components/ui/aurora-background";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 
-export function ChatPanel() {
+type ChatPanelProps = {
+  onSubmit?: (prompt: string) => void;
+};
+
+export function ChatPanel({ onSubmit }: ChatPanelProps) {
   const { examplePrompts } = siteConfig;
   const promptPairs = useMemo(
     () =>
@@ -16,6 +20,21 @@ export function ChatPanel() {
       })),
     [examplePrompts],
   );
+
+  const [value, setValue] = useState("");
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const nextValue = value.trim();
+    if (!nextValue) return;
+    onSubmit?.(nextValue);
+    setValue("");
+  };
+
+  const handlePromptClick = (prompt: string) => {
+    onSubmit?.(prompt);
+    setValue("");
+  };
 
   return (
     <section
@@ -35,10 +54,10 @@ export function ChatPanel() {
       >
         <Logo />
         <div className="space-y-4">
-          <p className="text-sm uppercase tracking-[0.5em] text-[var(--text-muted)]">
+          <p className="text-sm font-semibold uppercase tracking-[var(--tracking-wide)] text-[var(--text-muted)]">
             Riwayyaat Copilot
           </p>
-          <h1 className="text-4xl font-semibold leading-tight text-balance text-[var(--text-primary)]">
+          <h1 className="text-4xl font-bold leading-tight tracking-[var(--tracking-tight)] text-balance text-[var(--text-primary)]">
             Ask any question about a hadith, its matn, or sanad.
           </h1>
           <p className="text-base text-[var(--text-secondary)]">
@@ -47,10 +66,7 @@ export function ChatPanel() {
           </p>
         </div>
 
-        <form
-          className="w-full space-y-3"
-          onSubmit={(event) => event.preventDefault()}
-        >
+        <form className="w-full space-y-3" onSubmit={handleSubmit}>
           <div
             className="flex flex-col gap-3 rounded-[28px] border p-2 text-left shadow-inner sm:flex-row sm:items-center sm:p-3"
             style={{
@@ -67,6 +83,8 @@ export function ChatPanel() {
               type="text"
               autoComplete="off"
               placeholder="Ask anything about any hadith, its matn, or sanad..."
+              value={value}
+              onChange={(event) => setValue(event.target.value)}
               className="flex-1 rounded-[20px] border border-transparent bg-transparent px-4 py-3 text-base text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--input-border-focus)] focus:outline-none"
             />
             <button
@@ -97,6 +115,7 @@ export function ChatPanel() {
                   backgroundColor: "var(--chip-bg)",
                   color: "var(--example-text)",
                 }}
+                onClick={() => handlePromptClick(prompt)}
               >
                 <span
                   className="text-lg"

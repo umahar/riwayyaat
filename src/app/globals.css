@@ -113,6 +113,8 @@
   --color-foreground: var(--text-primary);
   --font-sans: var(--font-poppins);
   --font-mono: var(--font-poppins);
+  --tracking-tight: -0.02em;
+  --tracking-wide: 0.2em;
 }
 
 body {
@@ -128,6 +130,15 @@ body {
 ::selection {
   background-color: var(--accent-emerald);
   color: var(--background);
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
 
 .animate-fade-in-up {
