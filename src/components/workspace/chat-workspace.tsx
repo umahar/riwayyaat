@@ -876,10 +876,10 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div>
-                          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#1fb276]">
+                          <p className="text-sm font-semibold uppercase tracking-[0.08em] text-[#1fb276]">
                             {hadith.details.location}
                           </p>
-                          <p className="text-base font-semibold text-[var(--text-primary)]">
+                          <p className="text-base font-semibold tracking-tight text-[var(--text-primary)]">
                             {hadith.details.book}
                           </p>
                         </div>
@@ -1079,9 +1079,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                     <li key={node.name} className="relative pl-6">
                       {!isProphet && (
                         <span
-                          className={`absolute -left-2 w-px bg-[var(--border-soft)] ${
-                            index === 0 ? "top-[-0.5rem] h-[calc(100%+0.5rem)]" : "top-0 h-[calc(100%+0.5rem)]"
-                          }`}
+                          className="absolute -left-2 top-[10%] h-[80%] w-px bg-[var(--border-soft)]"
                         />
                       )}
                       <button
@@ -1095,6 +1093,11 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                         <div className="flex items-center justify-between gap-3">
                           <div>
                             <p className="text-sm font-semibold text-[color:inherit]">
+                              {!isProphet && (
+                                <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-[var(--accent-emerald)]/30 bg-[var(--accent-emerald)]/15 text-[0.7rem] text-[var(--accent-emerald)]">
+                                  {index + 1}
+                                </span>
+                              )}
                               {node.name}
                             </p>
                             <p className={`text-xs ${isProphet ? "text-white/80" : "text-[var(--text-muted)]"}`}>
