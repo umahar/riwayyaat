@@ -1926,6 +1926,9 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
             <div className="scrollbar-hide mt-4 space-y-6 overflow-y-auto pr-2">
               <section className="grid gap-4 text-left text-xs text-[var(--text-secondary)] sm:grid-cols-2">
                 <div className="space-y-3 rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-4 py-3">
+                  <p className="text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                    Attribution Type
+                  </p>
                   {(activeSourceTypes.length ? activeSourceTypes : [{ key: "none", title: "Not specified", description: "No source classification provided." }]).map(
                     (item) => (
                       <div key={item.title}>
@@ -1936,6 +1939,9 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                   )}
                 </div>
                 <div className="space-y-3 rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-4 py-3">
+                  <p className="text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                    Chain Type
+                  </p>
                   {(activeChainTypes.length ? activeChainTypes : [{ key: "none", title: "Not specified", description: "No chain classification provided." }]).map(
                     (item) => (
                       <div key={item.title}>
