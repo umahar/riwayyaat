@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { siteConfig } from "@/lib/site";
 
 type LogoProps = {
@@ -7,25 +8,27 @@ type LogoProps = {
 export function Logo({ className }: LogoProps) {
   return (
     <div
-      className={`inline-flex items-center gap-2 rounded-full border border-[var(--border-soft)] bg-[var(--surface-card)] px-3 py-1.5 text-[var(--text-primary)] backdrop-blur ${className ?? ""}`}
+      className={`inline-flex items-center rounded-full border border-[var(--border-soft)] bg-[var(--surface-card)] px-4 py-2 text-[var(--text-primary)] backdrop-blur ${className ?? ""}`}
     >
-      <span
-        className="flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold shadow-lg shadow-[var(--shadow-panel)]"
-        style={{
-          backgroundColor: "var(--accent-emerald)",
-          color: "var(--accent-contrast)",
-        }}
-      >
-        {siteConfig.shortName}
-      </span>
-      <div className="flex flex-col leading-tight">
-        <span className="text-[0.6rem] uppercase tracking-[0.35em] text-[var(--text-muted)]">
-          {siteConfig.name}
+      {siteConfig.logoPath ? (
+        <Image
+          src={siteConfig.logoPath}
+          alt={siteConfig.logoAlt ?? siteConfig.name}
+          width={160}
+          height={40}
+          className="h-9 w-auto object-contain"
+          priority
+        />
+      ) : (
+        <span
+          className="text-base font-semibold tracking-wide"
+          style={{
+            color: "var(--accent-contrast)",
+          }}
+        >
+          {siteConfig.shortName}
         </span>
-        <span className="text-sm font-semibold text-[var(--text-primary)]">
-          {siteConfig.byline}
-        </span>
-      </div>
+      )}
     </div>
   );
 }

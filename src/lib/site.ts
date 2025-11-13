@@ -9,6 +9,8 @@ export const siteConfig = {
     "Mapping narrations, matn variations, and narrator networks in one living graph.",
   heroSubcopy:
     "Trace sanad integrity, compare matn wording, and surface commentary insights in seconds.",
+  logoPath: "/logo.svg",
+  logoAlt: "HadithGraph logo",
   primaryCta: {
     label: "Jump into the copilot",
     href: "#copilot",

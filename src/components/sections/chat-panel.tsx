@@ -39,7 +39,7 @@ export function ChatPanel({ onSubmit }: ChatPanelProps) {
   return (
     <section
       id="copilot"
-      className="relative isolate flex min-h-svh items-center justify-center overflow-hidden px-6 py-16 text-[var(--text-primary)] md:px-12 lg:px-20"
+      className="relative isolate flex min-h-[calc(100svh-140px)] items-center justify-center overflow-hidden px-6 pt-10 pb-28 text-[var(--text-primary)] md:min-h-[calc(100svh-180px)] md:px-12 md:pt-12 md:pb-32 lg:min-h-[calc(100svh-200px)] lg:px-20 lg:pb-36"
     >
       <AuroraBackground showSheen={false} />
       <ThemeToggle className="absolute right-6 top-6" />
@@ -54,9 +54,6 @@ export function ChatPanel({ onSubmit }: ChatPanelProps) {
       >
         <Logo />
         <div className="space-y-4">
-          <p className="text-sm font-semibold uppercase tracking-[var(--tracking-wide)] text-[var(--text-muted)]">
-            Riwayyaat Copilot
-          </p>
           <h1 className="text-4xl font-bold leading-tight tracking-[var(--tracking-tight)] text-balance text-[var(--text-primary)]">
             Ask any question about a hadith, its matn, or sanad.
           </h1>
