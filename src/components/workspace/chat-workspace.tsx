@@ -26,8 +26,10 @@ type HadithInsight = {
   details: {
     source: string;
     book: string;
+    bookNumber: number;
     chapter: string;
     grading: string;
+    hadithNumber: number;
     location: string;
   };
   chain: Array<{
@@ -152,8 +154,10 @@ const hadithInsights: HadithInsight[] = [
     details: {
       source: "Sahih al-Bukhari",
       book: "Book of Revelation",
+      bookNumber: 1,
       chapter: "How revelation began",
       grading: "Ṣaḥīḥ li-dhātih",
+      hadithNumber: 1,
       location: "Hadith 1",
     },
     chain: [
@@ -174,8 +178,10 @@ const hadithInsights: HadithInsight[] = [
     details: {
       source: "Sahih Muslim",
       book: "Virtues",
+      bookNumber: 45,
       chapter: "Against heedlessness",
       grading: "Ṣaḥīḥ li-ghayrih",
+      hadithNumber: 2998,
       location: "Hadith 2998",
     },
     chain: [
@@ -196,8 +202,10 @@ const hadithInsights: HadithInsight[] = [
     details: {
       source: "Jami' al-Tirmidhi",
       book: "Zuhd",
+      bookNumber: 36,
       chapter: "Warnings regarding dunya",
       grading: "Ḥasan li-dhātih",
+      hadithNumber: 1209,
       location: "Hadith 1209",
     },
     chain: [
@@ -218,8 +226,10 @@ const hadithInsights: HadithInsight[] = [
     details: {
       source: "Sunan Ibn Majah",
       book: "Fasting",
+      bookNumber: 7,
       chapter: "Virtue of feeding the fasting",
       grading: "Ḥasan li-ghayrih",
+      hadithNumber: 1746,
       location: "Hadith 1746",
     },
     chain: [
@@ -239,8 +249,10 @@ const hadithInsights: HadithInsight[] = [
     details: {
       source: "Musnad Ahmad",
       book: "Musnad al-Ansar",
+      bookNumber: 34,
       chapter: "Narrations of Anas",
       grading: "Ḍaʿīf",
+      hadithNumber: 12744,
       location: "Hadith 12744",
     },
     chain: [
@@ -260,9 +272,11 @@ const hadithInsights: HadithInsight[] = [
     details: {
       source: "Al-Daraqutni",
       book: "Fada'il",
+      bookNumber: 50,
       chapter: "Virtues of transmitters",
       grading: "Ḍaʿīf Jiddan",
-      location: "Report 32",
+      hadithNumber: 32,
+      location: "Hadith 32",
     },
     chain: [
       { name: "Muhammad ibn al-Fadl", descriptor: "Severely weak narrator" },
@@ -280,9 +294,11 @@ const hadithInsights: HadithInsight[] = [
     details: {
       source: "Shu'ab al-Iman",
       book: "Optional Prayers",
+      bookNumber: 24,
       chapter: "Praying after 'Asr",
       grading: "Munkar / Shādhdh / Maqlūb",
-      location: "Report 3221",
+      hadithNumber: 3221,
+      location: "Hadith 3221",
     },
     chain: [
       { name: "Abd al-Rahman ibn Ziyad al-Afrīqi", descriptor: "Weak narrator" },
@@ -300,9 +316,11 @@ const hadithInsights: HadithInsight[] = [
     details: {
       source: "Al-Mawdu'at",
       book: "Fabricated Promises",
+      bookNumber: 12,
       chapter: "Virtues fabricated regarding foods",
       grading: "Mawḍūʿ",
-      location: "Report 178",
+      hadithNumber: 178,
+      location: "Hadith 178",
     },
     chain: [
       { name: "Isma'il ibn Yahya al-Madani", descriptor: "Identified fabricator" },
@@ -893,6 +911,9 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                         <span className="rounded-full border border-[var(--chip-border)] bg-[var(--chip-bg)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)]">
                           {hadith.details.chapter}
                         </span>
+                        <span className="rounded-full border border-[var(--chip-border)] bg-[var(--chip-bg)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)]">
+                          Book {hadith.details.bookNumber}
+                        </span>
                       </div>
                     </article>
                   );
@@ -991,16 +1012,13 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
       <aside className="scrollbar-hide relative flex max-h-svh flex-col overflow-y-auto bg-[var(--background-alt)] px-6 py-8">
         <header className="flex items-center justify-between gap-2">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[var(--tracking-wide)] text-[var(--text-muted)]">
-              Hadith insights
-            </p>
             {currentHadith ? (
               <>
                 <h3 className="text-lg font-bold tracking-[var(--tracking-tight)] text-[var(--text-primary)]">
                   {currentHadith.details.source}
                 </h3>
                 <p className="text-sm font-semibold text-[var(--text-secondary)]">
-                  {currentHadith.details.location}
+                  Book {currentHadith.details.bookNumber}, Hadith {currentHadith.details.hadithNumber}
                 </p>
               </>
             ) : (
@@ -1015,7 +1033,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                 {nonProphetNarratorCount} narrators
               </span>
               <span className="rounded-full border border-[var(--border-soft)] bg-[var(--surface-card)] px-3 py-1">
-                {formattedCurrentGrading}
+                {currentHadith.details.chapter}
               </span>
             </div>
           )}
