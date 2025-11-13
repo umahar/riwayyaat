@@ -137,6 +137,69 @@ const hadithInsights: HadithInsight[] = [
       },
     ],
   },
+  {
+    id: "mercy",
+    matn:
+      "The Most Merciful has mercy on the merciful. Show mercy to those on the earth and the One above the heavens will show mercy to you. The Prophet repeated this exhortation while pointing to the bonds between believers, encouraging a softness that begins in the heart before it flows into deeds...",
+    sanad:
+      "Narrated by Abdullah ibn Amr, transmitted by Amr ibn Shu'ayb, narrated by his father Shu'ayb...",
+    details: {
+      source: "Sunan al-Tirmidhi",
+      book: "Righteousness and Maintaining Ties",
+      chapter: "Mercy towards creation",
+      grading: "Hasan",
+      location: "Hadith 1924",
+    },
+    chain: [
+      { name: "Imam al-Tirmidhi", descriptor: "Compiler" },
+      { name: "Qutaybah ibn Sa'id", descriptor: "Primary transmitter" },
+      { name: "Layth ibn Sa'd", descriptor: "Egyptian Imam" },
+      { name: "Abu Qilabah", descriptor: "Basran scholar" },
+      { name: "Abdullah ibn Amr", descriptor: "Companion" },
+    ],
+  },
+  {
+    id: "light",
+    matn:
+      "Those who gather in one of the houses of Allah, reciting the Book of Allah and studying it together, tranquility descends upon them, mercy envelops them, the angels surround them, and Allah mentions them to those near Him. The Messenger emphasized the serenity that settles over circles of remembrance, explaining how their light stretches to the heavens even when the gathering is small and humble...",
+    sanad:
+      "Narrated by Abu Huraira, transmitted by Abu Salih, narrated by Al-A'raj, reported by Imam Muslim...",
+    details: {
+      source: "Sahih Muslim",
+      book: "Remembrance",
+      chapter: "Virtues of gatherings of dhikr",
+      grading: "Sahih",
+      location: "Hadith 2699",
+    },
+    chain: [
+      { name: "Imam Muslim", descriptor: "Compiler" },
+      { name: "Yahya ibn Yahya", descriptor: "Primary transmitter" },
+      { name: "Abu Salih", descriptor: "Narrator" },
+      { name: "Al-A'raj", descriptor: "Tabi'i" },
+      { name: "Abu Huraira", descriptor: "Companion" },
+    ],
+  },
+  {
+    id: "trust",
+    matn:
+      "When trust is lost, await the Hour. The Prophet was asked how trust would be lost and he answered: when authority is given to those unworthy of it. He elaborated on how amanah is not merely a personal trait but the spine of communal integrity, and that societies crumble when posts become favors instead of responsibilities...",
+    sanad:
+      "Narrated by Abu Huraira, transmitted by Shu'ba, narrated by Qatada...",
+    details: {
+      source: "Sahih al-Bukhari",
+      book: "Knowledge",
+      chapter: "When authority is entrusted",
+      grading: "Sahih",
+      location: "Hadith 6496",
+    },
+    chain: [
+      { name: "Imam al-Bukhari", descriptor: "Compiler" },
+      { name: "Musaddad ibn Musarhad", descriptor: "Primary transmitter" },
+      { name: "Abu 'Awanah", descriptor: "Narrator" },
+      { name: "Qatada ibn Di'ama", descriptor: "Basran exegete" },
+      { name: "Abu Huraira", descriptor: "Companion" },
+    ],
+  },
 ];
 
 type ChatWorkspaceProps = {
@@ -169,7 +232,12 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
   );
   const [input, setInput] = useState("");
   const [hadithIndex, setHadithIndex] = useState(0);
-  const [expandedNarrator, setExpandedNarrator] = useState<string | null>(null);
+  const [expandedNarrators, setExpandedNarrators] = useState<Set<string>>(
+    () => new Set<string>(),
+  );
+  const [expandedMatnIds, setExpandedMatnIds] = useState<Set<string>>(
+    () => new Set<string>(),
+  );
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [leftWidth, setLeftWidth] = useState(320);
   const [rightWidth, setRightWidth] = useState(420);
@@ -298,10 +366,36 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
     }
   };
 
+  const handleCardClick = (index: number, id: string) => {
+    setHadithIndex(index);
+    setExpandedNarrators(new Set<string>());
+    setExpandedMatnIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleToggleNarrator = (name: string) => {
+    setExpandedNarrators((current) => {
+      const next = new Set(current);
+      if (next.has(name)) {
+        next.delete(name);
+      } else {
+        next.add(name);
+      }
+      return next;
+    });
+  };
+
 
   return (
     <section
-      className="grid min-h-svh w-full grid-cols-1 transition-[grid-template-columns] duration-300 lg:grid-cols-[25%_40%_35%]"
+      className="grid min-h-svh w-full grid-cols-1 bg-[#eef2f7] transition-[grid-template-columns] duration-300 lg:grid-cols-[25%_40%_35%]"
       style={
         isDesktop
           ? {
@@ -310,7 +404,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
           : undefined
       }
     >
-      <aside className="relative flex max-h-svh flex-col gap-6 overflow-y-auto border-r border-[var(--border-soft)] bg-[var(--background-alt)] px-4 py-6">
+      <aside className="relative flex max-h-svh flex-col gap-7 overflow-y-auto border-r border-[var(--border-soft)] bg-transparent px-6 py-8">
         <div className="flex items-center justify-between gap-3">
           {!leftCollapsed && (
             <div className="flex flex-1 items-center justify-between gap-2">
@@ -321,7 +415,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
           <button
             type="button"
             onClick={handleToggleLeft}
-            className="rounded-full border border-[var(--border-soft)] bg-[var(--surface-card)] p-2 text-xs"
+            className="rounded-full border border-slate-300 bg-white p-2 text-sm text-slate-600 shadow-sm"
             aria-label={leftCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             {leftCollapsed ? "→" : "←"}
@@ -332,76 +426,69 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
             <button
               type="button"
               onClick={onNewChat}
-              className="inline-flex items-center justify-center rounded-2xl bg-[var(--accent-emerald)] px-3 py-2 text-xs font-semibold text-[var(--accent-contrast)] transition hover:opacity-90"
+              className="inline-flex items-center justify-center rounded-[1.75rem] bg-[var(--accent-emerald)] px-4 py-2.5 text-sm font-semibold text-[var(--accent-contrast)] transition hover:opacity-90"
             >
               <span aria-hidden="true" className="mr-2">
                 ✦
               </span>
               New chat
             </button>
-            <div className="flex items-center justify-between rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-3 py-2 text-xs text-[var(--text-primary)]">
-              <div>
-                <p className="text-[0.6rem] uppercase tracking-[0.3em] text-[var(--text-muted)]">
-                  Hadith
-                </p>
-                <p className="font-semibold text-[var(--text-primary)]">
-                  {currentHadith.details.source}
-                </p>
-              </div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border-soft)] bg-[var(--surface-panel)] px-2 py-1 text-[0.65rem]">
-                <button
-                  type="button"
-                  onClick={handlePrevHadith}
-                  aria-label="Previous hadith"
-                >
-                  ←
-                </button>
-                <span>
-                  {hadithIndex + 1}/{hadithInsights.length}
-                </span>
-                <button
-                  type="button"
-                  onClick={handleNextHadith}
-                  aria-label="Next hadith"
-                >
-                  →
-                </button>
-              </div>
-            </div>
-            <div className="space-y-5">
-              <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-panel)] p-3 shadow-inner">
-                <p className="text-[0.6rem] font-semibold uppercase tracking-[0.25em] text-[var(--text-muted)]">
-                  Matn
-                </p>
-                <p className="mt-2 text-xs leading-relaxed text-[var(--text-secondary)]">
-                  {currentHadith.matn}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-panel)] p-3 shadow-inner">
-                <p className="text-[0.6rem] font-semibold uppercase tracking-[0.25em] text-[var(--text-muted)]">
-                  Sanad
-                </p>
-                <p className="mt-2 text-xs leading-relaxed text-[var(--text-secondary)]">
-                  {currentHadith.sanad}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-panel)] p-3 shadow-inner">
-                <p className="text-[0.6rem] font-semibold uppercase tracking-[0.25em] text-[var(--text-muted)]">
-                  Details
-                </p>
-                <dl className="mt-3 space-y-2 text-xs text-[var(--text-secondary)]">
-                  {Object.entries(currentHadith.details).map(([key, value]) => (
-                    <div key={key} className="flex justify-between gap-3">
-                      <dt className="uppercase tracking-[0.15em] text-[var(--text-subtle)]">
-                        {key}
-                      </dt>
-                      <dd className="text-right text-[var(--text-primary)]">
-                        {value}
-                      </dd>
+            <header className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-500">
+                Hadiths
+              </p>
+              <p className="text-base font-semibold text-slate-900">
+                {hadithInsights.length} entries
+              </p>
+            </header>
+            <div className="space-y-6">
+              {hadithInsights.map((hadith, index) => {
+                const isActive = hadithIndex === index;
+                const isExpanded = expandedMatnIds.has(hadith.id);
+                const truncated =
+                  hadith.matn.length > 220
+                    ? `${hadith.matn.slice(0, 220)}…`
+                    : hadith.matn;
+                const matnPreview = isExpanded ? hadith.matn : truncated;
+                return (
+                  <article
+                    key={hadith.id}
+                    onClick={() => handleCardClick(index, hadith.id)}
+                    className={`cursor-pointer rounded-3xl border bg-white px-5 py-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+                      isActive
+                        ? "border-emerald-300 shadow-lg ring-1 ring-emerald-200"
+                        : "border-slate-200"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.45em] text-slate-400">
+                          {hadith.details.location}
+                        </p>
+                        <p className="text-base font-semibold text-slate-900">
+                          {hadith.details.book}
+                        </p>
+                      </div>
+                      <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                        {hadith.details.source}
+                      </span>
                     </div>
-                  ))}
-                </dl>
-              </div>
+                    <div className="mt-4 space-y-3">
+                      <p className="text-sm leading-relaxed text-slate-600">
+                        {matnPreview}
+                      </p>
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                        {hadith.details.grading}
+                      </span>
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                        {hadith.details.chapter}
+                      </span>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           </>
         )}
@@ -530,7 +617,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
             </h4>
             <ul className="mt-4 space-y-4">
               {currentHadith.chain.map((node, index) => {
-                const isExpanded = expandedNarrator === node.name;
+                const isExpanded = expandedNarrators.has(node.name);
                 return (
                   <li key={node.name} className="relative pl-6">
                     {index !== 0 && (
@@ -538,11 +625,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                     )}
                     <button
                       type="button"
-                      onClick={() =>
-                        setExpandedNarrator((current) =>
-                          current === node.name ? null : node.name,
-                        )
-                      }
+                      onClick={() => handleToggleNarrator(node.name)}
                       className={`w-full rounded-2xl border px-4 py-3 text-left shadow-sm transition ${
                         isExpanded
                           ? "border-[var(--accent-emerald)] bg-[var(--background)]"
