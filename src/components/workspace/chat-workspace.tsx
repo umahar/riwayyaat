@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Dispatch,
+  SetStateAction,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Logo } from "@/components/ui/logo";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 
@@ -202,6 +210,11 @@ const hadithInsights: HadithInsight[] = [
   },
 ];
 
+const ICON_BUTTON_CLASSES =
+  "inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-soft)] bg-[var(--surface-card)] text-base text-[var(--text-secondary)] shadow-sm transition hover:-translate-y-0.5 hover:text-[var(--accent-emerald)]";
+const FILTER_BUTTON_BASE =
+  "inline-flex h-10 items-center gap-2 rounded-full border border-[var(--border-soft)] bg-[var(--surface-card)] px-4 text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)] shadow-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-emerald)]";
+
 type ChatWorkspaceProps = {
   initialPrompt: string;
   onNewChat: () => void;
@@ -231,19 +244,35 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
     createSeedMessages(initialPrompt),
   );
   const [input, setInput] = useState("");
-  const [hadithIndex, setHadithIndex] = useState(0);
+  const [hadithIndex, setHadithIndex] = useState<number | null>(null);
   const [expandedNarrators, setExpandedNarrators] = useState<Set<string>>(
     () => new Set<string>(),
   );
   const [expandedMatnIds, setExpandedMatnIds] = useState<Set<string>>(
     () => new Set<string>(),
   );
+  const [selectedGradings, setSelectedGradings] = useState<Set<string>>(
+    () => new Set<string>(),
+  );
+  const [selectedBooks, setSelectedBooks] = useState<Set<string>>(
+    () => new Set<string>(),
+  );
+  const [selectedSources, setSelectedSources] = useState<Set<string>>(
+    () => new Set<string>(),
+  );
+  const [isGradingMenuOpen, setIsGradingMenuOpen] = useState(false);
+  const [isBookMenuOpen, setIsBookMenuOpen] = useState(false);
+  const [isSourceMenuOpen, setIsSourceMenuOpen] = useState(false);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [leftWidth, setLeftWidth] = useState(320);
   const [rightWidth, setRightWidth] = useState(420);
   const [isDesktop, setIsDesktop] = useState(false);
 
   const previousLeftWidth = useRef(leftWidth);
+  const gradingMenuRef = useRef<HTMLDivElement | null>(null);
+  const bookMenuRef = useRef<HTMLDivElement | null>(null);
+  const sourceMenuRef = useRef<HTMLDivElement | null>(null);
+  const leftWidthInitialized = useRef(false);
   useEffect(() => {
     const mediaQuery = window.matchMedia("(min-width: 1024px)");
     const setMatch = () => setIsDesktop(mediaQuery.matches);
@@ -252,6 +281,23 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
     mediaQuery.addEventListener("change", setMatch);
 
     return () => mediaQuery.removeEventListener("change", setMatch);
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (gradingMenuRef.current && !gradingMenuRef.current.contains(target)) {
+        setIsGradingMenuOpen(false);
+      }
+      if (bookMenuRef.current && !bookMenuRef.current.contains(target)) {
+        setIsBookMenuOpen(false);
+      }
+      if (sourceMenuRef.current && !sourceMenuRef.current.contains(target)) {
+        setIsSourceMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const handleSend = () => {
@@ -272,22 +318,77 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
     setInput("");
   };
 
-  const currentHadith = useMemo(
-    () => hadithInsights[hadithIndex] ?? hadithInsights[0],
-    [hadithIndex],
+  const currentHadith = useMemo(() => {
+    if (hadithIndex === null) return null;
+    return hadithInsights[hadithIndex] ?? null;
+  }, [hadithIndex]);
+
+  const hadithIndexById = useMemo(() => {
+    return hadithInsights.reduce<Record<string, number>>((acc, hadith, index) => {
+      acc[hadith.id] = index;
+      return acc;
+    }, {});
+  }, []);
+
+  const gradingOptions = useMemo(
+    () =>
+      Array.from(new Set(hadithInsights.map((hadith) => hadith.details.grading))),
+    [],
   );
 
-  const handlePrevHadith = () =>
-    setHadithIndex((index) =>
-      index === 0 ? hadithInsights.length - 1 : index - 1,
-    );
-  const handleNextHadith = () =>
-    setHadithIndex((index) =>
-      index === hadithInsights.length - 1 ? 0 : index + 1,
-    );
+  const bookOptions = useMemo(
+    () => Array.from(new Set(hadithInsights.map((hadith) => hadith.details.book))),
+    [],
+  );
+
+  const sourceOptions = useMemo(
+    () => Array.from(new Set(hadithInsights.map((hadith) => hadith.details.source))),
+    [],
+  );
+
+  const filteredHadiths = useMemo(
+    () =>
+      hadithInsights.filter((hadith) => {
+        if (
+          selectedGradings.size > 0 &&
+          !selectedGradings.has(hadith.details.grading)
+        ) {
+          return false;
+        }
+        if (selectedBooks.size > 0 && !selectedBooks.has(hadith.details.book)) {
+          return false;
+        }
+        if (
+          selectedSources.size > 0 &&
+          !selectedSources.has(hadith.details.source)
+        ) {
+          return false;
+        }
+        return true;
+      }),
+    [selectedGradings, selectedBooks, selectedSources],
+  );
+
+  useEffect(() => {
+    if (!filteredHadiths.length) {
+      setHadithIndex(null);
+      return;
+    }
+    if (hadithIndex === null) return;
+    const selectedId = hadithInsights[hadithIndex]?.id;
+    if (!selectedId) {
+      setHadithIndex(null);
+      return;
+    }
+    const stillVisible = filteredHadiths.some((hadith) => hadith.id === selectedId);
+    if (!stillVisible) {
+      setHadithIndex(null);
+    }
+  }, [filteredHadiths, hadithIndex]);
 
   const LEFT_MIN = 260;
-  const LEFT_MAX = 420;
+  const LEFT_MAX = 640;
+  const LEFT_DEFAULT_RATIO = 0.3;
   const RIGHT_MIN = 360;
   const RIGHT_MAX = 520;
   const COLLAPSED_WIDTH = 72;
@@ -297,6 +398,18 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
 
   const effectiveLeftWidth = leftCollapsed ? COLLAPSED_WIDTH : leftWidth;
   const effectiveRightWidth = rightWidth;
+
+  useEffect(() => {
+    if (!isDesktop || leftCollapsed || leftWidthInitialized.current) return;
+    const idealWidth = clamp(
+      window.innerWidth * LEFT_DEFAULT_RATIO,
+      LEFT_MIN,
+      LEFT_MAX,
+    );
+    setLeftWidth(idealWidth);
+    previousLeftWidth.current = idealWidth;
+    leftWidthInitialized.current = true;
+  }, [isDesktop, leftCollapsed]);
 
   const dragState = useRef<{
     panel: "left" | "right";
@@ -366,8 +479,11 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
     }
   };
 
-  const handleCardClick = (index: number, id: string) => {
-    setHadithIndex(index);
+  const handleCardClick = (id: string) => {
+    const index = hadithIndexById[id];
+    if (typeof index === "number") {
+      setHadithIndex(index);
+    }
     setExpandedNarrators(new Set<string>());
     setExpandedMatnIds((current) => {
       const next = new Set(current);
@@ -392,10 +508,25 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
     });
   };
 
+  const toggleSetValue = (
+    value: string,
+    setter: Dispatch<SetStateAction<Set<string>>>,
+  ) => {
+    setter((current) => {
+      const next = new Set(current);
+      if (next.has(value)) {
+        next.delete(value);
+      } else {
+        next.add(value);
+      }
+      return next;
+    });
+  };
+
 
   return (
     <section
-      className="grid min-h-svh w-full grid-cols-1 bg-[#eef2f7] transition-[grid-template-columns] duration-300 lg:grid-cols-[25%_40%_35%]"
+      className="grid min-h-svh w-full grid-cols-1 bg-[var(--background)] transition-[grid-template-columns] duration-300 lg:grid-cols-[25%_40%_35%]"
       style={
         isDesktop
           ? {
@@ -407,15 +538,25 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
       <aside className="relative flex max-h-svh flex-col gap-7 overflow-y-auto border-r border-[var(--border-soft)] bg-transparent px-6 py-8">
         <div className="flex items-center justify-between gap-3">
           {!leftCollapsed && (
-            <div className="flex flex-1 items-center justify-between gap-2">
+              <div className="flex flex-1 items-center justify-between gap-3">
               <Logo className="scale-90 transform" />
-              <ThemeToggle className="shrink-0" />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={onNewChat}
+                  className={ICON_BUTTON_CLASSES}
+                  aria-label="Start a new chat"
+                >
+                  ✦
+                </button>
+                <ThemeToggle className="hover:-translate-y-0.5" />
+              </div>
             </div>
           )}
           <button
             type="button"
             onClick={handleToggleLeft}
-            className="rounded-full border border-slate-300 bg-white p-2 text-sm text-slate-600 shadow-sm"
+            className={ICON_BUTTON_CLASSES}
             aria-label={leftCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             {leftCollapsed ? "→" : "←"}
@@ -423,72 +564,216 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
         </div>
         {!leftCollapsed && (
           <>
-            <button
-              type="button"
-              onClick={onNewChat}
-              className="inline-flex items-center justify-center rounded-[1.75rem] bg-[var(--accent-emerald)] px-4 py-2.5 text-sm font-semibold text-[var(--accent-contrast)] transition hover:opacity-90"
-            >
-              <span aria-hidden="true" className="mr-2">
-                ✦
-              </span>
-              New chat
-            </button>
             <header className="space-y-1">
-              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-500">
-                Hadiths
-              </p>
-              <p className="text-base font-semibold text-slate-900">
-                {hadithInsights.length} entries
-              </p>
+              <div className="flex flex-nowrap items-center gap-2 whitespace-nowrap sm:gap-3">
+                <div className="flex flex-col whitespace-nowrap">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+                    Hadiths
+                  </p>
+                  <p className="text-base font-semibold text-[var(--text-primary)]">
+                    {filteredHadiths.length} results
+                  </p>
+                </div>
+                <div className="flex flex-nowrap items-center gap-2 sm:gap-3">
+                  <div className="relative" ref={gradingMenuRef}>
+                    <button
+                      type="button"
+                      onClick={() => setIsGradingMenuOpen((open) => !open)}
+                      className={`${FILTER_BUTTON_BASE} ${
+                        selectedGradings.size > 0
+                          ? "border-[var(--accent-emerald)] text-[var(--accent-emerald)]"
+                          : "text-[var(--text-muted)]"
+                      }`}
+                    >
+                      <span>Grade</span>
+                      <span className="text-xs">▾</span>
+                    </button>
+                    {isGradingMenuOpen && (
+                      <div className="absolute right-0 top-full z-10 mt-2 w-48 rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-popover)] p-3 shadow-xl">
+                        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[var(--text-muted)]">
+                          Select grade
+                        </p>
+                        <div className="mt-2 space-y-1">
+                          {gradingOptions.map((grade) => (
+                            <label
+                              key={grade}
+                              className="flex items-start gap-2 rounded-xl px-2 py-1 text-sm text-[var(--text-primary)] hover:bg-[var(--surface-panel)]"
+                            >
+                              <input
+                                type="checkbox"
+                                className="rounded border-[var(--border-soft)] text-[var(--accent-emerald)] focus:ring-[var(--accent-emerald)]"
+                                checked={selectedGradings.has(grade)}
+                                onChange={() =>
+                                  toggleSetValue(grade, setSelectedGradings)
+                                }
+                              />
+                              <span className="flex-1 whitespace-normal break-words text-left leading-snug">
+                                {grade}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedGradings(new Set<string>())}
+                          className="mt-3 text-xs font-semibold text-emerald-600 hover:text-emerald-700"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <div className="relative" ref={bookMenuRef}>
+                    <button
+                      type="button"
+                      onClick={() => setIsBookMenuOpen((open) => !open)}
+                      className={`${FILTER_BUTTON_BASE} ${
+                        selectedBooks.size > 0
+                          ? "border-[var(--accent-emerald)] text-[var(--accent-emerald)]"
+                          : "text-[var(--text-muted)]"
+                      }`}
+                    >
+                      <span>Book</span>
+                      <span className="text-xs">▾</span>
+                    </button>
+                    {isBookMenuOpen && (
+                      <div className="absolute right-0 top-full z-10 mt-2 w-48 rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-popover)] p-3 shadow-xl">
+                        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[var(--text-muted)]">
+                          Select book
+                        </p>
+                        <div className="mt-2 space-y-1">
+                          {bookOptions.map((book) => (
+                            <label
+                              key={book}
+                              className="flex items-start gap-2 rounded-xl px-2 py-1 text-sm text-[var(--text-primary)] hover:bg-[var(--surface-panel)]"
+                            >
+                              <input
+                                type="checkbox"
+                                className="rounded border-[var(--border-soft)] text-[var(--accent-emerald)] focus:ring-[var(--accent-emerald)]"
+                                checked={selectedBooks.has(book)}
+                                onChange={() =>
+                                  toggleSetValue(book, setSelectedBooks)
+                                }
+                              />
+                              <span className="flex-1 whitespace-normal break-words text-left leading-snug">
+                                {book}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedBooks(new Set<string>())}
+                          className="mt-3 text-xs font-semibold text-emerald-600 hover:text-emerald-700"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <div className="relative" ref={sourceMenuRef}>
+                    <button
+                      type="button"
+                      onClick={() => setIsSourceMenuOpen((open) => !open)}
+                      className={`${FILTER_BUTTON_BASE} ${
+                        selectedSources.size > 0
+                          ? "border-[var(--accent-emerald)] text-[var(--accent-emerald)]"
+                          : "text-[var(--text-muted)]"
+                      }`}
+                    >
+                      <span>Source</span>
+                      <span className="text-xs">▾</span>
+                    </button>
+                    {isSourceMenuOpen && (
+                      <div className="absolute right-0 top-full z-10 mt-2 w-48 rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-popover)] p-3 shadow-xl">
+                        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[var(--text-muted)]">
+                          Select source
+                        </p>
+                        <div className="mt-2 space-y-1">
+                          {sourceOptions.map((source) => (
+                            <label
+                              key={source}
+                              className="flex items-start gap-2 rounded-xl px-2 py-1 text-sm text-[var(--text-primary)] hover:bg-[var(--surface-panel)]"
+                            >
+                              <input
+                                type="checkbox"
+                                className="rounded border-[var(--border-soft)] text-[var(--accent-emerald)] focus:ring-[var(--accent-emerald)]"
+                                checked={selectedSources.has(source)}
+                                onChange={() =>
+                                  toggleSetValue(source, setSelectedSources)
+                                }
+                              />
+                              <span className="flex-1 whitespace-normal break-words text-left leading-snug">
+                                {source}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedSources(new Set<string>())}
+                          className="mt-3 text-xs font-semibold text-emerald-600 hover:text-emerald-700"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </header>
             <div className="space-y-6">
-              {hadithInsights.map((hadith, index) => {
-                const isActive = hadithIndex === index;
-                const isExpanded = expandedMatnIds.has(hadith.id);
-                const truncated =
-                  hadith.matn.length > 220
-                    ? `${hadith.matn.slice(0, 220)}…`
-                    : hadith.matn;
-                const matnPreview = isExpanded ? hadith.matn : truncated;
-                return (
-                  <article
-                    key={hadith.id}
-                    onClick={() => handleCardClick(index, hadith.id)}
-                    className={`cursor-pointer rounded-3xl border bg-white px-5 py-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
-                      isActive
-                        ? "border-emerald-300 shadow-lg ring-1 ring-emerald-200"
-                        : "border-slate-200"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.45em] text-slate-400">
-                          {hadith.details.location}
-                        </p>
-                        <p className="text-base font-semibold text-slate-900">
-                          {hadith.details.book}
+              {filteredHadiths.length > 0 ? (
+                filteredHadiths.map((hadith) => {
+                  const isActive = currentHadith?.id === hadith.id;
+                  const isExpanded = expandedMatnIds.has(hadith.id);
+                  const truncated =
+                    hadith.matn.length > 220
+                      ? `${hadith.matn.slice(0, 220)}…`
+                      : hadith.matn;
+                  const matnPreview = isExpanded ? hadith.matn : truncated;
+                  return (
+                    <article
+                      key={hadith.id}
+                      onClick={() => handleCardClick(hadith.id)}
+                      className={`cursor-pointer rounded-3xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-5 py-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+                        isActive
+                          ? "border-[var(--accent-emerald)] shadow-lg"
+                          : ""
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#1fb276]">
+                            {hadith.details.location}
+                          </p>
+                          <p className="text-base font-semibold text-[var(--text-primary)]">
+                            {hadith.details.book}
+                          </p>
+                        </div>
+                        <span className="rounded-full bg-[var(--surface-panel)] px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                          {hadith.details.source}
+                        </span>
+                      </div>
+                      <div className="mt-4 space-y-3">
+                        <p className="text-sm leading-relaxed text-[var(--text-secondary)]">
+                          {matnPreview}
                         </p>
                       </div>
-                      <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
-                        {hadith.details.source}
-                      </span>
-                    </div>
-                    <div className="mt-4 space-y-3">
-                      <p className="text-sm leading-relaxed text-slate-600">
-                        {matnPreview}
-                      </p>
-                    </div>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                        {hadith.details.grading}
-                      </span>
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                        {hadith.details.chapter}
-                      </span>
-                    </div>
-                  </article>
-                );
-              })}
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <span className="rounded-full bg-[var(--surface-panel)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)]">
+                          {hadith.details.grading}
+                        </span>
+                        <span className="rounded-full bg-[var(--surface-panel)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)]">
+                          {hadith.details.chapter}
+                        </span>
+                      </div>
+                    </article>
+                  );
+                })
+              ) : (
+                <p className="text-sm text-[var(--text-muted)]">No hadith match the selected filters.</p>
+              )}
             </div>
           </>
         )}
@@ -583,80 +868,81 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
             <p className="text-xs font-semibold uppercase tracking-[var(--tracking-wide)] text-[var(--text-muted)]">
               Hadith insights
             </p>
-            <h3 className="text-lg font-bold tracking-[var(--tracking-tight)] text-[var(--text-primary)]">
-              {currentHadith.details.source}
-            </h3>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border-soft)] bg-[var(--surface-card)] px-3 py-1 text-xs">
-              <button
-                type="button"
-                onClick={handlePrevHadith}
-                aria-label="Previous hadith"
-              >
-                ←
-              </button>
-              <span>
-                {hadithIndex + 1}/{hadithInsights.length}
-              </span>
-              <button
-                type="button"
-                onClick={handleNextHadith}
-                aria-label="Next hadith"
-              >
-                →
-              </button>
-            </div>
+            {currentHadith ? (
+              <>
+                <h3 className="text-lg font-bold tracking-[var(--tracking-tight)] text-[var(--text-primary)]">
+                  {currentHadith.details.source}
+                </h3>
+                <p className="text-sm font-semibold text-[var(--text-secondary)]">
+                  {currentHadith.details.location}
+                </p>
+              </>
+            ) : (
+              <h3 className="text-lg font-semibold text-[var(--text-secondary)]">
+                Select a hadith to view isnad
+              </h3>
+            )}
           </div>
         </header>
 
-        <div className="mt-6 space-y-6 overflow-y-auto pr-2">
-          <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-panel)] p-4 shadow-lg">
-            <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
-              Isnad chain
-            </h4>
-            <ul className="mt-4 space-y-4">
-              {currentHadith.chain.map((node, index) => {
-                const isExpanded = expandedNarrators.has(node.name);
-                return (
-                  <li key={node.name} className="relative pl-6">
-                    {index !== 0 && (
-                      <span className="absolute -left-2 top-0 h-full w-px bg-[var(--border-soft)]" />
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => handleToggleNarrator(node.name)}
-                      className={`w-full rounded-2xl border px-4 py-3 text-left shadow-sm transition ${
-                        isExpanded
-                          ? "border-[var(--accent-emerald)] bg-[var(--background)]"
-                          : "border-[var(--border-soft)] bg-[var(--background)]"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-semibold text-[var(--text-primary)]">
-                            {node.name}
-                          </p>
-                          <p className="text-xs text-[var(--text-muted)]">
-                            {node.descriptor}
-                          </p>
-                        </div>
-                        <span className="text-lg">
-                          {isExpanded ? "−" : "+"}
-                        </span>
-                      </div>
-                      {isExpanded && (
-                        <p className="mt-3 text-xs leading-relaxed text-[var(--text-secondary)]">
-                          {node.bio}
-                        </p>
+        {currentHadith ? (
+          <div className="mt-6 space-y-6 overflow-y-auto pr-2">
+            <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-panel)] p-4 shadow-lg">
+              <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+                Isnad chain
+              </h4>
+              <ul className="mt-4 space-y-4">
+                {currentHadith.chain.map((node, index) => {
+                  const isExpanded = expandedNarrators.has(node.name);
+                  return (
+                    <li key={node.name} className="relative pl-6">
+                      {index !== 0 && (
+                        <span className="absolute -left-2 top-0 h-full w-px bg-[var(--border-soft)]" />
                       )}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleNarrator(node.name)}
+                        className={`w-full rounded-2xl border px-4 py-3 text-left shadow-sm transition ${
+                          isExpanded
+                            ? "border-[var(--accent-emerald)] bg-[var(--background)]"
+                            : "border-[var(--border-soft)] bg-[var(--background)]"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-[var(--text-primary)]">
+                              {node.name}
+                            </p>
+                            <p className="text-xs text-[var(--text-muted)]">
+                              {node.descriptor}
+                            </p>
+                          </div>
+                          <span className="text-lg">
+                            {isExpanded ? "−" : "+"}
+                          </span>
+                        </div>
+                        {isExpanded && (
+                          <p className="mt-3 text-xs leading-relaxed text-[var(--text-secondary)]">
+                            {node.bio}
+                          </p>
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="mt-8 rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-panel)] p-5 text-sm text-[var(--text-secondary)]">
+            <p className="font-semibold text-[var(--text-primary)]">
+              No hadith selected
+            </p>
+            <p className="mt-2 leading-relaxed">
+              Choose a hadith card on the left to preview its matn excerpt and view the full isnad chain here.
+            </p>
+          </div>
+        )}
         {isDesktop && (
           <div
             role="separator"
