@@ -461,7 +461,6 @@ const narratorLifespans: Record<string, string> = {
   "Nu'man ibn Bashir": "d. 65 AH",
   "Abu al-Zinad": "d. 130 AH",
   "Shahr ibn Hawshab": "d. 112 AH",
-  "Anas ibn Malik": "1–93 AH",
   "Khalid ibn Ilyas": "2nd c. AH",
   "Abu Ghassan Muhammad ibn Mutarrif": "d. 180 AH",
   "Abu Salih al-Samman": "d. 101 AH",
@@ -2450,7 +2449,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                     !isProphet && node.reliability
                       ? reliabilityTierInfo[node.reliability]
                       : null;
-                  const nodeLifespan = narratorLifespans[node.name] ?? node.lifespan;
+                  const nodeLifespan = narratorLifespans[node.name];
                   const connectorColor = !isProphet && reliabilityInfo
                     ? reliabilityInfo.background
                     : "var(--border-soft)";
