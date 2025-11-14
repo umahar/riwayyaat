@@ -9,6 +9,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { getTheme } from "@/theme";
 
 type Theme = "light" | "dark";
 type ThemeContextValue = {
@@ -32,6 +33,10 @@ function applyTheme(value: Theme) {
   const root = document.documentElement;
   root.dataset.theme = value;
   root.style.setProperty("color-scheme", value);
+  const theme = getTheme(value);
+  Object.entries(theme.colors).forEach(([key, val]) => {
+    root.style.setProperty(`--${key.replace(/[A-Z]/g, (match) => `-${match.toLowerCase()}`)}`, val);
+  });
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {

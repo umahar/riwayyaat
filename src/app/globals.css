@@ -1,84 +1,46 @@
 @import "tailwindcss";
 
-:root,
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --background: #030712;
-  --background-alt: #050f1f;
-  --surface-panel: rgba(5, 12, 28, 0.75);
-  --surface-card: rgba(255, 255, 255, 0.08);
-  --surface-input: rgba(0, 0, 0, 0.35);
-  --surface-popover: rgba(3, 7, 18, 0.9);
-  --workspace-card-bg: rgba(255, 255, 255, 0.08);
-  --workspace-card-border: rgba(255, 255, 255, 0.18);
-  --chip-bg: rgba(255, 255, 255, 0.08);
-  --chip-border: rgba(255, 255, 255, 0.18);
-  --border-soft: rgba(255, 255, 255, 0.18);
-  --border-strong: rgba(255, 255, 255, 0.35);
-  --text-primary: #f8fafc;
-  --text-secondary: rgba(248, 250, 252, 0.82);
-  --text-muted: rgba(248, 250, 252, 0.65);
-  --text-subtle: rgba(248, 250, 252, 0.45);
-  --accent-emerald: #34d399;
-  --accent-cyan: #0ea5e9;
-  --accent-contrast: #041b11;
-  --cta-primary-bg: #f0fdf4;
-  --cta-primary-text: #064e3b;
-  --cta-primary-hover: #bbf7d0;
-  --cta-secondary-border: rgba(255, 255, 255, 0.35);
-  --cta-secondary-hover-border: rgba(255, 255, 255, 0.9);
-  --cta-secondary-text: rgba(255, 255, 255, 0.85);
-  --aurora-top: rgba(16, 185, 129, 0.35);
-  --aurora-bottom: rgba(14, 116, 144, 0.45);
-  --aurora-blur-one: rgba(52, 211, 153, 0.85);
-  --aurora-blur-two: rgba(14, 165, 233, 0.8);
-  --sheen: rgba(255, 255, 255, 0.08);
-  --shadow-panel: rgba(3, 7, 18, 0.8);
-  --input-border: rgba(255, 255, 255, 0.2);
-  --input-border-focus: rgba(255, 255, 255, 0.85);
-  --example-text: rgba(248, 250, 252, 0.85);
-}
+@layer base {
+  :root,
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --background: #030712;
+    --background-alt: #050f1f;
+    --surface-panel: rgba(5, 12, 28, 0.75);
+    --surface-card: rgba(255, 255, 255, 0.08);
+    --surface-input: rgba(0, 0, 0, 0.35);
+    --surface-popover: rgba(3, 7, 18, 0.9);
+    --workspace-card-bg: rgba(255, 255, 255, 0.08);
+    --workspace-card-border: rgba(255, 255, 255, 0.18);
+    --chip-bg: rgba(255, 255, 255, 0.08);
+    --chip-border: rgba(255, 255, 255, 0.18);
+    --border-soft: rgba(255, 255, 255, 0.18);
+    --border-strong: rgba(255, 255, 255, 0.35);
+    --text-primary: #f8fafc;
+    --text-secondary: rgba(248, 250, 252, 0.82);
+    --text-muted: rgba(248, 250, 252, 0.65);
+    --text-subtle: rgba(248, 250, 252, 0.45);
+    --accent-emerald: #34d399;
+    --accent-cyan: #0ea5e9;
+    --accent-contrast: #041b11;
+    --cta-primary-bg: #f0fdf4;
+    --cta-primary-text: #064e3b;
+    --cta-primary-hover: #bbf7d0;
+    --cta-secondary-border: rgba(255, 255, 255, 0.35);
+    --cta-secondary-hover-border: rgba(255, 255, 255, 0.9);
+    --cta-secondary-text: rgba(255, 255, 255, 0.85);
+    --aurora-top: rgba(16, 185, 129, 0.35);
+    --aurora-bottom: rgba(14, 116, 144, 0.45);
+    --aurora-blur-one: rgba(52, 211, 153, 0.85);
+    --aurora-blur-two: rgba(14, 165, 233, 0.8);
+    --sheen: rgba(255, 255, 255, 0.08);
+    --shadow-panel: rgba(3, 7, 18, 0.8);
+    --input-border: rgba(255, 255, 255, 0.2);
+    --input-border-focus: rgba(255, 255, 255, 0.85);
+    --example-text: rgba(248, 250, 252, 0.85);
+  }
 
-:root[data-theme="light"] {
-  color-scheme: light;
-  --background: #f4faf7;
-  --background-alt: #e7f4ff;
-  --surface-panel: rgba(255, 255, 255, 0.92);
-  --surface-card: rgba(15, 23, 42, 0.06);
-  --surface-input: rgba(255, 255, 255, 0.94);
-  --surface-popover: rgba(255, 255, 255, 0.96);
-  --workspace-card-bg: #ffffff;
-  --workspace-card-border: rgba(15, 23, 42, 0.08);
-  --chip-bg: rgba(15, 23, 42, 0.05);
-  --chip-border: rgba(15, 23, 42, 0.12);
-  --border-soft: rgba(15, 23, 42, 0.12);
-  --border-strong: rgba(15, 23, 42, 0.25);
-  --text-primary: #0f172a;
-  --text-secondary: rgba(15, 23, 42, 0.85);
-  --text-muted: rgba(15, 23, 42, 0.65);
-  --text-subtle: rgba(15, 23, 42, 0.5);
-  --accent-emerald: #10b981;
-  --accent-cyan: #0ea5e9;
-  --accent-contrast: #f8fafc;
-  --cta-primary-bg: #0f172a;
-  --cta-primary-text: #f8fafc;
-  --cta-primary-hover: #1d2841;
-  --cta-secondary-border: rgba(15, 23, 42, 0.2);
-  --cta-secondary-hover-border: rgba(15, 23, 42, 0.45);
-  --cta-secondary-text: rgba(15, 23, 42, 0.85);
-  --aurora-top: rgba(14, 165, 233, 0.35);
-  --aurora-bottom: rgba(16, 185, 129, 0.45);
-  --aurora-blur-one: rgba(16, 185, 129, 0.35);
-  --aurora-blur-two: rgba(14, 165, 233, 0.35);
-  --sheen: rgba(255, 255, 255, 0.6);
-  --shadow-panel: rgba(15, 23, 42, 0.25);
-  --input-border: rgba(15, 23, 42, 0.15);
-  --input-border-focus: rgba(15, 23, 42, 0.6);
-  --example-text: rgba(15, 23, 42, 0.85);
-}
-
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme]) {
+  :root[data-theme="light"] {
     color-scheme: light;
     --background: #f4faf7;
     --background-alt: #e7f4ff;
@@ -114,6 +76,46 @@
     --input-border: rgba(15, 23, 42, 0.15);
     --input-border-focus: rgba(15, 23, 42, 0.6);
     --example-text: rgba(15, 23, 42, 0.85);
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme]) {
+      color-scheme: light;
+      --background: #f4faf7;
+      --background-alt: #e7f4ff;
+      --surface-panel: rgba(255, 255, 255, 0.92);
+      --surface-card: rgba(15, 23, 42, 0.06);
+      --surface-input: rgba(255, 255, 255, 0.94);
+      --surface-popover: rgba(255, 255, 255, 0.96);
+      --workspace-card-bg: #ffffff;
+      --workspace-card-border: rgba(15, 23, 42, 0.08);
+      --chip-bg: rgba(15, 23, 42, 0.05);
+      --chip-border: rgba(15, 23, 42, 0.12);
+      --border-soft: rgba(15, 23, 42, 0.12);
+      --border-strong: rgba(15, 23, 42, 0.25);
+      --text-primary: #0f172a;
+      --text-secondary: rgba(15, 23, 42, 0.85);
+      --text-muted: rgba(15, 23, 42, 0.65);
+      --text-subtle: rgba(15, 23, 42, 0.5);
+      --accent-emerald: #10b981;
+      --accent-cyan: #0ea5e9;
+      --accent-contrast: #f8fafc;
+      --cta-primary-bg: #0f172a;
+      --cta-primary-text: #f8fafc;
+      --cta-primary-hover: #1d2841;
+      --cta-secondary-border: rgba(15, 23, 42, 0.2);
+      --cta-secondary-hover-border: rgba(15, 23, 42, 0.45);
+      --cta-secondary-text: rgba(15, 23, 42, 0.85);
+      --aurora-top: rgba(14, 165, 233, 0.35);
+      --aurora-bottom: rgba(16, 185, 129, 0.45);
+      --aurora-blur-one: rgba(16, 185, 129, 0.35);
+      --aurora-blur-two: rgba(14, 165, 233, 0.35);
+      --sheen: rgba(255, 255, 255, 0.6);
+      --shadow-panel: rgba(15, 23, 42, 0.25);
+      --input-border: rgba(15, 23, 42, 0.15);
+      --input-border-focus: rgba(15, 23, 42, 0.6);
+      --example-text: rgba(15, 23, 42, 0.85);
+    }
   }
 }
 
