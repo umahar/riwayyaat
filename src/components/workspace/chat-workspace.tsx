@@ -1501,6 +1501,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
   const [leftWidth, setLeftWidth] = useState(320);
   const [rightWidth, setRightWidth] = useState(420);
   const [isDesktop, setIsDesktop] = useState(false);
+  const [isNarrationDetailsOpen, setIsNarrationDetailsOpen] = useState(false);
 
   const previousLeftWidth = useRef(leftWidth);
   const gradingMenuRef = useRef<HTMLDivElement | null>(null);
@@ -1775,6 +1776,10 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
       return next;
     });
   };
+
+  useEffect(() => {
+    setIsNarrationDetailsOpen(false);
+  }, [hadithIndex]);
 
   const toggleSetValue = (
     value: string,
@@ -2167,9 +2172,6 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
           </div>
           {currentHadith && (
             <div className="flex flex-col items-end gap-1 text-xs font-semibold text-[var(--text-secondary)]">
-              <span className="rounded-full border border-[#1fb276]/30 bg-[#1fb276]/15 px-3 py-1 text-[#0d3525] dark:border-[#1fb276]/40 dark:bg-[#1fb276]/20 dark:text-[#b6f5da]">
-                {nonProphetNarratorCount} narrators
-              </span>
               <span className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-3 py-2 text-right">
                 {currentSourceAuthor ? (
                   <>
@@ -2192,7 +2194,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
           <>
             <div className="my-4 h-px w-full bg-[var(--border-soft)]" />
             <div className="scrollbar-hide mt-4 space-y-6 overflow-y-auto pr-2">
-              <section className="grid gap-4 text-left text-xs text-[var(--text-secondary)] sm:grid-cols-2 lg:grid-cols-3">
+              <section className="grid gap-4 text-left text-xs text-[var(--text-secondary)] sm:grid-cols-2">
                 <div className="space-y-3 rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-4 py-3">
                   <p className="text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
                     Attribution Type
@@ -2219,40 +2221,56 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                     ),
                   )}
                 </div>
-                <div className="space-y-3 rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-4 py-3">
-                  <p className="text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
-                    Narration Level
-                  </p>
-                  <div>
-                    <p className="font-semibold text-[var(--text-primary)]">
-                      {currentNarrationLevelInfo?.title ?? "Not classified"}
-                    </p>
-                    <p className="text-[var(--text-secondary)]">
-                      {currentNarrationLevelInfo?.description || "Narration level pending further review."}
-                    </p>
-                  </div>
-                </div>
               </section>
-              <div className="flex flex-col items-center gap-2 text-center">
-                <span
-                  className="rounded-full px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em]"
-                  style={
-                    currentGradingStyle
-                      ? {
-                        backgroundColor: currentGradingStyle.background,
-                        color: currentGradingStyle.color,
-                        boxShadow: `0 10px 25px ${currentGradingStyle.background}33`,
-                      }
-                    : undefined
-                }
-              >
-                {formattedCurrentGrading}
-              </span>
-                {currentGradingStyle?.description && (
-                  <p className="max-w-sm text-xs text-[var(--text-secondary)]">
-                    {currentGradingStyle.description}
-                  </p>
-                )}
+              <div className="grid gap-4 text-left text-xs text-[var(--text-secondary)] md:grid-cols-[0.65fr_0.35fr] items-start">
+                <div className="space-y-2">
+                  <span
+                    className="inline-flex rounded-full px-4 py-1 text-xs font-semibold uppercase tracking-[0.18em]"
+                    style={
+                      currentGradingStyle
+                        ? {
+                          backgroundColor: currentGradingStyle.background,
+                          color: currentGradingStyle.color,
+                          boxShadow: `0 10px 25px ${currentGradingStyle.background}1a`,
+                        }
+                        : undefined
+                    }
+                  >
+                    {formattedCurrentGrading}
+                  </span>
+                  {currentGradingStyle?.description && (
+                    <p className="mt-2 text-sm text-[var(--text-secondary)]">
+                      {currentGradingStyle.description}
+                    </p>
+                  )}
+                </div>
+                <div className="flex flex-col items-end gap-2 text-right text-sm font-semibold text-[var(--text-primary)]">
+                  <span>{nonProphetNarratorCount} narrators</span>
+                  {currentNarrationLevelInfo && (
+                    <div className="w-full rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-3 py-2 text-left text-xs text-[var(--text-secondary)]">
+                      <p className="text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                        Narration Level
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setIsNarrationDetailsOpen((prev) => !prev)
+                        }
+                        className="mt-1 flex w-full items-center justify-between text-sm font-semibold text-[var(--text-primary)]"
+                      >
+                        {currentNarrationLevelInfo.title}
+                        <span className="text-[var(--text-muted)] text-xs">
+                          {isNarrationDetailsOpen ? "▴" : "▾"}
+                        </span>
+                      </button>
+                      {isNarrationDetailsOpen && (
+                        <p className="mt-1 text-[var(--text-secondary)]">
+                          {currentNarrationLevelInfo.description}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-panel)] p-4 shadow-lg">
                 <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
