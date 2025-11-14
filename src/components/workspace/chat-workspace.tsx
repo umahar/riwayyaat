@@ -26,6 +26,21 @@ type NarrationLevel =
   | "gharib"
   | "fard";
 
+type ReliabilityTier =
+  | "thiqah"
+  | "saduq"
+  | "layyin"
+  | "matruk"
+  | "kadhdhab"
+  | "majhul_ayn"
+  | "majhul_hal"
+  | "mukhadram";
+
+type SourceAuthorInfo = {
+  name: string;
+  lifespan: string;
+};
+
 type NarratorTier =
   | "sahabi"
   | "tabi"
@@ -54,6 +69,7 @@ type HadithInsight = {
     descriptor?: string;
     type?: "prophet";
     classification?: NarratorTier;
+    reliability?: ReliabilityTier;
   }>;
   sourceTypes: string[];
   chainTypes: string[];
@@ -242,6 +258,34 @@ const narrationLevelInfo: Record<
   },
 };
 
+const sourceAuthorMap: Record<string, SourceAuthorInfo> = {
+  "Sahih al-Bukhari": { name: "Imam al-Bukhari", lifespan: "194–256 AH" },
+  "Sahih Muslim": { name: "Imam Muslim", lifespan: "204–261 AH" },
+  "Sunan al-Tirmidhi": { name: "Imam al-Tirmidhi", lifespan: "209–279 AH" },
+  "Sunan Abi Dawud": { name: "Imam Abu Dawud", lifespan: "202–275 AH" },
+  "Sunan al-Nasa'i": { name: "Imam al-Nasa'i", lifespan: "214–303 AH" },
+  "Sunan Ibn Majah": { name: "Imam Ibn Majah", lifespan: "209–273 AH" },
+  "Musnad Ahmad": { name: "Imam Ahmad ibn Hanbal", lifespan: "164–241 AH" },
+  "Musannaf Ibn Abi Shaybah": { name: "Ibn Abi Shaybah", lifespan: "159–235 AH" },
+  "Kitab al-Zuhd (Ibn al-Mubarak)": {
+    name: "Abdullah ibn al-Mubarak",
+    lifespan: "118–181 AH",
+  },
+  "Shu'ab al-Iman": { name: "Imam al-Bayhaqi", lifespan: "384–458 AH" },
+  "Al-Bayhaqi, Shu'ab al-Iman": { name: "Imam al-Bayhaqi", lifespan: "384–458 AH" },
+  "Sunan al-Kubra (al-Bayhaqi)": { name: "Imam al-Bayhaqi", lifespan: "384–458 AH" },
+  "Sunan al-Daraqutni": { name: "Imam al-Daraqutni", lifespan: "306–385 AH" },
+  "Al-Daraqutni, al-Ilal": { name: "Imam al-Daraqutni", lifespan: "306–385 AH" },
+  "Al-Ilal Ibn Abi Hatim": { name: "Ibn Abi Hatim", lifespan: "240–327 AH" },
+  "Al-Mu'jam al-Awsat": { name: "Imam al-Tabarani", lifespan: "260–360 AH" },
+  "Al-Jami' al-Saghir": { name: "Imam al-Suyuti", lifespan: "849–911 AH" },
+  "Sahih Ibn Hibban": { name: "Ibn Hibban", lifespan: "270–354 AH" },
+  "Ibn Hibban, al-Majruhin": { name: "Ibn Hibban", lifespan: "270–354 AH" },
+  "Ibn al-Jawzi, al-Mawdu'at": { name: "Ibn al-Jawzi", lifespan: "508–597 AH" },
+  "Al-Suyuti, al-La'ali al-Masnu'a": { name: "Imam al-Suyuti", lifespan: "849–911 AH" },
+  "Musnad al-Bazzar": { name: "Imam al-Bazzar", lifespan: "210–292 AH" },
+};
+
 const narratorTierInfo: Record<
   NarratorTier,
   { title: string; description: string }
@@ -281,6 +325,74 @@ const narratorTierInfo: Record<
     description: "A narrator formally authorized to transmit specific chains.",
   },
 };
+
+const reliabilityTierInfo: Record<
+  ReliabilityTier,
+  {
+    title: string;
+    description: string;
+    badge: string;
+    background: string;
+    color: string;
+  }
+> = {
+  thiqah: {
+    title: "Thiqah (Trustworthy)",
+    description: "Strong memory with impeccable character.",
+    badge: "Thiqah",
+    background: "#065f46",
+    color: "#ecfdf5",
+  },
+  saduq: {
+    title: "Ṣadūq (Truthful)",
+    description: "Good character with slightly lighter memory.",
+    badge: "Ṣadūq",
+    background: "#15803d",
+    color: "#ecfdf5",
+  },
+  layyin: {
+    title: "Layyin (Soft/Weak)",
+    description: "Weak memory requiring support.",
+    badge: "Layyin",
+    background: "#f97316",
+    color: "#fff7ed",
+  },
+  matruk: {
+    title: "Matrūk (Abandoned)",
+    description: "Extremely weak; narrations are left aside.",
+    badge: "Matrūk",
+    background: "#ea580c",
+    color: "#fff7ed",
+  },
+  kadhdhab: {
+    title: "Kādhdhāb (Liar)",
+    description: "Accused of fabricating hadith.",
+    badge: "Kādhdhāb",
+    background: "#7f1d1d",
+    color: "#fee2e2",
+  },
+  majhul_ayn: {
+    title: "Majhūl al-ʿAyn (Unknown person)",
+    description: "Only a single narrator reports from them.",
+    badge: "Majhūl al-ʿAyn",
+    background: "#475569",
+    color: "#e2e8f0",
+  },
+  majhul_hal: {
+    title: "Majhūl al-Ḥāl (Unknown condition)",
+    description: "Identity known but character not documented.",
+    badge: "Majhūl al-Ḥāl",
+    background: "#64748b",
+    color: "#f8fafc",
+  },
+  mukhadram: {
+    title: "Mukhadram",
+    description: "Lived during the Prophet’s era but never met him.",
+    badge: "Mukhadram",
+    background: "#2563eb",
+    color: "#dbeafe",
+  },
+};
 const hadithInsights: HadithInsight[] = [
   {
     id: "niyyah-musnad",
@@ -298,11 +410,11 @@ const hadithInsights: HadithInsight[] = [
       location: "Hadith 1",
     },
     chain: [
-      { name: "Yahya ibn Bukayr", descriptor: "Primary transmitter", classification: "muhaddith" },
-      { name: "Layth ibn Sa'd", descriptor: "Egyptian jurist", classification: "muhaddith" },
-      { name: "Muhammad ibn Ibrahim al-Taymi", descriptor: "Medinese scholar", classification: "tabi" },
-      { name: "Alqamah ibn Waqqas", descriptor: "Companion student", classification: "sahabi" },
-      { name: "Umar ibn al-Khattab", descriptor: "Companion", classification: "sahabi" },
+      { name: "Yahya ibn Bukayr", descriptor: "Primary transmitter", classification: "muhaddith", reliability: "thiqah" },
+      { name: "Layth ibn Sa'd", descriptor: "Egyptian jurist", classification: "muhaddith", reliability: "thiqah" },
+      { name: "Muhammad ibn Ibrahim al-Taymi", descriptor: "Medinese scholar", classification: "tabi", reliability: "thiqah" },
+      { name: "Alqamah ibn Waqqas", descriptor: "Companion student", classification: "sahabi", reliability: "thiqah" },
+      { name: "Umar ibn al-Khattab", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -325,10 +437,10 @@ const hadithInsights: HadithInsight[] = [
       location: "Hadith 2649",
     },
     chain: [
-      { name: "Sufyan al-Thawri", descriptor: "Kufan hadith master (mudallis)", classification: "muhaddith" },
-      { name: "Muhammad ibn Muslim al-Zuhri", descriptor: "Scholar of Medina", classification: "tabi" },
-      { name: "Sa'id ibn al-Musayyib", descriptor: "Leader of the Tābi'īn", classification: "tabi" },
-      { name: "Abu Huraira", descriptor: "Companion", classification: "sahabi" },
+      { name: "Sufyan al-Thawri", descriptor: "Kufan hadith master (mudallis)", classification: "muhaddith", reliability: "thiqah" },
+      { name: "Muhammad ibn Muslim al-Zuhri", descriptor: "Scholar of Medina", classification: "tabi", reliability: "thiqah" },
+      { name: "Sa'id ibn al-Musayyib", descriptor: "Leader of the Tābi'īn", classification: "tabi", reliability: "thiqah" },
+      { name: "Abu Huraira", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -351,10 +463,10 @@ const hadithInsights: HadithInsight[] = [
       location: "Report 25009",
     },
     chain: [
-      { name: "Hammad ibn Salama", descriptor: "Basran transmitter", classification: "muhaddith" },
-      { name: "Abu Ishaq al-Sabi'i", descriptor: "Kufan teacher", classification: "tabi" },
-      { name: "Abdullah ibn Mas'ud", descriptor: "Companion", classification: "sahabi" },
-      { name: "Umar ibn al-Khattab", descriptor: "Companion", classification: "sahabi" },
+      { name: "Hammad ibn Salama", descriptor: "Basran transmitter", classification: "muhaddith", reliability: "thiqah" },
+      { name: "Abu Ishaq al-Sabi'i", descriptor: "Kufan teacher", classification: "tabi", reliability: "saduq" },
+      { name: "Abdullah ibn Mas'ud", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
+      { name: "Umar ibn al-Khattab", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
     ],
     sourceTypes: ["mawquf"],
     chainTypes: ["musnad"],
@@ -376,9 +488,9 @@ const hadithInsights: HadithInsight[] = [
       location: "Report 1345",
     },
     chain: [
-      { name: "Hisham al-Dustuwa'i", descriptor: "Basran transmitter", classification: "atbae" },
-      { name: "Yunus ibn 'Ubayd", descriptor: "Ascetic", classification: "tabi" },
-      { name: "Al-Hasan al-Basri", descriptor: "Tābi'ī sage", classification: "tabi" },
+      { name: "Hisham al-Dustuwa'i", descriptor: "Basran transmitter", classification: "atbae", reliability: "thiqah" },
+      { name: "Yunus ibn 'Ubayd", descriptor: "Ascetic", classification: "tabi", reliability: "thiqah" },
+      { name: "Al-Hasan al-Basri", descriptor: "Tābi'ī sage", classification: "tabi", reliability: "thiqah" },
     ],
     sourceTypes: ["maqtu"],
     chainTypes: ["musnad"],
@@ -400,9 +512,9 @@ const hadithInsights: HadithInsight[] = [
       location: "Report 3435",
     },
     chain: [
-      { name: "Sufyan ibn 'Uyaynah", descriptor: "Meccan hadith master", classification: "muhaddith" },
-      { name: "'Amr ibn Dinar", descriptor: "Meccan jurist", classification: "tabi" },
-      { name: "Abdullah ibn Abbas", descriptor: "Companion", classification: "sahabi" },
+      { name: "Sufyan ibn 'Uyaynah", descriptor: "Meccan hadith master", classification: "muhaddith", reliability: "thiqah" },
+      { name: "'Amr ibn Dinar", descriptor: "Meccan jurist", classification: "tabi", reliability: "thiqah" },
+      { name: "Abdullah ibn Abbas", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
     ],
     sourceTypes: ["athar"],
     chainTypes: ["musnad"],
@@ -424,7 +536,7 @@ const hadithInsights: HadithInsight[] = [
       location: "Hadith 1107",
     },
     chain: [
-      { name: "Al-Hasan al-Basri", descriptor: "Tābi'ī sage", classification: "tabi" },
+      { name: "Al-Hasan al-Basri", descriptor: "Tābi'ī sage", classification: "tabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -447,8 +559,8 @@ const hadithInsights: HadithInsight[] = [
       location: "Report 2180",
     },
     chain: [
-      { name: "Abu Ishaq al-Sabi'i", descriptor: "Kufan teacher", classification: "tabi" },
-      { name: "Ubayy ibn Ka'b", descriptor: "Companion", classification: "sahabi" },
+      { name: "Abu Ishaq al-Sabi'i", descriptor: "Kufan teacher", classification: "tabi", reliability: "saduq" },
+      { name: "Ubayy ibn Ka'b", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -471,8 +583,8 @@ const hadithInsights: HadithInsight[] = [
       location: "Hadith 5127",
     },
     chain: [
-      { name: "Qatada ibn Di'ama", descriptor: "Basran exegete", classification: "tabi" },
-      { name: "Anas ibn Malik", descriptor: "Companion", classification: "sahabi" },
+      { name: "Qatada ibn Di'ama", descriptor: "Basran exegete", classification: "tabi", reliability: "thiqah" },
+      { name: "Anas ibn Malik", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -495,7 +607,7 @@ const hadithInsights: HadithInsight[] = [
       location: "Hadith 1899",
     },
     chain: [
-      { name: "Abu Huraira", descriptor: "Companion", classification: "sahabi" },
+      { name: "Abu Huraira", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -518,9 +630,9 @@ const hadithInsights: HadithInsight[] = [
       location: "Hadith 3437",
     },
     chain: [
-      { name: "Sufyan ibn Husayn", descriptor: "Narrator known for tadlis", classification: "rawi" },
-      { name: "Abu Qilabah", descriptor: "Follower", classification: "tabi" },
-      { name: "Abu Huraira", descriptor: "Companion", classification: "sahabi" },
+      { name: "Sufyan ibn Husayn", descriptor: "Narrator known for tadlis", classification: "rawi", reliability: "layyin" },
+      { name: "Abu Qilabah", descriptor: "Follower", classification: "tabi", reliability: "thiqah" },
+      { name: "Abu Huraira", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -543,7 +655,7 @@ const hadithInsights: HadithInsight[] = [
       location: "Hadith 4679",
     },
     chain: [
-      { name: "Abu Qilabah", descriptor: "Follower", classification: "tabi" },
+      { name: "Abu Qilabah", descriptor: "Follower", classification: "tabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -566,8 +678,8 @@ const hadithInsights: HadithInsight[] = [
       location: "Hadith 10841",
     },
     chain: [
-      { name: "Abd al-Malik ibn Jurayj", descriptor: "Meccan narrator", classification: "atbae" },
-      { name: "Ata ibn Abi Rabah", descriptor: "Senior Tābi'ī", classification: "tabi" },
+      { name: "Abd al-Malik ibn Jurayj", descriptor: "Meccan narrator", classification: "atbae", reliability: "saduq" },
+      { name: "Ata ibn Abi Rabah", descriptor: "Senior Tābi'ī", classification: "tabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -590,10 +702,10 @@ const hadithInsights: HadithInsight[] = [
       location: "Hadith 8",
     },
     chain: [
-      { name: "Abdullah ibn Yusuf al-Tinnisi", descriptor: "Damascene transmitter", classification: "muhaddith" },
-      { name: "Malik ibn Anas", descriptor: "Imam of Medina", classification: "muhaddith" },
-      { name: "Nafi' mawla Ibn Umar", descriptor: "Freedman of Ibn Umar", classification: "tabi" },
-      { name: "Abdullah ibn Umar", descriptor: "Companion", classification: "sahabi" },
+      { name: "Abdullah ibn Yusuf al-Tinnisi", descriptor: "Damascene transmitter", classification: "muhaddith", reliability: "thiqah" },
+      { name: "Malik ibn Anas", descriptor: "Imam of Medina", classification: "muhaddith", reliability: "thiqah" },
+      { name: "Nafi' mawla Ibn Umar", descriptor: "Freedman of Ibn Umar", classification: "tabi", reliability: "thiqah" },
+      { name: "Abdullah ibn Umar", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -616,10 +728,10 @@ const hadithInsights: HadithInsight[] = [
       location: "Hadith 45",
     },
     chain: [
-      { name: "Abu al-Walid al-Tayalisi", descriptor: "Basran musnid", classification: "muhaddith" },
-      { name: "Hammad ibn Zayd", descriptor: "Basran hadith master", classification: "muhaddith" },
-      { name: "Qatada ibn Di'ama", descriptor: "Exegete of Basra", classification: "tabi" },
-      { name: "Anas ibn Malik", descriptor: "Companion", classification: "sahabi" },
+      { name: "Abu al-Walid al-Tayalisi", descriptor: "Basran musnid", classification: "muhaddith", reliability: "thiqah" },
+      { name: "Hammad ibn Zayd", descriptor: "Basran hadith master", classification: "muhaddith", reliability: "thiqah" },
+      { name: "Qatada ibn Di'ama", descriptor: "Exegete of Basra", classification: "tabi", reliability: "thiqah" },
+      { name: "Anas ibn Malik", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -642,10 +754,10 @@ const hadithInsights: HadithInsight[] = [
       location: "Hadith 95",
     },
     chain: [
-      { name: "Yahya ibn Abi Kathir", descriptor: "Scholar of Basra", classification: "tabi" },
-      { name: "Abu Qilabah", descriptor: "Follower", classification: "tabi" },
-      { name: "Abu Asma' al-Rahbi", descriptor: "Syrian jurist", classification: "tabi" },
-      { name: "Tamim al-Dari", descriptor: "Companion", classification: "sahabi" },
+      { name: "Yahya ibn Abi Kathir", descriptor: "Scholar of Basra", classification: "tabi", reliability: "thiqah" },
+      { name: "Abu Qilabah", descriptor: "Follower", classification: "tabi", reliability: "thiqah" },
+      { name: "Abu Asma' al-Rahbi", descriptor: "Syrian jurist", classification: "tabi", reliability: "thiqah" },
+      { name: "Tamim al-Dari", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -668,9 +780,9 @@ const hadithInsights: HadithInsight[] = [
       location: "Hadith 1409",
     },
     chain: [
-      { name: "Hajjaj ibn Hassan", descriptor: "Basran transmitter", classification: "rawi" },
-      { name: "Abdurrahman ibn Yazid ibn Jabir", descriptor: "Damascene reliable", classification: "tabi" },
-      { name: "Shaddad ibn Aws", descriptor: "Companion", classification: "sahabi" },
+      { name: "Hajjaj ibn Hassan", descriptor: "Basran transmitter", classification: "rawi", reliability: "saduq" },
+      { name: "Abdurrahman ibn Yazid ibn Jabir", descriptor: "Damascene reliable", classification: "tabi", reliability: "thiqah" },
+      { name: "Shaddad ibn Aws", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -693,9 +805,9 @@ const hadithInsights: HadithInsight[] = [
       location: "Hadith 1924",
     },
     chain: [
-      { name: "Sufyan ibn 'Uyaynah", descriptor: "Meccan hadith master", classification: "muhaddith" },
-      { name: "Amr ibn Shu'ayb", descriptor: "Descendant of Abdullah ibn Amr", classification: "tabi" },
-      { name: "Abdullah ibn Amr ibn al-As", descriptor: "Companion", classification: "sahabi" },
+      { name: "Sufyan ibn 'Uyaynah", descriptor: "Meccan hadith master", classification: "muhaddith", reliability: "thiqah" },
+      { name: "Amr ibn Shu'ayb", descriptor: "Descendant of Abdullah ibn Amr", classification: "tabi", reliability: "saduq" },
+      { name: "Abdullah ibn Amr ibn al-As", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -718,9 +830,9 @@ const hadithInsights: HadithInsight[] = [
       location: "Hadith 23824",
     },
     chain: [
-      { name: "Yazid ibn Harun", descriptor: "Basran memorizer", classification: "muhaddith" },
-      { name: "Al-Qasim ibn Abdurrahman", descriptor: "Grandson of Abdullah ibn Mas'ud", classification: "tabi" },
-      { name: "Bilal ibn al-Harith", descriptor: "Companion", classification: "sahabi" },
+      { name: "Yazid ibn Harun", descriptor: "Basran memorizer", classification: "muhaddith", reliability: "thiqah" },
+      { name: "Al-Qasim ibn Abdurrahman", descriptor: "Grandson of Abdullah ibn Mas'ud", classification: "tabi", reliability: "thiqah" },
+      { name: "Bilal ibn al-Harith", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -743,10 +855,10 @@ const hadithInsights: HadithInsight[] = [
       location: "Hadith 2317",
     },
     chain: [
-      { name: "Malik ibn Anas", descriptor: "Imam of Medina", classification: "muhaddith" },
-      { name: "Ibn Shihab al-Zuhri", descriptor: "Medinese scholar", classification: "tabi" },
-      { name: "Yahya ibn Sa'id al-Ansari", descriptor: "Early judge of Medina", classification: "tabi" },
-      { name: "Abu Huraira", descriptor: "Companion", classification: "sahabi" },
+      { name: "Malik ibn Anas", descriptor: "Imam of Medina", classification: "muhaddith", reliability: "thiqah" },
+      { name: "Ibn Shihab al-Zuhri", descriptor: "Medinese scholar", classification: "tabi", reliability: "thiqah" },
+      { name: "Yahya ibn Sa'id al-Ansari", descriptor: "Early judge of Medina", classification: "tabi", reliability: "thiqah" },
+      { name: "Abu Huraira", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -769,10 +881,10 @@ const hadithInsights: HadithInsight[] = [
       location: "Hadith 2340",
     },
     chain: [
-      { name: "Al-Layth ibn Sa'd", descriptor: "Egyptian jurist", classification: "muhaddith" },
-      { name: "Yahya ibn Sa'id al-Ansari", descriptor: "Medinese judge", classification: "tabi" },
-      { name: "Abu Idris al-Khawlani", descriptor: "Damascene tabi'i", classification: "tabi" },
-      { name: "Ubadah ibn al-Samit", descriptor: "Companion", classification: "sahabi" },
+      { name: "Al-Layth ibn Sa'd", descriptor: "Egyptian jurist", classification: "muhaddith", reliability: "thiqah" },
+      { name: "Yahya ibn Sa'id al-Ansari", descriptor: "Medinese judge", classification: "tabi", reliability: "thiqah" },
+      { name: "Abu Idris al-Khawlani", descriptor: "Damascene tabi'i", classification: "tabi", reliability: "thiqah" },
+      { name: "Ubadah ibn al-Samit", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -795,9 +907,9 @@ const hadithInsights: HadithInsight[] = [
       location: "Hadith 4032",
     },
     chain: [
-      { name: "Mis'ar ibn Kidam", descriptor: "Kufan narrator", classification: "atbae" },
-      { name: "Mujahid ibn Jabr", descriptor: "Meccan exegete", classification: "tabi" },
-      { name: "Abdullah ibn Umar", descriptor: "Companion", classification: "sahabi" },
+      { name: "Mis'ar ibn Kidam", descriptor: "Kufan narrator", classification: "atbae", reliability: "thiqah" },
+      { name: "Mujahid ibn Jabr", descriptor: "Meccan exegete", classification: "tabi", reliability: "thiqah" },
+      { name: "Abdullah ibn Umar", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -820,10 +932,10 @@ const hadithInsights: HadithInsight[] = [
       location: "Hadith 2517",
     },
     chain: [
-      { name: "Abdullah ibn al-Mubarak", descriptor: "Khurasani imam", classification: "muhaddith" },
-      { name: "Hisham ibn Hassan", descriptor: "Basran narrator", classification: "atbae" },
-      { name: "Thabit al-Bunani", descriptor: "Student of Anas", classification: "tabi" },
-      { name: "Anas ibn Malik", descriptor: "Companion", classification: "sahabi" },
+      { name: "Abdullah ibn al-Mubarak", descriptor: "Khurasani imam", classification: "muhaddith", reliability: "thiqah" },
+      { name: "Hisham ibn Hassan", descriptor: "Basran narrator", classification: "atbae", reliability: "saduq" },
+      { name: "Thabit al-Bunani", descriptor: "Student of Anas", classification: "tabi", reliability: "thiqah" },
+      { name: "Anas ibn Malik", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -846,8 +958,8 @@ const hadithInsights: HadithInsight[] = [
       location: "Hadith 3372",
     },
     chain: [
-      { name: "Abu Ishaq al-Sabi'i", descriptor: "Kufan transmitter", classification: "tabi" },
-      { name: "Nu'man ibn Bashir", descriptor: "Companion", classification: "sahabi" },
+      { name: "Abu Ishaq al-Sabi'i", descriptor: "Kufan transmitter", classification: "tabi", reliability: "saduq" },
+      { name: "Nu'man ibn Bashir", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -870,9 +982,9 @@ const hadithInsights: HadithInsight[] = [
       location: "Hadith 1930",
     },
     chain: [
-      { name: "Abu al-Zinad", descriptor: "Medinese faqih", classification: "atbae" },
-      { name: "Al-A'raj (Abu Dawud Nufayr)", descriptor: "Freedman of Abu Huraira", classification: "tabi" },
-      { name: "Abu Huraira", descriptor: "Companion", classification: "sahabi" },
+      { name: "Abu al-Zinad", descriptor: "Medinese faqih", classification: "atbae", reliability: "saduq" },
+      { name: "Al-A'raj (Abu Dawud Nufayr)", descriptor: "Freedman of Abu Huraira", classification: "tabi", reliability: "thiqah" },
+      { name: "Abu Huraira", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -895,9 +1007,9 @@ const hadithInsights: HadithInsight[] = [
       location: "Report 1763",
     },
     chain: [
-      { name: "Shahr ibn Hawshab", descriptor: "Narrator with memory issues", classification: "tabi" },
-      { name: "Abu Atiyyah al-Wazzan", descriptor: "Basran narrator", classification: "rawi" },
-      { name: "Anas ibn Malik", descriptor: "Companion", classification: "sahabi" },
+      { name: "Shahr ibn Hawshab", descriptor: "Narrator with memory issues", classification: "tabi", reliability: "layyin" },
+      { name: "Abu Atiyyah al-Wazzan", descriptor: "Basran narrator", classification: "rawi", reliability: "majhul_hal" },
+      { name: "Anas ibn Malik", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -920,9 +1032,9 @@ const hadithInsights: HadithInsight[] = [
       location: "Entry 8798",
     },
     chain: [
-      { name: "Ismail ibn Yahya al-Muzani", descriptor: "Weak narrator", classification: "rawi" },
-      { name: "Nafi' mawla Ibn Umar", descriptor: "Freedman of Ibn Umar", classification: "tabi" },
-      { name: "Abdullah ibn Umar", descriptor: "Companion", classification: "sahabi" },
+      { name: "Ismail ibn Yahya al-Muzani", descriptor: "Weak narrator", classification: "rawi", reliability: "majhul_hal" },
+      { name: "Nafi' mawla Ibn Umar", descriptor: "Freedman of Ibn Umar", classification: "tabi", reliability: "thiqah" },
+      { name: "Abdullah ibn Umar", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -945,9 +1057,9 @@ const hadithInsights: HadithInsight[] = [
       location: "Hadith 1382",
     },
     chain: [
-      { name: "Abdullah ibn Lahi'ah", descriptor: "Egyptian judge with weak memory", classification: "rawi" },
-      { name: "Abu al-Khattab", descriptor: "Unknown narrator", classification: "rawi" },
-      { name: "Abdullah ibn Umar", descriptor: "Companion", classification: "sahabi" },
+      { name: "Abdullah ibn Lahi'ah", descriptor: "Egyptian judge with weak memory", classification: "rawi", reliability: "layyin" },
+      { name: "Abu al-Khattab", descriptor: "Unknown narrator", classification: "rawi", reliability: "majhul_ayn" },
+      { name: "Abdullah ibn Umar", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -970,8 +1082,8 @@ const hadithInsights: HadithInsight[] = [
       location: "Entry 910",
     },
     chain: [
-      { name: "Sulayman ibn Arin", descriptor: "Accused of fabrication", classification: "rawi" },
-      { name: "Abu Huraira", descriptor: "Companion", classification: "sahabi" },
+      { name: "Sulayman ibn Arin", descriptor: "Accused of fabrication", classification: "rawi", reliability: "kadhdhab" },
+      { name: "Abu Huraira", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -994,9 +1106,9 @@ const hadithInsights: HadithInsight[] = [
       location: "Entry 337",
     },
     chain: [
-      { name: "Abu Bakr ibn Abi Maryam", descriptor: "Syrian narrator who became confused", classification: "rawi" },
-      { name: "Muhammad ibn al-Munkadir", descriptor: "Medinese scholar", classification: "tabi" },
-      { name: "Jabir ibn Abdullah", descriptor: "Companion", classification: "sahabi" },
+      { name: "Abu Bakr ibn Abi Maryam", descriptor: "Syrian narrator who became confused", classification: "rawi", reliability: "layyin" },
+      { name: "Muhammad ibn al-Munkadir", descriptor: "Medinese scholar", classification: "tabi", reliability: "thiqah" },
+      { name: "Jabir ibn Abdullah", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -1019,9 +1131,9 @@ const hadithInsights: HadithInsight[] = [
       location: "Hadith 5129",
     },
     chain: [
-      { name: "Khalid ibn Ilyas", descriptor: "Rejected narrator", classification: "rawi" },
-      { name: "Abu Bakr ibn Abi Maryam", descriptor: "Syrian narrator", classification: "rawi" },
-      { name: "Anas ibn Malik", descriptor: "Companion", classification: "sahabi" },
+      { name: "Khalid ibn Ilyas", descriptor: "Rejected narrator", classification: "rawi", reliability: "matruk" },
+      { name: "Abu Bakr ibn Abi Maryam", descriptor: "Syrian narrator", classification: "rawi", reliability: "layyin" },
+      { name: "Anas ibn Malik", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -1044,9 +1156,9 @@ const hadithInsights: HadithInsight[] = [
       location: "Hadith 2879",
     },
     chain: [
-      { name: "Abu Ghassan Muhammad ibn Mutarrif", descriptor: "Narrator with munkar reports", classification: "rawi" },
-      { name: "Abu Salih al-Samman", descriptor: "Medinese narrator", classification: "tabi" },
-      { name: "Abu Huraira", descriptor: "Companion", classification: "sahabi" },
+      { name: "Abu Ghassan Muhammad ibn Mutarrif", descriptor: "Narrator with munkar reports", classification: "rawi", reliability: "layyin" },
+      { name: "Abu Salih al-Samman", descriptor: "Medinese narrator", classification: "tabi", reliability: "thiqah" },
+      { name: "Abu Huraira", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -1069,9 +1181,9 @@ const hadithInsights: HadithInsight[] = [
       location: "Report 210",
     },
     chain: [
-      { name: "Abd al-Rahman ibn Ziyad al-Afriki", descriptor: "North African narrator declared munkar", classification: "tabi" },
-      { name: "Abu Ghalib", descriptor: "Damascene narrator", classification: "rawi" },
-      { name: "Aisha bint Abi Bakr", descriptor: "Mother of the believers", classification: "sahabi" },
+      { name: "Abd al-Rahman ibn Ziyad al-Afriki", descriptor: "North African narrator declared munkar", classification: "tabi", reliability: "layyin" },
+      { name: "Abu Ghalib", descriptor: "Damascene narrator", classification: "rawi", reliability: "saduq" },
+      { name: "Aisha bint Abi Bakr", descriptor: "Mother of the believers", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -1094,9 +1206,9 @@ const hadithInsights: HadithInsight[] = [
       location: "Report 3901",
     },
     chain: [
-      { name: "Abdullah ibn Lahi'ah", descriptor: "Weak Egyptian judge", classification: "rawi" },
-      { name: "Abu Farwah Yazid ibn Sinan", descriptor: "Narrator of munkar reports", classification: "rawi" },
-      { name: "Abdullah ibn Umar", descriptor: "Companion", classification: "sahabi" },
+      { name: "Abdullah ibn Lahi'ah", descriptor: "Weak Egyptian judge", classification: "rawi", reliability: "layyin" },
+      { name: "Abu Farwah Yazid ibn Sinan", descriptor: "Narrator of munkar reports", classification: "rawi", reliability: "matruk" },
+      { name: "Abdullah ibn Umar", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -1119,9 +1231,9 @@ const hadithInsights: HadithInsight[] = [
       location: "Hadith 5159",
     },
     chain: [
-      { name: "Abdullah ibn Juraij", descriptor: "Meccan scholar", classification: "muhaddith" },
-      { name: "Kuraib mawla Ibn Abbas", descriptor: "Freedman of Ibn Abbas", classification: "tabi" },
-      { name: "Abdullah ibn Abbas", descriptor: "Companion", classification: "sahabi" },
+      { name: "Abdullah ibn Juraij", descriptor: "Meccan scholar", classification: "muhaddith", reliability: "saduq" },
+      { name: "Kuraib mawla Ibn Abbas", descriptor: "Freedman of Ibn Abbas", classification: "tabi", reliability: "thiqah" },
+      { name: "Abdullah ibn Abbas", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -1144,9 +1256,9 @@ const hadithInsights: HadithInsight[] = [
       location: "Hadith 2421",
     },
     chain: [
-      { name: "Ash'ath ibn Sawwar", descriptor: "Kufan narrator with odd reports", classification: "rawi" },
-      { name: "Abdullah ibn Busr", descriptor: "Companion", classification: "sahabi" },
-      { name: "Al-Samma' bint Busr", descriptor: "Companion woman", classification: "sahabi" },
+      { name: "Ash'ath ibn Sawwar", descriptor: "Kufan narrator with odd reports", classification: "rawi", reliability: "layyin" },
+      { name: "Abdullah ibn Busr", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
+      { name: "Al-Samma' bint Busr", descriptor: "Companion woman", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -1169,9 +1281,9 @@ const hadithInsights: HadithInsight[] = [
       location: "Hadith 13469",
     },
     chain: [
-      { name: "Abd al-Aziz ibn al-Mutalib", descriptor: "Medinese narrator", classification: "rawi" },
-      { name: "Abu Ghutayf", descriptor: "Narrator with limited precision", classification: "rawi" },
-      { name: "Anas ibn Malik", descriptor: "Companion", classification: "sahabi" },
+      { name: "Abd al-Aziz ibn al-Mutalib", descriptor: "Medinese narrator", classification: "rawi", reliability: "majhul_hal" },
+      { name: "Abu Ghutayf", descriptor: "Narrator with limited precision", classification: "rawi", reliability: "majhul_ayn" },
+      { name: "Anas ibn Malik", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -1194,10 +1306,10 @@ const hadithInsights: HadithInsight[] = [
       location: "Entry 125",
     },
     chain: [
-      { name: "Abdullah ibn al-Zubayr al-Humaydi", descriptor: "Meccan musnid", classification: "muhaddith" },
-      { name: "Abd al-Malik ibn Abd al-Aziz ibn Jurayj", descriptor: "Meccan scholar", classification: "muhaddith" },
-      { name: "Nafi' mawla Ibn Umar", descriptor: "Freedman of Ibn Umar", classification: "tabi" },
-      { name: "Abdullah ibn Umar", descriptor: "Companion", classification: "sahabi" },
+      { name: "Abdullah ibn al-Zubayr al-Humaydi", descriptor: "Meccan musnid", classification: "muhaddith", reliability: "thiqah" },
+      { name: "Abd al-Malik ibn Abd al-Aziz ibn Jurayj", descriptor: "Meccan scholar", classification: "muhaddith", reliability: "saduq" },
+      { name: "Nafi' mawla Ibn Umar", descriptor: "Freedman of Ibn Umar", classification: "tabi", reliability: "thiqah" },
+      { name: "Abdullah ibn Umar", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -1220,9 +1332,9 @@ const hadithInsights: HadithInsight[] = [
       location: "Entry 823",
     },
     chain: [
-      { name: "Abdullah ibn Lahi'ah", descriptor: "Weak Egyptian judge", classification: "rawi" },
-      { name: "Abu Tamim al-Jayshani", descriptor: "Egyptian narrator", classification: "tabi" },
-      { name: "Abu Huraira", descriptor: "Companion", classification: "sahabi" },
+      { name: "Abdullah ibn Lahi'ah", descriptor: "Weak Egyptian judge", classification: "rawi", reliability: "layyin" },
+      { name: "Abu Tamim al-Jayshani", descriptor: "Egyptian narrator", classification: "tabi", reliability: "saduq" },
+      { name: "Abu Huraira", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -1245,9 +1357,9 @@ const hadithInsights: HadithInsight[] = [
       location: "Entry 167",
     },
     chain: [
-      { name: "Sufyan al-Thawri", descriptor: "Kufan hadith master", classification: "muhaddith" },
-      { name: "Alqamah ibn Qays", descriptor: "Senior tabi'i", classification: "tabi" },
-      { name: "Abdullah ibn Mas'ud", descriptor: "Companion", classification: "sahabi" },
+      { name: "Sufyan al-Thawri", descriptor: "Kufan hadith master", classification: "muhaddith", reliability: "thiqah" },
+      { name: "Alqamah ibn Qays", descriptor: "Senior tabi'i", classification: "tabi", reliability: "thiqah" },
+      { name: "Abdullah ibn Mas'ud", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -1270,9 +1382,9 @@ const hadithInsights: HadithInsight[] = [
       location: "Entry 373",
     },
     chain: [
-      { name: "Muhammad ibn Ibrahim ibn Abi Sabrah", descriptor: "Fabricator", classification: "rawi" },
-      { name: "Ibrahim ibn Muhammad", descriptor: "Weak transmitter", classification: "rawi" },
-      { name: "Ali ibn Abi Talib", descriptor: "Companion", classification: "sahabi" },
+      { name: "Muhammad ibn Ibrahim ibn Abi Sabrah", descriptor: "Fabricator", classification: "rawi", reliability: "kadhdhab" },
+      { name: "Ibrahim ibn Muhammad", descriptor: "Weak transmitter", classification: "rawi", reliability: "majhul_hal" },
+      { name: "Ali ibn Abi Talib", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -1295,9 +1407,9 @@ const hadithInsights: HadithInsight[] = [
       location: "Entry 90",
     },
     chain: [
-      { name: "Ahmad ibn Abdullah al-Juwaybari", descriptor: "Confessed fabricator", classification: "rawi" },
-      { name: "Abd al-Wahhab ibn Abi al-Hasan", descriptor: "Unknown narrator", classification: "rawi" },
-      { name: "Anas ibn Malik", descriptor: "Companion", classification: "sahabi" },
+      { name: "Ahmad ibn Abdullah al-Juwaybari", descriptor: "Confessed fabricator", classification: "rawi", reliability: "kadhdhab" },
+      { name: "Abd al-Wahhab ibn Abi al-Hasan", descriptor: "Unknown narrator", classification: "rawi", reliability: "majhul_ayn" },
+      { name: "Anas ibn Malik", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -1320,9 +1432,9 @@ const hadithInsights: HadithInsight[] = [
       location: "Entry 512",
     },
     chain: [
-      { name: "Sa'id ibn Qarun", descriptor: "Unknown, likely invented", classification: "rawi" },
-      { name: "Ikrimah mawla Ibn Abbas", descriptor: "Meccan exegete", classification: "tabi" },
-      { name: "Abdullah ibn Abbas", descriptor: "Companion", classification: "sahabi" },
+      { name: "Sa'id ibn Qarun", descriptor: "Unknown, likely invented", classification: "rawi", reliability: "majhul_ayn" },
+      { name: "Ikrimah mawla Ibn Abbas", descriptor: "Meccan exegete", classification: "tabi", reliability: "saduq" },
+      { name: "Abdullah ibn Abbas", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
     sourceTypes: ["marfu"],
@@ -1462,6 +1574,9 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
     : [];
   const currentNarrationLevelInfo = currentHadith
     ? narrationLevelInfo[currentHadith.narrationLevel]
+    : null;
+  const currentSourceAuthor = currentHadith
+    ? sourceAuthorMap[currentHadith.details.source] ?? null
     : null;
 
   const hadithIndexById = useMemo(() => {
@@ -2052,11 +2167,22 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
           </div>
           {currentHadith && (
             <div className="flex flex-col items-end gap-1 text-xs font-semibold text-[var(--text-secondary)]">
-              <span className="rounded-full border border-[var(--border-soft)] bg-[var(--surface-card)] px-3 py-1">
+              <span className="rounded-full border border-[#1fb276]/30 bg-[#1fb276]/15 px-3 py-1 text-[#0d3525] dark:border-[#1fb276]/40 dark:bg-[#1fb276]/20 dark:text-[#b6f5da]">
                 {nonProphetNarratorCount} narrators
               </span>
-              <span className="rounded-full border border-[var(--border-soft)] bg-[var(--surface-card)] px-3 py-1">
-                {currentHadith.details.chapter}
+              <span className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-3 py-2 text-right">
+                {currentSourceAuthor ? (
+                  <>
+                    <span className="block text-[var(--text-primary)]">
+                      {currentSourceAuthor.name}
+                    </span>
+                    <span className="mt-1 inline-block rounded-full bg-[#14532d]/10 px-2 py-0.5 text-[0.7rem] font-semibold text-[#14532d] dark:bg-[#1fb276]/20 dark:text-[#92f5d0]">
+                      {currentSourceAuthor.lifespan}
+                    </span>
+                  </>
+                ) : (
+                  "Author not specified"
+                )}
               </span>
             </div>
           )}
@@ -2140,6 +2266,13 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                     !isProphet && node.classification
                       ? narratorTierInfo[node.classification]
                       : null;
+                  const tierLabel = tierInfo?.title
+                    ? tierInfo.title.split(" (")[0]
+                    : node.descriptor;
+                  const reliabilityInfo =
+                    !isProphet && node.reliability
+                      ? reliabilityTierInfo[node.reliability]
+                      : null;
                   const baseClasses = isProphet
                     ? "bg-gradient-to-r from-[#0b7a6c] to-[#1b4332] text-white border-transparent shadow-lg"
                     : isExpanded
@@ -2160,8 +2293,8 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                         }}
                         className={`w-full rounded-2xl border px-4 py-3 text-left shadow-sm transition ${baseClasses}`}
                       >
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
+                        <div className="flex items-start gap-3">
+                          <div className="flex-1">
                             <p className="text-sm font-semibold text-[color:inherit]">
                               {!isProphet && (
                                 <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-[var(--accent-emerald)]/30 bg-[var(--accent-emerald)]/15 text-[0.7rem] text-[var(--accent-emerald)]">
@@ -2170,10 +2303,25 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                               )}
                               {node.name}
                             </p>
-                            <p className={`text-xs ${isProphet ? "text-white/80" : "text-[var(--text-muted)]"}`}>
-                              {isProphet ? node.descriptor : tierInfo?.title ?? node.descriptor}
+                            <p
+                              className={`mt-0.5 text-xs ${
+                                isProphet ? "text-white/80" : "text-[var(--text-muted)]"
+                              }`}
+                            >
+                              {isProphet ? node.descriptor : tierLabel}
                             </p>
                           </div>
+                          {!isProphet && reliabilityInfo && (
+                            <span
+                              className="rounded-full px-3 py-1 text-[0.6rem] font-semibold uppercase tracking-[0.12em]"
+                              style={{
+                                backgroundColor: reliabilityInfo.background,
+                                color: reliabilityInfo.color,
+                              }}
+                            >
+                              {reliabilityInfo.badge}
+                            </span>
+                          )}
                           {isProphet ? (
                             <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/30 text-xl text-white shadow-[0_8px_25px_rgba(255,255,255,0.35)] ring-2 ring-white/40 animate-pulse">
                               ﷺ
@@ -2185,17 +2333,30 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                           )}
                         </div>
                         {!isProphet && isExpanded && (
-                          <div className="mt-3 space-y-1 text-xs leading-relaxed text-[var(--text-secondary)]">
-                            <p className="font-semibold text-[var(--text-primary)]">
-                              Generational Rank:{" "}
-                              <span className="text-[var(--text-primary)]">
-                                {tierInfo?.title ?? "Narrator"}
-                              </span>
-                            </p>
-                            <p>
-                              {tierInfo?.description ??
-                                "Narration role pending further classification."}
-                            </p>
+                          <div className="mt-3 space-y-3 text-xs leading-relaxed text-[var(--text-secondary)]">
+                            <div>
+                              <p className="font-semibold text-[var(--text-primary)]">
+                                Generational Rank:{" "}
+                                <span className="text-[var(--text-primary)]">
+                                  {tierInfo?.title ?? "Narrator"}
+                                </span>
+                              </p>
+                              <p>
+                                {tierInfo?.description ??
+                                  "Narration role pending further classification."}
+                              </p>
+                            </div>
+                            {reliabilityInfo && (
+                              <div>
+                                <p className="font-semibold text-[var(--text-primary)]">
+                                  Reliability Rank:{" "}
+                                  <span className="text-[var(--text-primary)]">
+                                    {reliabilityInfo.title}
+                                  </span>
+                                </p>
+                                <p>{reliabilityInfo.description}</p>
+                              </div>
+                            )}
                           </div>
                         )}
                       </button>
