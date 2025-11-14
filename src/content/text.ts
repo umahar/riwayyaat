@@ -70,6 +70,9 @@ export const workspaceCopy = {
       book: { label: "Book", title: "Select book", clear: "Clear" },
       source: { label: "Source", title: "Select source", clear: "Clear" },
     },
+    loadingMessage: "Loading hadith data…",
+    errorMessage: "Unable to load hadiths.",
+    retryLabel: "Retry",
     emptyState: "No hadith match the selected filters.",
   },
   conversation: {

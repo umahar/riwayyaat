@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { ReactNode, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Disclosure } from "@/components/ui/disclosure";
 import { Tag } from "@/components/ui/tag";
@@ -14,17 +14,31 @@ import {
 } from "@/lib/hadith/taxonomy";
 import { HadithInsight } from "@/lib/hadith/types";
 import { workspaceCopy } from "@/content/text";
+import { LoadingState } from "@/components/ui/state/loading-state";
+import { ErrorState } from "@/components/ui/state/error-state";
+import { EmptyState } from "@/components/ui/state/empty-state";
 import { NarratorChain } from "./narrator-chain";
 
 type HadithDetailsPanelProps = {
   hadith: HadithInsight | null;
   isDesktop: boolean;
   onResizeStart?: (event: React.MouseEvent) => void;
+  loading: boolean;
+  error: string | null;
+  onRetry?: () => void;
 };
 
-export function HadithDetailsPanel({ hadith, isDesktop, onResizeStart }: HadithDetailsPanelProps) {
+export function HadithDetailsPanel({
+  hadith,
+  isDesktop,
+  onResizeStart,
+  loading,
+  error,
+  onRetry,
+}: HadithDetailsPanelProps) {
   const [isNarrationDetailsOpen, setIsNarrationDetailsOpen] = useState(false);
   const detailsCopy = workspaceCopy.details;
+  const sidebarCopy = workspaceCopy.sidebar;
 
   const gradingData = useMemo(() => {
     if (!hadith) return null;
@@ -33,21 +47,27 @@ export function HadithDetailsPanel({ hadith, isDesktop, onResizeStart }: HadithD
     return { style, label };
   }, [hadith]);
 
+  if (loading) {
+    return (
+      <PanelWrapper isDesktop={isDesktop} onResizeStart={onResizeStart}>
+        <LoadingState message={sidebarCopy.loadingMessage} />
+      </PanelWrapper>
+    );
+  }
+
+  if (error) {
+    return (
+      <PanelWrapper isDesktop={isDesktop} onResizeStart={onResizeStart}>
+        <ErrorState message={error ?? sidebarCopy.errorMessage} onRetry={onRetry} retryLabel={sidebarCopy.retryLabel} />
+      </PanelWrapper>
+    );
+  }
+
   if (!hadith) {
     return (
-      <aside className="scrollbar-hide relative flex max-h-svh flex-col overflow-y-auto bg-[var(--background-alt)] px-6 py-8">
-        <h3 className="text-lg font-semibold text-[var(--text-secondary)]">{detailsCopy.selectPrompt}</h3>
-        {isDesktop && (
-          <div
-            role="separator"
-            aria-orientation="vertical"
-            className="pointer-events-auto absolute left-0 top-0 hidden h-full w-2 -translate-x-1/2 cursor-col-resize lg:block"
-            onMouseDown={onResizeStart}
-          >
-            <span className="absolute inset-0 rounded-full bg-white/5" />
-          </div>
-        )}
-      </aside>
+      <PanelWrapper isDesktop={isDesktop} onResizeStart={onResizeStart}>
+        <EmptyState title={detailsCopy.selectPrompt} />
+      </PanelWrapper>
     );
   }
 
@@ -57,7 +77,7 @@ export function HadithDetailsPanel({ hadith, isDesktop, onResizeStart }: HadithD
   const sourceAuthor = sourceAuthorMap[hadith.details.source] ?? null;
 
   return (
-    <aside className="scrollbar-hide relative flex max-h-svh flex-col overflow-y-auto bg-[var(--background-alt)] px-6 py-8">
+    <PanelWrapper isDesktop={isDesktop} onResizeStart={onResizeStart}>
       <header className="flex items-center justify-between gap-2">
         <div>
           <h3 className="text-lg font-bold tracking-[var(--tracking-tight)] text-[var(--text-primary)]">
@@ -184,7 +204,20 @@ export function HadithDetailsPanel({ hadith, isDesktop, onResizeStart }: HadithD
 
         <NarratorChain hadith={hadith} />
       </div>
+    </PanelWrapper>
+  );
+}
 
+type PanelWrapperProps = {
+  children: ReactNode;
+  isDesktop: boolean;
+  onResizeStart?: (event: React.MouseEvent) => void;
+};
+
+function PanelWrapper({ children, isDesktop, onResizeStart }: PanelWrapperProps) {
+  return (
+    <aside className="scrollbar-hide relative flex max-h-svh flex-col overflow-y-auto bg-[var(--background-alt)] px-6 py-8">
+      {children}
       {isDesktop && (
         <div
           role="separator"

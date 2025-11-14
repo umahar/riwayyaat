@@ -7,6 +7,9 @@ import { IconButton } from "@/components/ui/button";
 import { FilterMenu, FilterOption } from "@/components/ui/filter-menu";
 import { HadithInsight } from "@/lib/hadith/types";
 import { workspaceCopy } from "@/content/text";
+import { LoadingState } from "@/components/ui/state/loading-state";
+import { ErrorState } from "@/components/ui/state/error-state";
+import { EmptyState } from "@/components/ui/state/empty-state";
 import { HadithCard } from "./hadith-card";
 
 export type FilterGroup = {
@@ -30,6 +33,9 @@ type HadithSidebarProps = {
   activeHadithId: string | null;
   onSelectHadith: (id: string) => void;
   filterGroups: FilterGroup[];
+  loading: boolean;
+  error: string | null;
+  onRetry?: () => void;
 };
 
 export function HadithSidebar({
@@ -42,6 +48,9 @@ export function HadithSidebar({
   activeHadithId,
   onSelectHadith,
   filterGroups,
+  loading,
+  error,
+  onRetry,
 }: HadithSidebarProps) {
   const [expandedMatnIds, setExpandedMatnIds] = useState<Set<string>>(new Set());
   const copy = workspaceCopy.sidebar;
@@ -93,7 +102,7 @@ export function HadithSidebar({
                     {copy.heading}
                   </p>
                   <p className="text-base font-semibold text-[var(--text-primary)]">
-                    {hadiths.length} {copy.resultsSuffix}
+                    {loading ? "—" : hadiths.length} {copy.resultsSuffix}
                   </p>
                 </div>
                 <div className="flex flex-nowrap items-center gap-2 sm:gap-3">
@@ -116,7 +125,11 @@ export function HadithSidebar({
             </div>
           </header>
           <div className="space-y-6">
-            {hadiths.length > 0 ? (
+            {loading ? (
+              <LoadingState message={copy.loadingMessage} />
+            ) : error ? (
+              <ErrorState message={error ?? copy.errorMessage} onRetry={onRetry} retryLabel={copy.retryLabel} />
+            ) : hadiths.length > 0 ? (
               hadiths.map((hadith) => (
                 <HadithCard
                   key={hadith.id}
@@ -127,7 +140,7 @@ export function HadithSidebar({
                 />
               ))
             ) : (
-              <p className="text-sm text-[var(--text-muted)]">{copy.emptyState}</p>
+              <EmptyState title={copy.emptyState} />
             )}
           </div>
         </>
