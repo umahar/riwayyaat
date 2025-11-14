@@ -2172,7 +2172,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
           </div>
           {currentHadith && (
             <div className="flex flex-col items-end gap-1 text-xs font-semibold text-[var(--text-secondary)]">
-              <span className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-3 py-2 text-right">
+              <span className="px-3 py-1 text-right text-xs font-semibold text-[var(--text-secondary)]">
                 {currentSourceAuthor ? (
                   <>
                     <span className="block text-[var(--text-primary)]">
@@ -2199,27 +2199,39 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                   <p className="text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
                     Attribution Type
                   </p>
-                  {(activeSourceTypes.length ? activeSourceTypes : [{ key: "none", title: "Not specified", description: "No source classification provided." }]).map(
-                    (item) => (
-                      <div key={item.title}>
-                        <p className="font-semibold text-[var(--text-primary)]">{item.title}</p>
-                        <p className="text-[var(--text-secondary)]">{item.description}</p>
-                      </div>
-                    ),
-                  )}
+                  {(activeSourceTypes.length
+                    ? activeSourceTypes
+                    : [
+                        {
+                          key: "none",
+                          title: "Not specified",
+                          description: "No source classification provided.",
+                        },
+                      ]
+                  ).map((item) => (
+                    <DisclosureRow key={item.title} title={item.title}>
+                      {item.description}
+                    </DisclosureRow>
+                  ))}
                 </div>
                 <div className="space-y-3 rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-4 py-3">
                   <p className="text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
                     Chain Type
                   </p>
-                  {(activeChainTypes.length ? activeChainTypes : [{ key: "none", title: "Not specified", description: "No chain classification provided." }]).map(
-                    (item) => (
-                      <div key={item.title}>
-                        <p className="font-semibold text-[var(--text-primary)]">{item.title}</p>
-                        <p className="text-[var(--text-secondary)]">{item.description}</p>
-                      </div>
-                    ),
-                  )}
+                  {(activeChainTypes.length
+                    ? activeChainTypes
+                    : [
+                        {
+                          key: "none",
+                          title: "Not specified",
+                          description: "No chain classification provided.",
+                        },
+                      ]
+                  ).map((item) => (
+                    <DisclosureRow key={item.title} title={item.title}>
+                      {item.description}
+                    </DisclosureRow>
+                  ))}
                 </div>
               </section>
               <div className="grid gap-4 text-left text-xs text-[var(--text-secondary)] md:grid-cols-[0.65fr_0.35fr] items-start">
@@ -2409,3 +2421,27 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
     </section>
   );
 }
+const DisclosureRow = ({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="space-y-1">
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="flex w-full items-center justify-between text-sm font-semibold text-[var(--text-primary)]"
+      >
+        {title}
+        <span className="text-xs text-[var(--text-muted)]">
+          {open ? "▴" : "▾"}
+        </span>
+      </button>
+      {open && <p className="text-[var(--text-secondary)]">{children}</p>}
+    </div>
+  );
+};
