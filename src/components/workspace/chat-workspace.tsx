@@ -484,6 +484,37 @@ const narratorLifespans: Record<string, string> = {
   "Ikrimah mawla Ibn Abbas": "d. 105 AH",
   "Abdullah ibn Lahi'ah": "97–174 AH",
 };
+
+const transmissionMethods = [
+  {
+    title: "Samāʿ",
+    description: "Student hears directly from the teacher.",
+  },
+  {
+    title: "Qirāʾah / ʿArḍ",
+    description: "Student reads to the teacher who confirms.",
+  },
+  {
+    title: "Ijāzah",
+    description: "Teacher grants formal permission to transmit.",
+  },
+  {
+    title: "Munāwalah",
+    description: "Teacher hands written texts to the student.",
+  },
+  {
+    title: "Mukātabah",
+    description: "Teacher writes to the student conveying the hadith.",
+  },
+  {
+    title: "Wajāda",
+    description: "Narrator discovers a work attributable to a teacher.",
+  },
+  {
+    title: "Ḥaml",
+    description: "Student carries manuscripts received from the teacher.",
+  },
+];
 const hadithInsights: HadithInsight[] = [
   {
     id: "niyyah-musnad",
@@ -1536,7 +1567,7 @@ const hadithInsights: HadithInsight[] = [
 
 
 const ICON_BUTTON_CLASSES =
-  "inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-soft)] bg-[var(--surface-card)] text-base text-[var(--text-secondary)] shadow-sm transition hover:-translate-y-0.5 hover:text-[var(--accent-emerald)]";
+  "inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-soft)] bg-[#e5f6ef] dark:bg-[#0f2f24] text-base text-[var(--text-secondary)] shadow-sm transition hover:-translate-y-0.5 hover:text-[var(--accent-emerald)]";
 const FILTER_BUTTON_BASE =
   "inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[0.65rem] font-semibold uppercase tracking-[0.18em] shadow-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-emerald)]";
 
@@ -2404,7 +2435,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                     {nonProphetNarratorCount} narrators
                   </span>
                 </div>
-              <ul className="mt-4 space-y-4">
+              <ul className="mt-4 space-y-5">
                 {currentHadith.chain.map((node, index) => {
                   const isProphet = node.type === "prophet";
                   const isExpanded = expandedNarrators.has(node.name);
@@ -2423,6 +2454,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                   const connectorColor = !isProphet && reliabilityInfo
                     ? reliabilityInfo.background
                     : "var(--border-soft)";
+                  const methodInfo = transmissionMethods[index % transmissionMethods.length];
                   const baseClasses = isProphet
                     ? "bg-gradient-to-r from-[#0b7a6c] to-[#1b4332] text-white border-transparent shadow-lg"
                     : isExpanded
@@ -2442,7 +2474,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                           if (isProphet) return;
                           handleToggleNarrator(node.name);
                         }}
-                        className={`w-full rounded-2xl border px-4 py-3 text-left shadow-sm transition ${baseClasses}`}
+                        className={`relative w-full rounded-2xl border px-4 py-3 text-left shadow-sm transition ${baseClasses}`}
                       >
                         <div className="flex items-start gap-3">
                           <div className="flex-1">
@@ -2531,6 +2563,29 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                                 <p>{reliabilityInfo.description}</p>
                               </div>
                             )}
+                            {methodInfo && (
+                              <div>
+                                <p className="font-semibold text-[var(--text-primary)]">
+                                  Transmission Method:{" "}
+                                  <span className="text-[var(--text-primary)]">
+                                    {methodInfo.title}
+                                  </span>
+                                </p>
+                                <p className="text-[var(--text-secondary)]">
+                                  {methodInfo.description}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {!isProphet && methodInfo && (
+                          <div
+                            className="pointer-events-none absolute bottom-0 left-1/2 h-6 w-28 -translate-x-1/2 translate-y-1/2 overflow-hidden rounded-full border border-[var(--border-soft)] bg-[#dbeafe] text-center text-[0.55rem] font-semibold uppercase text-[#0f172a] shadow-sm dark:bg-[#1e293b] dark:text-white"
+                            title={methodInfo.description}
+                          >
+                            <span className="flex h-full w-full items-center justify-center">
+                              {methodInfo.title}
+                            </span>
                           </div>
                         )}
                       </button>
