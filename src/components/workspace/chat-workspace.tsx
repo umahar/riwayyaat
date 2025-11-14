@@ -206,25 +206,25 @@ const sourceTypeInfo: Array<{
 }> = [
   {
     key: "marfu",
-    title: "Marfūʿ", secondary: "(مرفوع)", secondary: "(مرفوع)",
+    title: "Marfūʿ",
     secondary: "(مرفوع)",
     description: "Attributed to the Prophet ﷺ.",
   },
   {
     key: "mawquf",
-    title: "Mawqūf", secondary: "(موقوف)", secondary: "(موقوف)",
+    title: "Mawqūf",
     secondary: "(موقوف)",
     description: "Statement/action of a Companion only.",
   },
   {
     key: "maqtu",
-    title: "Maqṭūʿ", secondary: "(مقطوع)", secondary: "(مقطوع)",
+    title: "Maqṭūʿ",
     secondary: "(مقطوع)",
     description: "Statement of a Tābiʿī or later.",
   },
   {
     key: "athar",
-    title: "Athar", secondary: "(أثر)", secondary: "(أثر)",
+    title: "Athar",
     secondary: "(أثر)",
     description: "General report — may be marfūʿ, mawqūf, or maqṭūʿ.",
   },
@@ -2207,7 +2207,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                     <span className="block text-[var(--text-primary)]">
                       {currentSourceAuthor.name}
                     </span>
-                    <span className="mt-1 inline-block rounded-full bg-[#14532d]/10 px-2 py-0.5 text-[0.7rem] font-semibold text-[#14532d] dark:bg-[#1fb276]/20 dark:text-[#92f5d0]">
+                    <span className="mt-1 inline-block rounded-full bg-[var(--surface-card)] px-2 py-0.5 text-[0.7rem] font-semibold text-[var(--text-primary)] dark:bg-[var(--surface-card)]/60 dark:text-white">
                       {currentSourceAuthor.lifespan}
                     </span>
                   </>
@@ -2224,7 +2224,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
             <div className="my-4 h-px w-full bg-[var(--border-soft)]" />
             <div className="scrollbar-hide mt-4 space-y-6 overflow-y-auto pr-2">
               <section className="grid gap-4 text-left text-xs text-[var(--text-secondary)] sm:grid-cols-2 lg:grid-cols-3">
-                <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-4 py-3">
+                <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-4 py-3 text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
                   <p className="text-[0.6rem] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
                     Narration Level
                   </p>
@@ -2259,7 +2259,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                     </p>
                   )}
                 </div>
-                <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-4 py-3">
+                <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-4 py-3 text-[var(--text-secondary)]">
                   <p className="text-[0.6rem] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
                     Attribution Type
                   </p>
@@ -2285,7 +2285,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                     ))}
                   </div>
                 </div>
-                <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-4 py-3">
+                <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-4 py-3 text-[var(--text-secondary)]">
                   <p className="text-[0.6rem] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
                     Chain Type
                   </p>
