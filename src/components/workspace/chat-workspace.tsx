@@ -422,6 +422,68 @@ const reliabilityTierInfo: Record<
     color: "#dbeafe",
   },
 };
+
+const narratorLifespans: Record<string, string> = {
+  "Sufyan al-Thawri": "97–161 AH",
+  "Muhammad ibn Muslim al-Zuhri": "51–124 AH",
+  "Sa'id ibn al-Musayyib": "15–94 AH",
+  "Abu Huraira": "d. 58 AH",
+  "Hammad ibn Salama": "d. 167 AH",
+  "Abdullah ibn Mas'ud": "d. 32 AH",
+  "Umar ibn al-Khattab": "40–23 AH",
+  "Hisham al-Dustuwa'i": "105–153 AH",
+  "Yunus ibn 'Ubayd": "d. 139 AH",
+  "Al-Hasan al-Basri": "21–110 AH",
+  "Sufyan ibn 'Uyaynah": "107–198 AH",
+  "'Amr ibn Dinar": "46–126 AH",
+  "Abdullah ibn Abbas": "3–68 AH",
+  "Qatada ibn Di'ama": "d. 117 AH",
+  "Anas ibn Malik": "1–93 AH",
+  "Abd al-Malik ibn Jurayj": "80–150 AH",
+  "Ata ibn Abi Rabah": "27–114 AH",
+  "Abdullah ibn Umar": "10–73 AH",
+  "Malik ibn Anas": "93–179 AH",
+  "Abu al-Walid al-Tayalisi": "d. 227 AH",
+  "Yahya ibn Abi Kathir": "d. 129 AH",
+  "Abu Qilabah": "d. 104 AH",
+  "Tamim al-Dari": "d. 40 AH",
+  "Hajjaj ibn Hassan": "d. 212 AH",
+  "Abdurrahman ibn Yazid ibn Jabir": "d. 153 AH",
+  "Shaddad ibn Aws": "d. 81 AH",
+  "Amr ibn Shu'ayb": "d. 118 AH",
+  "Abdullah ibn Amr ibn al-As": "7 BH–65 AH",
+  "Yazid ibn Harun": "118–206 AH",
+  "Bilal ibn al-Harith": "d. 62 AH",
+  "Mis'ar ibn Kidam": "d. 155 AH",
+  "Mujahid ibn Jabr": "21–104 AH",
+  "Abdullah ibn al-Mubarak": "118–181 AH",
+  "Thabit al-Bunani": "d. 123 AH",
+  "Nu'man ibn Bashir": "d. 65 AH",
+  "Abu al-Zinad": "d. 130 AH",
+  "Shahr ibn Hawshab": "d. 112 AH",
+  "Anas ibn Malik": "1–93 AH",
+  "Khalid ibn Ilyas": "2nd c. AH",
+  "Abu Ghassan Muhammad ibn Mutarrif": "d. 180 AH",
+  "Abu Salih al-Samman": "d. 101 AH",
+  "Abd al-Rahman ibn Ziyad al-Afriki": "d. 156 AH",
+  "Aisha bint Abi Bakr": "614–678 CE",
+  "Abdullah ibn Juraij": "80–150 AH",
+  "Kuraib mawla Ibn Abbas": "d. 98 AH",
+  "Ash'ath ibn Sawwar": "d. 179 AH",
+  "Abdullah ibn Busr": "d. 96 AH",
+  "Al-Samma' bint Busr": "1st c. AH",
+  "Abd al-Aziz ibn al-Mutalib": "2nd c. AH",
+  "Abu Ghutayf": "2nd c. AH",
+  "Abd al-Zubayr al-Humaydi": "164–219 AH",
+  "Abd al-Malik ibn Abd al-Aziz ibn Jurayj": "80–150 AH",
+  "Abu Tamim al-Jayshani": "1st c. AH",
+  "Alqamah ibn Qays": "d. 62 AH",
+  "Muhammad ibn Ibrahim ibn Abi Sabrah": "2nd c. AH",
+  "Ali ibn Abi Talib": "600–661 CE",
+  "Ahmad ibn Abdullah al-Juwaybari": "d. 280 AH",
+  "Ikrimah mawla Ibn Abbas": "d. 105 AH",
+  "Abdullah ibn Lahi'ah": "97–174 AH",
+};
 const hadithInsights: HadithInsight[] = [
   {
     id: "niyyah-musnad",
@@ -2357,6 +2419,10 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                     !isProphet && node.reliability
                       ? reliabilityTierInfo[node.reliability]
                       : null;
+                  const nodeLifespan = narratorLifespans[node.name] ?? node.lifespan;
+                  const connectorColor = !isProphet && reliabilityInfo
+                    ? reliabilityInfo.background
+                    : "var(--border-soft)";
                   const baseClasses = isProphet
                     ? "bg-gradient-to-r from-[#0b7a6c] to-[#1b4332] text-white border-transparent shadow-lg"
                     : isExpanded
@@ -2366,7 +2432,8 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                     <li key={node.name} className="relative pl-6">
                       {!isProphet && (
                         <span
-                          className="absolute -left-2 top-[10%] h-[80%] w-px bg-[var(--border-soft)]"
+                          className="absolute left-3 top-[10%] h-[80%] w-[2px]"
+                          style={{ backgroundColor: connectorColor }}
                         />
                       )}
                       <button
@@ -2379,32 +2446,45 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                       >
                         <div className="flex items-start gap-3">
                           <div className="flex-1">
-                            <p className="text-sm font-semibold text-[color:inherit]">
+                            <div className="flex items-start gap-2">
                               {!isProphet && (
-                                <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-[var(--accent-emerald)]/30 bg-[var(--accent-emerald)]/15 text-[0.7rem] text-[var(--accent-emerald)]">
+                                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-[var(--accent-emerald)]/30 bg-[var(--accent-emerald)]/15 text-[0.7rem] text-[var(--accent-emerald)]">
                                   {index + 1}
                                 </span>
                               )}
-                              {node.name}
-                            </p>
-                            <p
-                              className={`mt-0.5 text-xs ${
-                                isProphet ? "text-white/80" : "text-[var(--text-muted)]"
-                              }`}
-                            >
-                              {isProphet ? node.descriptor : tierLabel}
-                            </p>
+                              <div>
+                                <p className="text-sm font-semibold text-[color:inherit]">
+                                  {node.name}
+                                </p>
+                                <p
+                                  className={`mt-0.5 text-xs ${
+                                    isProphet ? "text-white/80" : "text-[var(--text-muted)]"
+                                  }`}
+                                >
+                                  {isProphet ? node.descriptor : tierLabel}
+                                </p>
+                              </div>
+                            </div>
                           </div>
-                          {!isProphet && reliabilityInfo && (
-                            <span
-                              className="rounded-full px-3 py-1 text-[0.6rem] font-semibold uppercase tracking-[0.12em]"
-                              style={{
-                                backgroundColor: reliabilityInfo.background,
-                                color: reliabilityInfo.color,
-                              }}
-                            >
-                              {reliabilityInfo.badge}
-                            </span>
+                          {!isProphet && (
+                            <div className="flex flex-col items-end gap-1">
+                              {reliabilityInfo && (
+                                <span
+                                  className="rounded-full px-3 py-1 text-[0.6rem] font-semibold uppercase tracking-[0.12em]"
+                                  style={{
+                                    backgroundColor: reliabilityInfo.background,
+                                    color: reliabilityInfo.color,
+                                  }}
+                                >
+                                  {reliabilityInfo.badge}
+                                </span>
+                              )}
+                              {nodeLifespan && (
+                                <span className="rounded-full bg-[var(--surface-card)] px-2 py-0.5 text-[0.65rem] font-semibold text-[var(--text-primary)] dark:text-white">
+                                  {nodeLifespan}
+                                </span>
+                              )}
+                            </div>
                           )}
                           {isProphet ? (
                             <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/30 text-xl text-white shadow-[0_8px_25px_rgba(255,255,255,0.35)] ring-2 ring-white/40 animate-pulse">
