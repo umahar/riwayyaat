@@ -2,6 +2,7 @@
 
 import {
   Dispatch,
+  ReactNode,
   SetStateAction,
   useCallback,
   useEffect,
@@ -197,63 +198,82 @@ const formatGradingLabel = (grading: string) => {
   return grading;
 };
 
-const sourceTypeInfo = [
+const sourceTypeInfo: Array<{
+  key: string;
+  title: string;
+  secondary?: string;
+  description: string;
+}> = [
   {
     key: "marfu",
-    title: "Marfūʿ (مرفوع)",
+    title: "Marfūʿ", secondary: "(مرفوع)", secondary: "(مرفوع)",
+    secondary: "(مرفوع)",
     description: "Attributed to the Prophet ﷺ.",
   },
   {
     key: "mawquf",
-    title: "Mawqūf (موقوف)",
+    title: "Mawqūf", secondary: "(موقوف)", secondary: "(موقوف)",
+    secondary: "(موقوف)",
     description: "Statement/action of a Companion only.",
   },
   {
     key: "maqtu",
-    title: "Maqṭūʿ (مقطوع)",
+    title: "Maqṭūʿ", secondary: "(مقطوع)", secondary: "(مقطوع)",
+    secondary: "(مقطوع)",
     description: "Statement of a Tābiʿī or later.",
   },
   {
     key: "athar",
-    title: "Athar (أثر)",
+    title: "Athar", secondary: "(أثر)", secondary: "(أثر)",
+    secondary: "(أثر)",
     description: "General report — may be marfūʿ, mawqūf, or maqṭūʿ.",
   },
 ];
 
-const chainTypeInfo = [
-  { key: "musnad", title: "Musnad (مسند)", description: "Fully connected chain reaching Prophet ﷺ." },
-  { key: "mursal", title: "Mursal (مرسل)", description: "Tābiʿī skips the Companion." },
-  { key: "munqati", title: "Munqaṭiʿ (منقطع)", description: "A break in the chain at any point." },
-  { key: "muadal", title: "Muʿḍal (معضل)", description: "Two or more consecutive narrators missing." },
-  { key: "muallaq", title: "Muʿallaq (معلق)", description: "Beginning of chain missing." },
-  { key: "mudallas", title: "Mudallas (مدلس)", description: "Narrator hides the person he heard from." },
-  { key: "muannan", title: "Muʿannʿan (معنعن)", description: "Narrated with “from” (عن); hearing not guaranteed." },
-  { key: "mursal-jali", title: "Mursal Jali (مرسل جلي)", description: "Clear disconnection." },
-  { key: "mursal-khafi", title: "Mursal Khafi (مرسل خفي)", description: "Hidden disconnection." },
+const chainTypeInfo: Array<{
+  key: string;
+  title: string;
+  secondary?: string;
+  description: string;
+}> = [
+  { key: "musnad", title: "Musnad", secondary: "(مسند)", description: "Fully connected chain reaching Prophet ﷺ." },
+  { key: "mursal", title: "Mursal", secondary: "(مرسل)", description: "Tābiʿī skips the Companion." },
+  { key: "munqati", title: "Munqaṭiʿ", secondary: "(منقطع)", description: "A break in the chain at any point." },
+  { key: "muadal", title: "Muʿḍal", secondary: "(معضل)", description: "Two or more consecutive narrators missing." },
+  { key: "muallaq", title: "Muʿallaq", secondary: "(معلق)", description: "Beginning of chain missing." },
+  { key: "mudallas", title: "Mudallas", secondary: "(مدلس)", description: "Narrator hides the person he heard from." },
+  { key: "muannan", title: "Muʿannʿan", secondary: "(معنعن)", description: "Narrated with “from” (عن); hearing not guaranteed." },
+  { key: "mursal-jali", title: "Mursal Jali", secondary: "(مرسل جلي)", description: "Clear disconnection." },
+  { key: "mursal-khafi", title: "Mursal Khafi", secondary: "(مرسل خفي)", description: "Hidden disconnection." },
 ];
 
 const narrationLevelInfo: Record<
   NarrationLevel,
-  { title: string; description: string }
+  { title: string; secondary: string; description: string }
 > = {
   mutawatir: {
-    title: "Mutawātir (متواتر)",
+    title: "Mutawātir",
+    secondary: "(متواتر)",
     description: "Reported by many; impossible to fabricate.",
   },
   mashhur: {
-    title: "Mashhūr (مشهور)",
+    title: "Mashhūr",
+    secondary: "(مشهور)",
     description: "Narrated by 3+ in every generation.",
   },
   aziz: {
-    title: "ʿAzīz (عزيز)",
+    title: "ʿAzīz",
+    secondary: "(عزيز)",
     description: "Narrated by at least 2 at each level.",
   },
   gharib: {
-    title: "Gharīb (غريب)",
+    title: "Gharīb",
+    secondary: "(غريب)",
     description: "Single narrator at one stage.",
   },
   fard: {
-    title: "Fard (فرد)",
+    title: "Fard",
+    secondary: "(فرد)",
     description: "Unique chain; only one path.",
   },
 };
@@ -288,40 +308,40 @@ const sourceAuthorMap: Record<string, SourceAuthorInfo> = {
 
 const narratorTierInfo: Record<
   NarratorTier,
-  { title: string; description: string }
+  { title: string; secondary?: string; description: string }
 > = {
   sahabi: {
-    title: "Ṣaḥābī (Companion)",
+    title: "Ṣaḥābī",
     description:
       "A Muslim who met the Prophet ﷺ, believed in him, and died as a believer.",
   },
   tabi: {
-    title: "Tābiʿī (Follower)",
+    title: "Tābiʿī",
     description: "A Muslim who met a Companion but did not meet the Prophet ﷺ.",
   },
   atbae: {
-    title: "Atbāʿ al-Tābiʿīn (Followers of the Followers)",
+    title: "Atbāʿ al-Tābiʿīn",
     description: "Those who met the Tābiʿīn but did not meet Companions.",
   },
   muhaddith: {
-    title: "Muhaddith (Hadith Scholar / Narrator)",
+    title: "Muhaddith",
     description: "A specialist who collects, transmits, and verifies hadith.",
   },
   rawi: {
-    title: "Rāwī (Narrator / Transmitter)",
+    title: "Rāwī",
     description:
       "A transmitter anywhere in the isnād — from trustworthy to weak narrators.",
   },
   shaykh: {
-    title: "Shaykh (Teacher in the isnād)",
+    title: "Shaykh",
     description: "An immediate teacher from whom a narrator directly learned.",
   },
   talib: {
-    title: "Ṭālib al-Ḥadīth (Student of Hadith)",
+    title: "Ṭālib al-Ḥadīth",
     description: "Learners who travel to gather hadith and share what they learn.",
   },
   mujaz: {
-    title: "Mujāz (One with Ijāzah)",
+    title: "Mujāz",
     description: "A narrator formally authorized to transmit specific chains.",
   },
 };
@@ -330,6 +350,7 @@ const reliabilityTierInfo: Record<
   ReliabilityTier,
   {
     title: string;
+    secondary?: string;
     description: string;
     badge: string;
     background: string;
@@ -337,49 +358,56 @@ const reliabilityTierInfo: Record<
   }
 > = {
   thiqah: {
-    title: "Thiqah (Trustworthy)",
+    title: "Thiqah",
+    secondary: "(ثقة)",
     description: "Strong memory with impeccable character.",
     badge: "Thiqah",
     background: "#065f46",
     color: "#ecfdf5",
   },
   saduq: {
-    title: "Ṣadūq (Truthful)",
+    title: "Ṣadūq",
+    secondary: "(صدوق)",
     description: "Good character with slightly lighter memory.",
     badge: "Ṣadūq",
     background: "#15803d",
     color: "#ecfdf5",
   },
   layyin: {
-    title: "Layyin (Soft/Weak)",
+    title: "Layyin",
+    secondary: "(لين)",
     description: "Weak memory requiring support.",
     badge: "Layyin",
     background: "#f97316",
     color: "#fff7ed",
   },
   matruk: {
-    title: "Matrūk (Abandoned)",
+    title: "Matrūk",
+    secondary: "(متروك)",
     description: "Extremely weak; narrations are left aside.",
     badge: "Matrūk",
     background: "#ea580c",
     color: "#fff7ed",
   },
   kadhdhab: {
-    title: "Kādhdhāb (Liar)",
+    title: "Kādhdhāb",
+    secondary: "(كذاب)",
     description: "Accused of fabricating hadith.",
     badge: "Kādhdhāb",
     background: "#7f1d1d",
     color: "#fee2e2",
   },
   majhul_ayn: {
-    title: "Majhūl al-ʿAyn (Unknown person)",
+    title: "Majhūl al-ʿAyn",
+    secondary: "(مجهول العين)",
     description: "Only a single narrator reports from them.",
     badge: "Majhūl al-ʿAyn",
     background: "#475569",
     color: "#e2e8f0",
   },
   majhul_hal: {
-    title: "Majhūl al-Ḥāl (Unknown condition)",
+    title: "Majhūl al-Ḥāl",
+    secondary: "(مجهول الحال)",
     description: "Identity known but character not documented.",
     badge: "Majhūl al-Ḥāl",
     background: "#64748b",
@@ -387,6 +415,7 @@ const reliabilityTierInfo: Record<
   },
   mukhadram: {
     title: "Mukhadram",
+    secondary: "(مخضرم)",
     description: "Lived during the Prophet’s era but never met him.",
     badge: "Mukhadram",
     background: "#2563eb",
@@ -2194,75 +2223,13 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
           <>
             <div className="my-4 h-px w-full bg-[var(--border-soft)]" />
             <div className="scrollbar-hide mt-4 space-y-6 overflow-y-auto pr-2">
-              <section className="grid gap-4 text-left text-xs text-[var(--text-secondary)] sm:grid-cols-2">
-                <div className="space-y-3 rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-4 py-3">
+              <section className="grid gap-4 text-left text-xs text-[var(--text-secondary)] sm:grid-cols-2 lg:grid-cols-3">
+                <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-4 py-3">
                   <p className="text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
-                    Attribution Type
+                    Narration Level
                   </p>
-                  {(activeSourceTypes.length
-                    ? activeSourceTypes
-                    : [
-                        {
-                          key: "none",
-                          title: "Not specified",
-                          description: "No source classification provided.",
-                        },
-                      ]
-                  ).map((item) => (
-                    <DisclosureRow key={item.title} title={item.title}>
-                      {item.description}
-                    </DisclosureRow>
-                  ))}
-                </div>
-                <div className="space-y-3 rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-4 py-3">
-                  <p className="text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
-                    Chain Type
-                  </p>
-                  {(activeChainTypes.length
-                    ? activeChainTypes
-                    : [
-                        {
-                          key: "none",
-                          title: "Not specified",
-                          description: "No chain classification provided.",
-                        },
-                      ]
-                  ).map((item) => (
-                    <DisclosureRow key={item.title} title={item.title}>
-                      {item.description}
-                    </DisclosureRow>
-                  ))}
-                </div>
-              </section>
-              <div className="grid gap-4 text-left text-xs text-[var(--text-secondary)] md:grid-cols-[0.65fr_0.35fr] items-start">
-                <div className="space-y-2">
-                  <span
-                    className="inline-flex rounded-full px-4 py-1 text-xs font-semibold uppercase tracking-[0.18em]"
-                    style={
-                      currentGradingStyle
-                        ? {
-                          backgroundColor: currentGradingStyle.background,
-                          color: currentGradingStyle.color,
-                          boxShadow: `0 10px 25px ${currentGradingStyle.background}1a`,
-                        }
-                        : undefined
-                    }
-                  >
-                    {formattedCurrentGrading}
-                  </span>
-                  {currentGradingStyle?.description && (
-                    <p className="mt-2 text-sm text-[var(--text-secondary)]">
-                      {currentGradingStyle.description}
-                    </p>
-                  )}
-                </div>
-                <div className="flex flex-col items-end gap-2 text-right text-sm font-semibold text-[var(--text-primary)]">
-                  <span>{nonProphetNarratorCount} narrators</span>
-                  {currentNarrationLevelInfo && (
-                    <div className="w-full rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-3 py-2 text-left text-xs text-[var(--text-secondary)]">
-                      <p className="text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
-                        Narration Level
-                      </p>
+                  {currentNarrationLevelInfo ? (
+                    <>
                       <button
                         type="button"
                         onClick={() =>
@@ -2276,13 +2243,98 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                         </span>
                       </button>
                       {isNarrationDetailsOpen && (
-                        <p className="mt-1 text-[var(--text-secondary)]">
-                          {currentNarrationLevelInfo.description}
-                        </p>
+                        <div className="mt-1 space-y-1 text-[var(--text-secondary)]">
+                          {currentNarrationLevelInfo.secondary && (
+                            <p className="text-[0.65rem] uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                              {currentNarrationLevelInfo.secondary}
+                            </p>
+                          )}
+                          <p>{currentNarrationLevelInfo.description}</p>
+                        </div>
                       )}
-                    </div>
+                    </>
+                  ) : (
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">
+                      Not classified
+                    </p>
                   )}
                 </div>
+                <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-4 py-3">
+                  <p className="text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                    Attribution Type
+                  </p>
+                  <div className="mt-1 space-y-2">
+                    {(activeSourceTypes.length
+                      ? activeSourceTypes
+                      : [
+                          {
+                            key: "none",
+                            title: "Not specified",
+                            description:
+                              "No source classification provided.",
+                          },
+                        ]
+                    ).map((item) => (
+                      <DisclosureRow
+                        key={item.title}
+                        title={item.title}
+                        secondary={item.secondary}
+                      >
+                        {item.description}
+                      </DisclosureRow>
+                    ))}
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-4 py-3">
+                  <p className="text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                    Chain Type
+                  </p>
+                  <div className="mt-1 space-y-2">
+                    {(activeChainTypes.length
+                      ? activeChainTypes
+                      : [
+                          {
+                            key: "none",
+                            title: "Not specified",
+                            description:
+                              "No chain classification provided.",
+                          },
+                        ]
+                    ).map((item) => (
+                      <DisclosureRow
+                        key={item.title}
+                        title={item.title}
+                        secondary={item.secondary}
+                      >
+                        {item.description}
+                      </DisclosureRow>
+                    ))}
+                  </div>
+                </div>
+              </section>
+              <div className="text-center text-xs text-[var(--text-secondary)]">
+                <p className="text-sm font-semibold text-[var(--text-primary)]">
+                  {nonProphetNarratorCount} narrators
+                </p>
+                <span
+                  className="mt-2 inline-flex rounded-full px-4 py-1 text-xs font-semibold uppercase tracking-[0.18em]"
+                  style={
+                    currentGradingStyle
+                      ? {
+                        backgroundColor: currentGradingStyle.background,
+                        color: currentGradingStyle.color,
+                        boxShadow: `0 10px 25px ${currentGradingStyle.background}1a`,
+                      }
+                      : undefined
+                  }
+                >
+                  {formattedCurrentGrading}
+                </span>
+                {currentGradingStyle?.description && (
+                  <p className="mt-2 text-sm text-[var(--text-secondary)]">
+                    {currentGradingStyle.description}
+                  </p>
+                )}
               </div>
               <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-panel)] p-4 shadow-lg">
                 <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
@@ -2370,6 +2422,11 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                                 <span className="text-[var(--text-primary)]">
                                   {tierInfo?.title ?? "Narrator"}
                                 </span>
+                                {tierInfo?.secondary && (
+                                  <span className="ml-2 text-[0.65rem] uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                                    {tierInfo.secondary}
+                                  </span>
+                                )}
                               </p>
                               <p>
                                 {tierInfo?.description ??
@@ -2384,6 +2441,11 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                                     {reliabilityInfo.title}
                                   </span>
                                 </p>
+                                {reliabilityInfo.secondary && (
+                                  <p className="text-[0.65rem] uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                                    {reliabilityInfo.secondary}
+                                  </p>
+                                )}
                                 <p>{reliabilityInfo.description}</p>
                               </div>
                             )}
@@ -2423,10 +2485,12 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
 }
 const DisclosureRow = ({
   title,
+  secondary,
   children,
 }: {
   title: string;
-  children: React.ReactNode;
+  secondary?: string;
+  children: ReactNode;
 }) => {
   const [open, setOpen] = useState(false);
   return (
@@ -2441,7 +2505,16 @@ const DisclosureRow = ({
           {open ? "▴" : "▾"}
         </span>
       </button>
-      {open && <p className="text-[var(--text-secondary)]">{children}</p>}
+      {open && (
+        <div className="space-y-1 text-[var(--text-secondary)]">
+          {secondary && (
+            <p className="text-[0.65rem] uppercase tracking-[0.12em] text-[var(--text-muted)]">
+              {secondary}
+            </p>
+          )}
+          <p>{children}</p>
+        </div>
+      )}
     </div>
   );
 };
