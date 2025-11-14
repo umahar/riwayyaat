@@ -6,6 +6,7 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { IconButton } from "@/components/ui/button";
 import { FilterMenu, FilterOption } from "@/components/ui/filter-menu";
 import { HadithInsight } from "@/lib/hadith/types";
+import { workspaceCopy } from "@/content/text";
 import { HadithCard } from "./hadith-card";
 
 export type FilterGroup = {
@@ -16,6 +17,7 @@ export type FilterGroup = {
   selected: Set<string>;
   onToggle: (value: string) => void;
   onClear: () => void;
+  clearLabel: string;
 };
 
 type HadithSidebarProps = {
@@ -42,6 +44,7 @@ export function HadithSidebar({
   filterGroups,
 }: HadithSidebarProps) {
   const [expandedMatnIds, setExpandedMatnIds] = useState<Set<string>>(new Set());
+  const copy = workspaceCopy.sidebar;
   const toggleMatn = (id: string) => {
     setExpandedMatnIds((current) => {
       const next = new Set(current);
@@ -66,7 +69,7 @@ export function HadithSidebar({
           <div className="flex flex-1 items-center justify-between gap-3">
             <Logo className="scale-90 transform" />
             <div className="flex items-center gap-2">
-              <IconButton label="Start a new chat" onClick={onNewChat}>
+              <IconButton label={copy.newChatLabel} onClick={onNewChat}>
                 ✦
               </IconButton>
               <ThemeToggle className="hover:-translate-y-0.5" />
@@ -74,7 +77,7 @@ export function HadithSidebar({
           </div>
         )}
         <IconButton
-          label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          label={collapsed ? copy.expandLabel : copy.collapseLabel}
           onClick={onToggleCollapse}
         >
           {collapsed ? "→" : "←"}
@@ -85,30 +88,31 @@ export function HadithSidebar({
         <>
           <header className="space-y-1">
             <div className="flex flex-nowrap items-center gap-2 whitespace-nowrap sm:gap-3">
-              <div className="flex flex-col whitespace-nowrap">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
-                  Hadiths
-                </p>
-                <p className="text-base font-semibold text-[var(--text-primary)]">
-                  {hadiths.length} results
-                </p>
-              </div>
-              <div className="flex flex-nowrap items-center gap-2 sm:gap-3">
-                {filterGroups.map((group) => (
-                  <FilterMenu
-                    key={group.key}
+                <div className="flex flex-col whitespace-nowrap">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+                    {copy.heading}
+                  </p>
+                  <p className="text-base font-semibold text-[var(--text-primary)]">
+                    {hadiths.length} {copy.resultsSuffix}
+                  </p>
+                </div>
+                <div className="flex flex-nowrap items-center gap-2 sm:gap-3">
+                  {filterGroups.map((group) => (
+                    <FilterMenu
+                      key={group.key}
                     label={group.label}
                     menuTitle={group.menuTitle}
                     options={group.options.map<FilterOption>((value) => ({
                       label: value,
                       value,
                     }))}
-                    selectedValues={group.selected}
-                    onToggle={group.onToggle}
-                    onClear={group.onClear}
-                  />
-                ))}
-              </div>
+                      selectedValues={group.selected}
+                      onToggle={group.onToggle}
+                      onClear={group.onClear}
+                      clearLabel={group.clearLabel}
+                    />
+                  ))}
+                </div>
             </div>
           </header>
           <div className="space-y-6">
@@ -123,7 +127,7 @@ export function HadithSidebar({
                 />
               ))
             ) : (
-              <p className="text-sm text-[var(--text-muted)]">No hadith match the selected filters.</p>
+              <p className="text-sm text-[var(--text-muted)]">{copy.emptyState}</p>
             )}
           </div>
         </>

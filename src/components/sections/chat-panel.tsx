@@ -2,9 +2,10 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { Logo } from "@/components/ui/logo";
-import { siteConfig } from "@/lib/site";
+import { siteConfig } from "@/content/site";
 import { AuroraBackground } from "@/components/ui/aurora-background";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { chatPanelCopy } from "@/content/text";
 
 type ChatPanelProps = {
   onSubmit?: (prompt: string) => void;
@@ -55,12 +56,9 @@ export function ChatPanel({ onSubmit }: ChatPanelProps) {
         <Logo />
         <div className="space-y-4">
           <h1 className="text-4xl font-bold leading-tight tracking-[var(--tracking-tight)] text-balance text-[var(--text-primary)]">
-            Ask any question about a hadith, its matn, or sanad.
+            {chatPanelCopy.title}
           </h1>
-          <p className="text-base text-[var(--text-secondary)]">
-            Describe a narration, compare transmissions, probe narrator
-            reliability, or surface commentaries—all from one canvas.
-          </p>
+          <p className="text-base text-[var(--text-secondary)]">{chatPanelCopy.description}</p>
         </div>
 
         <form className="w-full space-y-3" onSubmit={handleSubmit}>
@@ -73,13 +71,13 @@ export function ChatPanel({ onSubmit }: ChatPanelProps) {
             }}
           >
             <label className="sr-only" htmlFor="hadith-question">
-              Ask about any hadith
+              {chatPanelCopy.inputLabel}
             </label>
             <input
               id="hadith-question"
               type="text"
               autoComplete="off"
-              placeholder="Ask anything about any hadith, its matn, or sanad..."
+              placeholder={chatPanelCopy.placeholder}
               value={value}
               onChange={(event) => setValue(event.target.value)}
               className="flex-1 rounded-[20px] border border-transparent bg-transparent px-4 py-3 text-base text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--input-border-focus)] focus:outline-none"
@@ -92,14 +90,14 @@ export function ChatPanel({ onSubmit }: ChatPanelProps) {
                 color: "var(--accent-contrast)",
               }}
             >
-              Ask
+              {chatPanelCopy.buttonLabel}
             </button>
           </div>
         </form>
 
         <div className="flex w-full flex-col gap-3 text-left">
           <p className="text-xs uppercase tracking-[0.4em] text-[var(--text-subtle)]">
-            Try asking
+            {chatPanelCopy.tryHeading}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
             {promptPairs.map(({ id, prompt }) => (
@@ -114,11 +112,8 @@ export function ChatPanel({ onSubmit }: ChatPanelProps) {
                 }}
                 onClick={() => handlePromptClick(prompt)}
               >
-                <span
-                  className="text-lg"
-                  style={{ color: "var(--accent-emerald)" }}
-                >
-                  ✦
+                <span className="text-lg" style={{ color: "var(--accent-emerald)" }}>
+                  {chatPanelCopy.promptIcon}
                 </span>
                 <span className="leading-snug text-balance">{prompt}</span>
               </button>

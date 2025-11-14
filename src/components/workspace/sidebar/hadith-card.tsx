@@ -3,6 +3,7 @@
 import { HadithInsight } from "@/lib/hadith/types";
 import { formatGradingLabel, getGradingStyle } from "@/lib/hadith/taxonomy";
 import { Tag } from "@/components/ui/tag";
+import { workspaceCopy } from "@/content/text";
 
 type HadithCardProps = {
   hadith: HadithInsight;
@@ -21,6 +22,7 @@ export function HadithCard({ hadith, active, expanded, onSelect }: HadithCardPro
       ? `${hadith.matn.slice(0, MATN_PREVIEW_LIMIT)}…`
       : hadith.matn;
   const matnPreview = expanded ? hadith.matn : truncated;
+  const detailsCopy = workspaceCopy.details;
 
   return (
     <article
@@ -60,7 +62,7 @@ export function HadithCard({ hadith, active, expanded, onSelect }: HadithCardPro
           {hadith.details.chapter}
         </Tag>
         <Tag tone="chip" className="text-[var(--text-secondary)]">
-          Book {hadith.details.bookNumber}
+          {detailsCopy.bookLabel} {hadith.details.bookNumber}
         </Tag>
       </div>
     </article>

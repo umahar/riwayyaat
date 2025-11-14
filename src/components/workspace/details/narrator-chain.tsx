@@ -9,6 +9,7 @@ import {
   transmissionMethods,
 } from "@/lib/hadith/taxonomy";
 import { HadithInsight } from "@/lib/hadith/types";
+import { workspaceCopy } from "@/content/text";
 
 type NarratorChainProps = {
   hadith: HadithInsight;
@@ -16,7 +17,7 @@ type NarratorChainProps = {
 
 export function NarratorChain({ hadith }: NarratorChainProps) {
   const [expandedNarrators, setExpandedNarrators] = useState<Set<string>>(new Set());
-
+  const copy = workspaceCopy.narratorChain;
   const handleToggle = (name: string) => {
     setExpandedNarrators((current) => {
       const next = new Set(current);
@@ -35,10 +36,10 @@ export function NarratorChain({ hadith }: NarratorChainProps) {
     <Card tone="panel" className="p-4 shadow-lg">
       <div className="flex items-center justify-between">
         <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
-          Isnad chain
+          {copy.sectionTitle}
         </h4>
         <span className="text-sm font-semibold text-[var(--text-primary)]">
-          {nonProphetNarratorCount} narrators
+          {nonProphetNarratorCount} {copy.countSuffix}
         </span>
       </div>
       <ul className="mt-4 space-y-5">
@@ -129,7 +130,7 @@ export function NarratorChain({ hadith }: NarratorChainProps) {
                   <div className="mt-3 space-y-3 text-xs leading-relaxed text-[var(--text-secondary)]">
                     <div>
                       <p className="font-semibold text-[var(--text-primary)]">
-                        Generational Rank:{" "}
+                        {copy.generationalRank}:{" "}
                         <span className="text-[var(--text-primary)]">
                           {tierInfo?.title ?? "Narrator"}
                         </span>
@@ -139,15 +140,12 @@ export function NarratorChain({ hadith }: NarratorChainProps) {
                           </span>
                         )}
                       </p>
-                      <p>
-                        {tierInfo?.description ??
-                          "Narration role pending further classification."}
-                      </p>
+                      <p>{tierInfo?.description ?? copy.roleFallback}</p>
                     </div>
                     {reliabilityInfo && (
                       <div>
                         <p className="font-semibold text-[var(--text-primary)]">
-                          Reliability Rank:{" "}
+                          {copy.reliabilityRank}:{" "}
                           <span className="text-[var(--text-primary)]">
                             {reliabilityInfo.title}
                           </span>
@@ -163,10 +161,8 @@ export function NarratorChain({ hadith }: NarratorChainProps) {
                     {methodInfo && (
                       <div>
                         <p className="font-semibold text-[var(--text-primary)]">
-                          Transmission Method:{" "}
-                          <span className="text-[var(--text-primary)]">
-                            {methodInfo.title}
-                          </span>
+                          {copy.transmissionMethod}:{" "}
+                          <span className="text-[var(--text-primary)]">{methodInfo.title}</span>
                         </p>
                         <p>{methodInfo.description}</p>
                       </div>

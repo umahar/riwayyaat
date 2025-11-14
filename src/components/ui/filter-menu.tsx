@@ -12,6 +12,7 @@ type FilterMenuProps = {
   selectedValues: Set<string>;
   onToggle: (value: string) => void;
   onClear?: () => void;
+  clearLabel?: string;
   className?: string;
 };
 
@@ -29,6 +30,7 @@ export function FilterMenu({
   selectedValues,
   onToggle,
   onClear,
+  clearLabel = "Clear",
   className = "",
 }: FilterMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -87,7 +89,7 @@ export function FilterMenu({
               onClick={onClear}
               className="mt-3 text-xs font-semibold text-emerald-600 hover:text-emerald-700"
             >
-              Clear
+              {clearLabel}
             </button>
           )}
         </div>

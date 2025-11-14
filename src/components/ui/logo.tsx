@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { siteConfig } from "@/lib/site";
+import { siteConfig } from "@/content/site";
 
 type LogoProps = {
   className?: string;

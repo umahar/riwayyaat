@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme/theme-provider";
+import { layoutCopy } from "@/content/text";
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -12,11 +13,10 @@ const poppins = Poppins({
 export const metadata: Metadata = {
   metadataBase: new URL("https://riwayyaat.app"),
   title: {
-    default: "Riwayyaat",
-    template: "%s • Riwayyaat",
+    default: layoutCopy.metadata.defaultTitle,
+    template: layoutCopy.metadata.titleTemplate,
   },
-  description:
-    "Riwayyaat is a graph-native workspace for tracing hadith narrations, sanad integrity, and matn insights — a project by UA.",
+  description: layoutCopy.metadata.description,
 };
 
 export default function RootLayout({

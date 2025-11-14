@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Logo } from "@/components/ui/logo";
-import { siteConfig } from "@/lib/site";
+import { siteConfig } from "@/content/site";
+import { heroCopy } from "@/content/text";
 import { AuroraBackground } from "@/components/ui/aurora-background";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 
@@ -50,19 +51,19 @@ export function SplashHero() {
       <div className="grid w-full max-w-4xl grid-cols-1 gap-6 text-left sm:grid-cols-2">
         <div className="rounded-3xl border border-[var(--border-soft)] bg-[var(--surface-panel)] p-6 shadow-lg">
           <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[var(--text-muted)]">
-            Masters Research Project
+            {heroCopy.contactCardLabel}
           </p>
           <div className="mt-4 space-y-1 text-sm text-[var(--text-secondary)]">
             <p className="text-2xl font-semibold text-[var(--text-primary)]">
-              Umair Abdullah
+              {heroCopy.contactStudentName}
             </p>
-            <p>B01007607</p>
+            <p>{heroCopy.contactStudentId}</p>
             <p>
               <a
-                href="mailto:Abdullah-U@ulster.ac.uk"
+                href={`mailto:${heroCopy.contactEmailLabel}`}
                 className="underline-offset-2 hover:underline"
               >
-                Abdullah-U@ulster.ac.uk
+                {heroCopy.contactEmailLabel}
               </a>
             </p>
           </div>
@@ -70,13 +71,13 @@ export function SplashHero() {
 
         <div className="rounded-3xl border border-[var(--border-soft)] bg-[var(--surface-panel)] p-6 shadow-lg">
           <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[var(--text-muted)]">
-            Supervised by
+            {heroCopy.supervisorCardLabel}
           </p>
           <p className="mt-4 text-2xl font-semibold text-[var(--text-primary)]">
-            Dr. Marwan M Radwan
+            {heroCopy.supervisorName}
           </p>
           <p className="mt-2 text-sm text-[var(--text-secondary)]">
-            School of Computing, Ulster University
+            {heroCopy.supervisorOrg}
           </p>
         </div>
       </div>

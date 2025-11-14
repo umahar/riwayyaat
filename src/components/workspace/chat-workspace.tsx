@@ -13,6 +13,7 @@ import {
 } from "react";
 import { hadithInsights } from "@/lib/hadith/data";
 import { HadithInsight, Message } from "@/lib/hadith/types";
+import { workspaceCopy } from "@/content/text";
 import { HadithSidebar, FilterGroup } from "@/components/workspace/sidebar/hadith-sidebar";
 import { ConversationPanel } from "@/components/workspace/chat/conversation-panel";
 import { HadithDetailsPanel } from "@/components/workspace/details/hadith-details-panel";
@@ -34,8 +35,7 @@ const createSeedMessages = (prompt: string): Message[] =>
         {
           id: "assistant-initial",
           role: "assistant",
-          content:
-            "I parsed your request and gathered sanad overlaps along with commentary layers. Ask follow-up questions or request visual comparisons.",
+          content: workspaceCopy.system.placeholderResponse,
           timestamp: new Date().toLocaleTimeString(),
         },
       ]
@@ -92,8 +92,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
       {
         id: `assistant-${prev.length}`,
         role: "assistant",
-        content:
-          "Here is a synthesized response referencing the narrations and highlighting sanad integrity. (Placeholder response until backend is wired.)",
+        content: workspaceCopy.system.placeholderResponse,
         timestamp,
       },
     ]);
@@ -145,41 +144,36 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
     () => [
       {
         key: "grading",
-        label: "Grade",
-        menuTitle: "Select grade",
+        label: workspaceCopy.sidebar.filters.grade.label,
+        menuTitle: workspaceCopy.sidebar.filters.grade.title,
         options: gradingOptions,
         selected: selectedGradings,
         onToggle: (value: string) => toggleSetValue(value, setSelectedGradings),
         onClear: () => setSelectedGradings(new Set<string>()),
+        clearLabel: workspaceCopy.sidebar.filters.grade.clear,
       },
       {
         key: "book",
-        label: "Book",
-        menuTitle: "Select book",
+        label: workspaceCopy.sidebar.filters.book.label,
+        menuTitle: workspaceCopy.sidebar.filters.book.title,
         options: bookOptions,
         selected: selectedBooks,
         onToggle: (value: string) => toggleSetValue(value, setSelectedBooks),
         onClear: () => setSelectedBooks(new Set<string>()),
+        clearLabel: workspaceCopy.sidebar.filters.book.clear,
       },
       {
         key: "source",
-        label: "Source",
-        menuTitle: "Select source",
+        label: workspaceCopy.sidebar.filters.source.label,
+        menuTitle: workspaceCopy.sidebar.filters.source.title,
         options: sourceOptions,
         selected: selectedSources,
         onToggle: (value: string) => toggleSetValue(value, setSelectedSources),
         onClear: () => setSelectedSources(new Set<string>()),
+        clearLabel: workspaceCopy.sidebar.filters.source.clear,
       },
     ],
-    [
-      gradingOptions,
-      selectedGradings,
-      bookOptions,
-      selectedBooks,
-      sourceOptions,
-      selectedSources,
-      toggleSetValue,
-    ],
+    [gradingOptions, selectedGradings, bookOptions, selectedBooks, sourceOptions, selectedSources, toggleSetValue],
   );
 
   const filteredHadiths = useMemo(

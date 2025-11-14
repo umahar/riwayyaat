@@ -13,6 +13,7 @@ import {
   sourceTypeInfo,
 } from "@/lib/hadith/taxonomy";
 import { HadithInsight } from "@/lib/hadith/types";
+import { workspaceCopy } from "@/content/text";
 import { NarratorChain } from "./narrator-chain";
 
 type HadithDetailsPanelProps = {
@@ -23,6 +24,7 @@ type HadithDetailsPanelProps = {
 
 export function HadithDetailsPanel({ hadith, isDesktop, onResizeStart }: HadithDetailsPanelProps) {
   const [isNarrationDetailsOpen, setIsNarrationDetailsOpen] = useState(false);
+  const detailsCopy = workspaceCopy.details;
 
   const gradingData = useMemo(() => {
     if (!hadith) return null;
@@ -34,7 +36,7 @@ export function HadithDetailsPanel({ hadith, isDesktop, onResizeStart }: HadithD
   if (!hadith) {
     return (
       <aside className="scrollbar-hide relative flex max-h-svh flex-col overflow-y-auto bg-[var(--background-alt)] px-6 py-8">
-        <h3 className="text-lg font-semibold text-[var(--text-secondary)]">Select a hadith to view isnad</h3>
+        <h3 className="text-lg font-semibold text-[var(--text-secondary)]">{detailsCopy.selectPrompt}</h3>
         {isDesktop && (
           <div
             role="separator"
@@ -62,19 +64,24 @@ export function HadithDetailsPanel({ hadith, isDesktop, onResizeStart }: HadithD
             {hadith.details.source}
           </h3>
           <p className="text-sm font-semibold text-[var(--text-secondary)]">
-            Book {hadith.details.bookNumber}, Hadith {hadith.details.hadithNumber}
+            {detailsCopy.bookLabel} {hadith.details.bookNumber}, {detailsCopy.hadithLabel}{" "}
+            {hadith.details.hadithNumber}
           </p>
         </div>
-        {sourceAuthor && (
-          <div className="flex flex-col items-end gap-1 text-xs font-semibold text-[var(--text-secondary)]">
-            <span className="px-3 py-1 text-right text-xs font-semibold text-[var(--text-secondary)]">
-              <span className="block text-[var(--text-primary)]">{sourceAuthor.name}</span>
-              <span className="mt-1 inline-block rounded-full bg-[var(--surface-card)] px-2 py-0.5 text-[0.7rem] font-semibold text-[var(--text-primary)] dark:bg-[var(--surface-card)]/60 dark:text-white">
-                {sourceAuthor.lifespan}
-              </span>
-            </span>
-          </div>
-        )}
+        <div className="flex flex-col items-end gap-1 text-xs font-semibold text-[var(--text-secondary)]">
+          <span className="px-3 py-1 text-right text-xs font-semibold text-[var(--text-secondary)]">
+            {sourceAuthor ? (
+              <>
+                <span className="block text-[var(--text-primary)]">{sourceAuthor.name}</span>
+                <span className="mt-1 inline-block rounded-full bg-[var(--surface-card)] px-2 py-0.5 text-[0.7rem] font-semibold text-[var(--text-primary)] dark:bg-[var(--surface-card)]/60 dark:text-white">
+                  {sourceAuthor.lifespan}
+                </span>
+              </>
+            ) : (
+              detailsCopy.authorFallback
+            )}
+          </span>
+        </div>
       </header>
 
       <div className="my-4 h-px w-full bg-[var(--border-soft)]" />
@@ -83,7 +90,7 @@ export function HadithDetailsPanel({ hadith, isDesktop, onResizeStart }: HadithD
         <section className="grid gap-4 text-left text-xs text-[var(--text-secondary)] sm:grid-cols-2 lg:grid-cols-3">
           <Card className="px-4 py-3 text-[var(--text-secondary)]" tone="surface">
             <p className="text-[0.6rem] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
-              Narration Level
+              {detailsCopy.narrationHeading}
             </p>
             {narrationDetails ? (
               <>
@@ -107,13 +114,13 @@ export function HadithDetailsPanel({ hadith, isDesktop, onResizeStart }: HadithD
                 )}
               </>
             ) : (
-              <p className="text-sm font-semibold text-[var(--text-primary)]">Not classified</p>
+              <p className="text-sm font-semibold text-[var(--text-primary)]">{detailsCopy.notClassified}</p>
             )}
           </Card>
 
           <Card className="px-4 py-3 text-[var(--text-secondary)]" tone="surface">
             <p className="text-[0.6rem] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
-              Attribution Type
+              {detailsCopy.attributionHeading}
             </p>
             <div className="mt-1 space-y-2">
               {(activeSourceTypes.length
@@ -121,8 +128,8 @@ export function HadithDetailsPanel({ hadith, isDesktop, onResizeStart }: HadithD
                 : [
                     {
                       key: "none",
-                      title: "Not specified",
-                      description: "No source classification provided.",
+                      title: detailsCopy.fallbackTitle,
+                      description: detailsCopy.fallbackDescription,
                     },
                   ]
               ).map((item) => (
@@ -135,7 +142,7 @@ export function HadithDetailsPanel({ hadith, isDesktop, onResizeStart }: HadithD
 
           <Card className="px-4 py-3 text-[var(--text-secondary)]" tone="surface">
             <p className="text-[0.6rem] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
-              Chain Type
+              {detailsCopy.chainHeading}
             </p>
             <div className="mt-1 space-y-2">
               {(activeChainTypes.length
@@ -143,8 +150,8 @@ export function HadithDetailsPanel({ hadith, isDesktop, onResizeStart }: HadithD
                 : [
                     {
                       key: "none",
-                      title: "Not specified",
-                      description: "No chain classification provided.",
+                      title: detailsCopy.fallbackTitle,
+                      description: detailsCopy.fallbackDescription,
                     },
                   ]
               ).map((item) => (
