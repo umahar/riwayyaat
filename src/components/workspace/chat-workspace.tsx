@@ -2056,7 +2056,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                           </p>
                         </div>
                         <span
-                          className={`rounded-full border border-[var(--chip-border)] bg-[var(--chip-bg)] px-3 py-1 text-xs font-semibold uppercase tracking-wide ${
+                          className={`rounded-full border border-[var(--chip-border)] bg-[var(--chip-bg)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.08em] ${
                             isActive
                               ? "text-[#1fb276]"
                               : "text-[var(--text-secondary)]"
@@ -2225,7 +2225,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
             <div className="scrollbar-hide mt-4 space-y-6 overflow-y-auto pr-2">
               <section className="grid gap-4 text-left text-xs text-[var(--text-secondary)] sm:grid-cols-2 lg:grid-cols-3">
                 <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-4 py-3">
-                  <p className="text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                  <p className="text-[0.6rem] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
                     Narration Level
                   </p>
                   {currentNarrationLevelInfo ? (
@@ -2260,7 +2260,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                   )}
                 </div>
                 <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-4 py-3">
-                  <p className="text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                  <p className="text-[0.6rem] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
                     Attribution Type
                   </p>
                   <div className="mt-1 space-y-2">
@@ -2286,7 +2286,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                   </div>
                 </div>
                 <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-4 py-3">
-                  <p className="text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                  <p className="text-[0.6rem] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
                     Chain Type
                   </p>
                   <div className="mt-1 space-y-2">
@@ -2313,9 +2313,6 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                 </div>
               </section>
               <div className="text-center text-xs text-[var(--text-secondary)]">
-                <p className="text-sm font-semibold text-[var(--text-primary)]">
-                  {nonProphetNarratorCount} narrators
-                </p>
                 <span
                   className="mt-2 inline-flex rounded-full px-4 py-1 text-xs font-semibold uppercase tracking-[0.18em]"
                   style={
@@ -2337,9 +2334,14 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                 )}
               </div>
               <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-panel)] p-4 shadow-lg">
-                <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
-                  Isnad chain
-                </h4>
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+                    Isnad chain
+                  </h4>
+                  <span className="text-sm font-semibold text-[var(--text-primary)]">
+                    {nonProphetNarratorCount} narrators
+                  </span>
+                </div>
               <ul className="mt-4 space-y-4">
                 {currentHadith.chain.map((node, index) => {
                   const isProphet = node.type === "prophet";
