@@ -2467,7 +2467,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                             </div>
                           </div>
                           {!isProphet && (
-                            <div className="flex flex-col items-end gap-1">
+                            <div className="flex flex-col items-center gap-1">
                               {reliabilityInfo && (
                                 <span
                                   className="rounded-full px-3 py-1 text-[0.6rem] font-semibold uppercase tracking-[0.12em]"
@@ -2480,7 +2480,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
                                 </span>
                               )}
                               {nodeLifespan && (
-                                <span className="rounded-full bg-[var(--surface-card)] px-2 py-0.5 text-[0.65rem] font-semibold text-[var(--text-primary)] dark:text-white">
+                                <span className="text-[0.65rem] font-semibold text-[var(--text-primary)] dark:text-white">
                                   {nodeLifespan}
                                 </span>
                               )}
