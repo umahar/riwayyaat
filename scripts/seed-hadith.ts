@@ -99,7 +99,9 @@ async function syncSequence(client: PoolClient, table: string, column = "id") {
     if (!seq) return;
     const maxResult = await client.query<{ max: number | null }>(`SELECT MAX(${column}) AS max FROM ${table}`);
     const max = maxResult.rows[0]?.max ?? 0;
-    await client.query("SELECT setval($1, $2)", [seq, max]);
+    const nextValue = max > 0 ? max : 1;
+    const isCalled = max > 0;
+    await client.query("SELECT setval($1, $2, $3)", [seq, nextValue, isCalled]);
   } catch (error) {
     if (!isMissingRelation(error)) {
       throw error;
