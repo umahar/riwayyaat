@@ -46,12 +46,32 @@ public/                  # Static assets
 
 ## Database Setup
 
-PostgreSQL connection scaffolding lives under `src/server/db`. Provide your credentials via environment variables (see `.env.example`). Once populated, you can verify connectivity by running a quick script or importing the helpers in a Node REPL:
+PostgreSQL connection scaffolding lives under `src/server/db`. Provide your credentials via environment variables (see `.env.example`). Empty passwords are supported — just leave `PGPASSWORD=` blank inside `.env.local`. Once populated, you can verify connectivity by running a quick script or importing the helpers in a Node REPL:
 
 ```bash
 cp .env.example .env.local   # update with your password
 node -e "import('./dist/server/db/client.js').then(m => m.healthcheck().then(console.log))"
 ```
+
+### Handy DB scripts
+
+These TS scripts rely on the same `.env.local` credentials and can be executed with `npx tsx <script>`:
+
+- `scripts/check-db.ts` – lightweight healthcheck.
+- `scripts/list-tables.ts` – list public schema tables.
+- `scripts/show-narration-levels.ts` – inspect narration-level lookup rows.
+- `scripts/seed-hadith.ts` – load the dummy hadithInsights data into the normalized schema.
+
+### Seeding dummy data
+
+The seeding script is idempotent and safe to run repeatedly (it upserts lookups and reuses matn/hadith rows). Typical flow:
+
+```bash
+npx tsx scripts/check-db.ts        # optional sanity check
+npx tsx scripts/seed-hadith.ts     # inserts/updates 42 demo hadith
+```
+
+If you add or tweak dummy data in `src/lib/hadith/data.ts`, re-run the seed script; subsequent runs only insert missing rows. The script uses transactions/savepoints, so any failure rolls back cleanly.
 
 Helpers:
 
