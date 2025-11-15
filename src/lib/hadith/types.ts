@@ -32,9 +32,13 @@ export type NarratorTier =
 export type ChainNode = {
   name: string;
   descriptor?: string;
+  lifespan?: string;
   type?: "prophet";
   classification?: NarratorTier;
+  classificationDetail?: LookupDetail;
   reliability?: ReliabilityTier;
+  reliabilityDetail?: ReliabilityDetail;
+  transmissionMethodDetail?: TransmissionMethodDetail;
 };
 
 export type HadithInsight = {
@@ -47,13 +51,21 @@ export type HadithInsight = {
     bookNumber: number;
     chapter: string;
     grading: string;
+    gradeInfo?: GradeInfo;
     hadithNumber: number;
     location: string;
+    author?: {
+      name: string;
+      lifespan?: string;
+    };
   };
   chain: ChainNode[];
   sourceTypes: string[];
+  sourceTypeDetails?: LookupDetail[];
   chainTypes: string[];
+  chainTypeDetails?: LookupDetail[];
   narrationLevel: NarrationLevel;
+  narrationLevelDetail?: LookupDetail;
 };
 
 export type GradingStyle = {
@@ -110,4 +122,27 @@ export type ReliabilityTierInfo = {
 export type TransmissionMethod = {
   title: string;
   description: string;
+};
+
+export type LookupDetail = {
+  id: number;
+  title: string;
+  secondary?: string | null;
+  description?: string | null;
+};
+
+export type GradeInfo = LookupDetail & {
+  backgroundColor?: string | null;
+  textColor?: string | null;
+};
+
+export type ReliabilityDetail = LookupDetail & {
+  badgeBackground?: string | null;
+  badgeTextColor?: string | null;
+  connectorColor?: string | null;
+};
+
+export type TransmissionMethodDetail = LookupDetail & {
+  pillBackgroundLight?: string | null;
+  pillBackgroundDark?: string | null;
 };

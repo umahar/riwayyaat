@@ -62,6 +62,8 @@ These TS scripts rely on the same `.env.local` credentials and can be executed w
 - `scripts/show-narration-levels.ts` – inspect narration-level lookup rows.
 - `scripts/seed-hadith.ts` – load the dummy hadithInsights data into the normalized schema.
 
+The `/api/hadith` route and accompanying hooks always read from Postgres, so keep the database running and seeded before launching the UI. Labels for narration levels, attribution types, chain types, narrator tiers, reliability badges, transmission methods, and grade colors/descriptions now come straight from their respective lookup tables — edit those rows to see changes reflected instantly in the UI.
+
 ### Seeding dummy data
 
 The seeding script is idempotent and safe to run repeatedly (it upserts lookups and reuses matn/hadith rows). Typical flow:

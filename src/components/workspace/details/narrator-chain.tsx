@@ -2,12 +2,6 @@
 
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
-import {
-  narratorLifespans,
-  narratorTierInfo,
-  reliabilityTierInfo,
-  transmissionMethods,
-} from "@/lib/hadith/taxonomy";
 import { HadithInsight } from "@/lib/hadith/types";
 import { workspaceCopy } from "@/content/text";
 
@@ -46,13 +40,15 @@ export function NarratorChain({ hadith }: NarratorChainProps) {
         {hadith.chain.map((node, index) => {
           const isProphet = node.type === "prophet";
           const isExpanded = expandedNarrators.has(node.name);
-          const tierInfo = !isProphet && node.classification ? narratorTierInfo[node.classification] : null;
-          const tierLabel = tierInfo?.title ? tierInfo.title.split(" (")[0] : node.descriptor;
-          const reliabilityInfo = !isProphet && node.reliability ? reliabilityTierInfo[node.reliability] : null;
-          const nodeLifespan = narratorLifespans[node.name];
+          const tierInfo = !isProphet ? node.classificationDetail : null;
+          const tierLabel = tierInfo?.title ?? node.descriptor;
+          const reliabilityInfo = !isProphet ? node.reliabilityDetail : null;
           const connectorColor =
-            !isProphet && reliabilityInfo ? reliabilityInfo.background : "var(--border-soft)";
-          const methodInfo = transmissionMethods[index % transmissionMethods.length];
+            !isProphet && reliabilityInfo?.connectorColor
+              ? reliabilityInfo.connectorColor
+              : "var(--border-soft)";
+          const methodInfo = !isProphet ? node.transmissionMethodDetail : null;
+          const nodeLifespan = node.lifespan;
           const baseClasses = isProphet
             ? "bg-gradient-to-r from-[#0b7a6c] to-[#1b4332] text-white border-transparent shadow-lg"
             : isExpanded
@@ -75,15 +71,15 @@ export function NarratorChain({ hadith }: NarratorChainProps) {
                 }}
                 className={`relative w-full rounded-2xl border px-4 py-3 text-left shadow-sm transition ${baseClasses}`}
               >
-                <div className="flex items-start gap-3">
-                  <div className="flex-1">
-                    <div className="flex items-start gap-2">
-                      {!isProphet && (
-                        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-[var(--accent-emerald)]/30 bg-[var(--accent-emerald)]/15 text-[0.7rem] text-[var(--accent-emerald)]">
-                          {index + 1}
-                        </span>
-                      )}
-                      <div>
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1">
+                      <div className="flex items-start gap-2">
+                        {!isProphet && (
+                          <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-[var(--accent-emerald)]/30 bg-[var(--accent-emerald)]/15 text-[0.7rem] text-[var(--accent-emerald)]">
+                            {index + 1}
+                          </span>
+                        )}
+                        <div>
                         <p className="text-sm font-semibold text-[color:inherit]">{node.name}</p>
                         <p
                           className={`mt-0.5 text-xs ${
@@ -95,17 +91,17 @@ export function NarratorChain({ hadith }: NarratorChainProps) {
                       </div>
                     </div>
                   </div>
-                  {!isProphet && (
+                  {!isProphet && (reliabilityInfo || nodeLifespan) && (
                     <div className="flex flex-col items-center gap-1">
                       {reliabilityInfo && (
                         <span
                           className="rounded-full px-3 py-1 text-[0.6rem] font-semibold uppercase tracking-[0.12em]"
                           style={{
-                            backgroundColor: reliabilityInfo.background,
-                            color: reliabilityInfo.color,
+                            backgroundColor: reliabilityInfo.badgeBackground ?? "var(--surface-card)",
+                            color: reliabilityInfo.badgeTextColor ?? "var(--text-primary)",
                           }}
                         >
-                          {reliabilityInfo.badge}
+                          {reliabilityInfo.title}
                         </span>
                       )}
                       {nodeLifespan && (
@@ -132,7 +128,7 @@ export function NarratorChain({ hadith }: NarratorChainProps) {
                       <p className="font-semibold text-[var(--text-primary)]">
                         {copy.generationalRank}:{" "}
                         <span className="text-[var(--text-primary)]">
-                          {tierInfo?.title ?? "Narrator"}
+                          {tierInfo?.title ?? copy.roleFallback}
                         </span>
                         {tierInfo?.secondary && (
                           <span className="ml-2 text-[0.65rem] uppercase tracking-[0.12em] text-[var(--text-muted)]">
@@ -171,8 +167,12 @@ export function NarratorChain({ hadith }: NarratorChainProps) {
                 )}
                 {!isProphet && methodInfo && (
                   <div
-                    className="pointer-events-none absolute bottom-0 left-1/2 h-6 w-28 -translate-x-1/2 translate-y-1/2 overflow-hidden rounded-full border border-[var(--border-soft)] bg-[#dbeafe] text-center text-[0.55rem] font-semibold uppercase text-[#0f172a] shadow-sm dark:bg-[#1e293b] dark:text-white"
-                    title={methodInfo.description}
+                    className="pointer-events-none absolute bottom-0 left-1/2 h-6 w-28 -translate-x-1/2 translate-y-1/2 overflow-hidden rounded-full border border-[var(--border-soft)] text-center text-[0.55rem] font-semibold uppercase shadow-sm"
+                    title={methodInfo.description ?? undefined}
+                    style={{
+                      backgroundColor: methodInfo.pillBackgroundLight ?? "#dbeafe",
+                      color: methodInfo.pillBackgroundDark ?? "#0f172a",
+                    }}
                   >
                     <span className="flex h-full w-full items-center justify-center">
                       {methodInfo.title}

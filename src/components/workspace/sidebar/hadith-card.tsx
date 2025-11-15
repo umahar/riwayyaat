@@ -1,7 +1,7 @@
 "use client";
 
 import { HadithInsight } from "@/lib/hadith/types";
-import { formatGradingLabel, getGradingStyle } from "@/lib/hadith/taxonomy";
+import { formatGradingLabel } from "@/lib/hadith/taxonomy";
 import { Tag } from "@/components/ui/tag";
 import { workspaceCopy } from "@/content/text";
 
@@ -15,8 +15,9 @@ type HadithCardProps = {
 const MATN_PREVIEW_LIMIT = 220;
 
 export function HadithCard({ hadith, active, expanded, onSelect }: HadithCardProps) {
-  const gradingStyle = getGradingStyle(hadith.details.grading);
   const gradingLabel = formatGradingLabel(hadith.details.grading);
+  const badgeBackground = hadith.details.gradeInfo?.backgroundColor ?? "var(--accent-emerald)";
+  const badgeColor = hadith.details.gradeInfo?.textColor ?? "#041b11";
   const truncated =
     hadith.matn.length > MATN_PREVIEW_LIMIT
       ? `${hadith.matn.slice(0, MATN_PREVIEW_LIMIT)}…`
@@ -52,8 +53,8 @@ export function HadithCard({ hadith, active, expanded, onSelect }: HadithCardPro
           tone="accent"
           className="tracking-[0.15em]"
           style={{
-            backgroundColor: gradingStyle.background,
-            color: gradingStyle.color,
+            backgroundColor: badgeBackground,
+            color: badgeColor,
           }}
         >
           {gradingLabel}

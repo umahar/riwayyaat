@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { hadithInsights } from "@/lib/hadith/data";
 import { HadithInsight } from "@/lib/hadith/types";
 
 type UseHadithDataResult = {
@@ -18,10 +17,14 @@ export function useHadithData(): UseHadithDataResult {
     setLoading(true);
     setError(null);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 50));
-      setData(hadithInsights);
+      const response = await fetch("/api/hadith");
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`);
+      }
+      const payload = (await response.json()) as { data: HadithInsight[] };
+      setData(payload.data ?? []);
     } catch (error) {
-      console.error(error);
+      console.error("[useHadithData] Failed to load hadith", error);
       setError("Unable to load hadith data.");
       setData([]);
     } finally {

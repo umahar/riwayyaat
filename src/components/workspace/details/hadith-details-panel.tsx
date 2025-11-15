@@ -4,14 +4,7 @@ import { ReactNode, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Disclosure } from "@/components/ui/disclosure";
 import { Tag } from "@/components/ui/tag";
-import {
-  chainTypeInfo,
-  formatGradingLabel,
-  getGradingStyle,
-  narrationLevelInfo,
-  sourceAuthorMap,
-  sourceTypeInfo,
-} from "@/lib/hadith/taxonomy";
+import { formatGradingLabel } from "@/lib/hadith/taxonomy";
 import { HadithInsight } from "@/lib/hadith/types";
 import { workspaceCopy } from "@/content/text";
 import { LoadingState } from "@/components/ui/state/loading-state";
@@ -42,9 +35,12 @@ export function HadithDetailsPanel({
 
   const gradingData = useMemo(() => {
     if (!hadith) return null;
-    const style = getGradingStyle(hadith.details.grading);
-    const label = formatGradingLabel(hadith.details.grading);
-    return { style, label };
+    return {
+      label: formatGradingLabel(hadith.details.grading),
+      backgroundColor: hadith.details.gradeInfo?.backgroundColor ?? "var(--accent-emerald)",
+      textColor: hadith.details.gradeInfo?.textColor ?? "#041b11",
+      description: hadith.details.gradeInfo?.description,
+    };
   }, [hadith]);
 
   if (loading) {
@@ -71,10 +67,28 @@ export function HadithDetailsPanel({
     );
   }
 
-  const activeSourceTypes = sourceTypeInfo.filter((item) => hadith.sourceTypes.includes(item.key));
-  const activeChainTypes = chainTypeInfo.filter((item) => hadith.chainTypes.includes(item.key));
-  const narrationDetails = narrationLevelInfo[hadith.narrationLevel];
-  const sourceAuthor = sourceAuthorMap[hadith.details.source] ?? null;
+  const activeSourceTypes =
+    hadith.sourceTypeDetails && hadith.sourceTypeDetails.length > 0
+      ? hadith.sourceTypeDetails
+      : [
+          {
+            id: 0,
+            title: detailsCopy.fallbackTitle,
+            description: detailsCopy.fallbackDescription,
+          },
+        ];
+  const activeChainTypes =
+    hadith.chainTypeDetails && hadith.chainTypeDetails.length > 0
+      ? hadith.chainTypeDetails
+      : [
+          {
+            id: 0,
+            title: detailsCopy.fallbackTitle,
+            description: detailsCopy.fallbackDescription,
+          },
+        ];
+  const narrationDetails = hadith.narrationLevelDetail;
+  const sourceAuthor = hadith.details.author ?? null;
 
   return (
     <PanelWrapper isDesktop={isDesktop} onResizeStart={onResizeStart}>
@@ -93,9 +107,11 @@ export function HadithDetailsPanel({
             {sourceAuthor ? (
               <>
                 <span className="block text-[var(--text-primary)]">{sourceAuthor.name}</span>
-                <span className="mt-1 inline-block rounded-full bg-[var(--surface-card)] px-2 py-0.5 text-[0.7rem] font-semibold text-[var(--text-primary)] dark:bg-[var(--surface-card)]/60 dark:text-white">
-                  {sourceAuthor.lifespan}
-                </span>
+                {sourceAuthor.lifespan ? (
+                  <span className="mt-1 inline-block rounded-full bg-[var(--surface-card)] px-2 py-0.5 text-[0.7rem] font-semibold text-[var(--text-primary)] dark:bg-[var(--surface-card)]/60 dark:text-white">
+                    {sourceAuthor.lifespan}
+                  </span>
+                ) : null}
               </>
             ) : (
               detailsCopy.authorFallback
@@ -143,18 +159,9 @@ export function HadithDetailsPanel({
               {detailsCopy.attributionHeading}
             </p>
             <div className="mt-1 space-y-2">
-              {(activeSourceTypes.length
-                ? activeSourceTypes
-                : [
-                    {
-                      key: "none",
-                      title: detailsCopy.fallbackTitle,
-                      description: detailsCopy.fallbackDescription,
-                    },
-                  ]
-              ).map((item) => (
-                <Disclosure key={item.key} title={item.title} secondary={item.secondary}>
-                  {item.description}
+              {activeSourceTypes.map((item) => (
+                <Disclosure key={item.id ?? item.title} title={item.title} secondary={item.secondary ?? undefined}>
+                  {item.description ?? detailsCopy.fallbackDescription}
                 </Disclosure>
               ))}
             </div>
@@ -165,18 +172,9 @@ export function HadithDetailsPanel({
               {detailsCopy.chainHeading}
             </p>
             <div className="mt-1 space-y-2">
-              {(activeChainTypes.length
-                ? activeChainTypes
-                : [
-                    {
-                      key: "none",
-                      title: detailsCopy.fallbackTitle,
-                      description: detailsCopy.fallbackDescription,
-                    },
-                  ]
-              ).map((item) => (
-                <Disclosure key={item.key} title={item.title} secondary={item.secondary}>
-                  {item.description}
+              {activeChainTypes.map((item) => (
+                <Disclosure key={item.id ?? item.title} title={item.title} secondary={item.secondary ?? undefined}>
+                  {item.description ?? detailsCopy.fallbackDescription}
                 </Disclosure>
               ))}
             </div>
@@ -189,15 +187,15 @@ export function HadithDetailsPanel({
               tone="accent"
               className="mt-2 inline-flex px-4 py-1 text-xs font-semibold uppercase tracking-[0.18em]"
               style={{
-                backgroundColor: gradingData.style.background,
-                color: gradingData.style.color,
-                boxShadow: `0 10px 25px ${gradingData.style.background}1a`,
+                backgroundColor: gradingData.backgroundColor,
+                color: gradingData.textColor,
+                boxShadow: `0 10px 25px ${gradingData.backgroundColor}1a`,
               }}
             >
               {gradingData.label}
             </Tag>
-            {gradingData.style.description && (
-              <p className="mt-2 text-sm text-[var(--text-secondary)]">{gradingData.style.description}</p>
+            {gradingData.description && (
+              <p className="mt-2 text-sm text-[var(--text-secondary)]">{gradingData.description}</p>
             )}
           </div>
         )}
