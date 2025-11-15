@@ -1,0 +1,93 @@
+Table hadith_insights {
+  id text [pk]
+  matn text
+  sanad text
+  source text
+  book text
+  book_number int
+  chapter text
+  grading text
+  hadith_number int
+  location text
+  narration_level text
+  source_types text
+  chain_types text
+}
+
+Table chains {
+  id text [pk]
+  hadith_id text [not null]
+  name text
+  descriptor text
+  node_type text
+  classification text
+  reliability text
+  order_index int
+}
+
+Table grading_palette {
+  id serial [pk]
+  keyword text
+  background text
+  color text
+  description text
+}
+
+Table source_types {
+  id serial [pk]
+  key text [unique, not null]
+  title text
+  secondary text
+  description text
+}
+
+Table chain_types {
+  id serial [pk]
+  key text [unique, not null]
+  title text
+  secondary text
+  description text
+}
+
+Table narration_levels {
+  key text [pk]
+  title text
+  secondary text
+  description text
+}
+
+Table source_authors {
+  source text [pk]
+  name text
+  lifespan text
+}
+
+Table narrator_tiers {
+  key text [pk]
+  title text
+  secondary text
+  description text
+}
+
+Table reliability_tiers {
+  key text [pk]
+  title text
+  secondary text
+  description text
+  badge text
+  background text
+  color text
+}
+
+Table narrator_lifespans {
+  name text [pk]
+  lifespan text
+}
+
+Table transmission_methods {
+  id serial [pk]
+  title text
+  description text
+}
+
+Ref: chains.hadith_id > hadith_insights.id

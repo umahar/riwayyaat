@@ -43,3 +43,18 @@ public/                  # Static assets
 - Wire the chat input + prompt shortcuts to backend endpoints.
 - Capture waitlist submissions or integrate an auth flow.
 - Expand marketing sections (roadmap, partners, data sources) once content is ready.
+
+## Database Setup
+
+PostgreSQL connection scaffolding lives under `src/server/db`. Provide your credentials via environment variables (see `.env.example`). Once populated, you can verify connectivity by running a quick script or importing the helpers in a Node REPL:
+
+```bash
+cp .env.example .env.local   # update with your password
+node -e "import('./dist/server/db/client.js').then(m => m.healthcheck().then(console.log))"
+```
+
+Helpers:
+
+- `src/server/db/config.ts` loads env vars and configures SSL/app name.
+- `src/server/db/client.ts` exposes a singleton PG Pool plus `query` and `healthcheck` helpers.
+- `src/server/api/hadith-service.ts` is the placeholder service layer to house SQL once the API is wired up.

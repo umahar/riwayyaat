@@ -1,0 +1,240 @@
+////////////////////////////////////////////////////
+// Core Hadith Entities
+////////////////////////////////////////////////////
+
+Table hadith [headercolor: #175e7a] {
+  id               serial  [pk, not null, unique]
+  number           integer [not null]             // details.hadithNumber
+  book_id          integer                        // FK -> book.id
+  chapter_id       integer                        // FK -> chapter.id
+  source_id        integer [not null]             // FK -> source.id
+  grade_id         integer                        // FK -> grade.id
+  matn_id          integer [not null]             // FK -> matn.id
+  location         text                           // details.location (green tag)
+  sanad            text                           // long sanad description (optional)
+
+  indexes {
+    (number)                         [name: 'hadith_index_number']
+    (source_id, book_id, chapter_id) [name: 'hadith_index_source_book_chapter']
+    (matn_id)                        [name: 'hadith_index_matn']
+  }
+}
+
+Table matn [headercolor: #175e7a] {
+  id       serial [pk, not null, unique]
+  text_en  text   // displayed excerpt text
+  text_ar  text   // optional Arabic
+  summary  text   // optional short label / nickname
+}
+
+////////////////////////////////////////////////////
+// Sources, Books, Chapters, Authors
+////////////////////////////////////////////////////
+
+Table source [headercolor: #175e7a] {
+  id         serial [pk, not null, unique]
+  name       text   [not null]        // e.g. "Kitab al-Zuhd"
+  author_id  integer [not null]       // FK -> author.id
+}
+
+Table author [headercolor: #175e7a] {
+  id             serial [pk, not null, unique]
+  name           text [not null]      // "Abdullah ibn al-Mubarak"
+  date_of_birth  date                 // optional (Gregorian or stored as-is)
+  date_of_death  date
+  lifespan_label text                 // e.g. "118–181 AH"
+}
+
+Table book [headercolor: #175e7a] {
+  id         serial  [pk, not null, unique]
+  source_id  integer [not null]       // FK -> source.id
+  name       text                     // "Book of Zuhd"
+  number     integer                  // details.bookNumber
+
+  indexes {
+    (source_id, number) [name: 'book_index_source_number']
+  }
+}
+
+Table chapter [headercolor: #175e7a] {
+  id       serial  [pk, not null, unique]
+  book_id  integer [not null]         // FK -> book.id
+  name     text                       // chapter title
+  number   integer
+
+  indexes {
+    (book_id, number) [name: 'chapter_index_book_number']
+  }
+}
+
+////////////////////////////////////////////////////
+// Grading / Narration / Attribution / Chain Types
+////////////////////////////////////////////////////
+
+Table grade [headercolor: #175e7a] {
+  id               serial [pk, not null, unique]
+  name             text   [not null]  // e.g. "Hasan li-dhatih"
+  description      text   [not null]
+  background_color text              // CSS color for badge (optional)
+  text_color       text              // CSS color for badge text (optional)
+}
+
+Table narration_level [headercolor: #175e7a] {
+  id          serial [pk, not null, unique]
+  name_en     text   [not null]      // e.g. "Fard"
+  name_ar     text                  // e.g. "فرد"
+  description text                  // from narrationLevelDefinitions.description
+}
+
+Table attribution_type [headercolor: #175e7a] {
+  id          serial [pk, not null, unique]
+  name_en     text   [not null]      // e.g. "Maqtū‘"
+  name_ar     text                  // Arabic label
+  description text                  // from sourceTypeDefinitions.description
+}
+
+Table chain_type [headercolor: #175e7a] {
+  id          serial [pk, not null, unique]
+  name_en     text   [not null]      // e.g. "Musnad"
+  name_ar     text
+  description text
+}
+
+////////////////////////////////////////////////////
+// Narrators & Chain Metadata
+////////////////////////////////////////////////////
+
+Table narrator [headercolor: #175e7a] {
+  id         serial [pk, not null, unique]
+  name       text  [not null]       // narrator name
+  descriptor text                   // e.g. "Tābi‘ī"
+  lifespan   text                   // e.g. "105–153 AH"
+}
+
+Table narrator_tier [headercolor: #175e7a] {
+  id              serial [pk, not null, unique]
+  name            text   [not null] // title
+  secondary_label text             // e.g. Arabic or shorthand
+  description     text
+}
+
+Table reliability_tier [headercolor: #175e7a] {
+  id               serial [pk, not null, unique]
+  name             text   [not null]
+  secondary_label  text
+  description      text
+  badge_background text             // CSS colors
+  badge_text       text
+  connector_color  text
+}
+
+Table transmission_method [headercolor: #175e7a] {
+  id                    serial [pk, not null, unique]
+  name                  text   [not null] // title
+  description           text
+  pill_background_light text             // CSS colors
+  pill_background_dark  text
+}
+
+Table hadith_chain [headercolor: #175e7a] {
+  id                  serial  [pk, not null, unique]
+  hadith_id           integer [not null]        // FK -> hadith.id
+  narration_level_id  integer                   // FK -> narration_level.id
+  chain_type_id       integer                   // FK -> chain_type.id
+  attribution_type_id integer                   // FK -> attribution_type.id
+  is_primary          boolean [default: false]  // mark main chain for UI
+  label               text                      // optional label ("Chain A")
+  notes               text
+
+  indexes {
+    (hadith_id) [name: 'hadith_chain_index_hadith']
+  }
+}
+
+Table chain_narrator [headercolor: #175e7a] {
+  id                     serial  [pk, not null, unique]
+  chain_id               integer [not null]   // FK -> hadith_chain.id
+  narrator_id            integer [not null]   // FK -> narrator.id
+  position               integer [not null]   // order in chain (1 = earliest)
+  role                   text                // 'prophet' | 'narrator'
+  descriptor             text                // override subtitle if needed
+  classification_id      integer             // FK -> narrator_tier.id
+  reliability_id         integer             // FK -> reliability_tier.id
+  transmission_method_id integer             // FK -> transmission_method.id
+
+  indexes {
+    (chain_id, position) [name: 'chain_narrator_index_chain_pos']
+  }
+}
+
+////////////////////////////////////////////////////
+// Relationships
+////////////////////////////////////////////////////
+
+Ref fk_hadith_grade {
+  hadith.grade_id > grade.id
+}
+
+Ref fk_hadith_source {
+  hadith.source_id > source.id
+}
+
+Ref fk_hadith_book {
+  hadith.book_id > book.id
+}
+
+Ref fk_hadith_chapter {
+  hadith.chapter_id > chapter.id
+}
+
+Ref fk_hadith_matn {
+  hadith.matn_id > matn.id
+}
+
+Ref fk_source_author {
+  source.author_id > author.id
+}
+
+Ref fk_book_source {
+  book.source_id > source.id
+}
+
+Ref fk_chapter_book {
+  chapter.book_id > book.id
+}
+
+Ref fk_hadith_chain_hadith {
+  hadith_chain.hadith_id > hadith.id
+}
+
+Ref fk_hadith_chain_narration_level {
+  hadith_chain.narration_level_id > narration_level.id
+}
+
+Ref fk_hadith_chain_chain_type {
+  hadith_chain.chain_type_id > chain_type.id
+}
+
+Ref fk_hadith_chain_attribution_type {
+  hadith_chain.attribution_type_id > attribution_type.id
+}
+
+Ref fk_chain_narrator_chain {
+  chain_narrator.chain_id > hadith_chain.id
+}
+
+Ref fk_chain_narrator_narrator {
+  chain_narrator.narrator_id > narrator.id
+}
+
+Ref fk_chain_narrator_classification {
+  chain_narrator.classification_id > narrator_tier.id
+}
+
+Ref fk_chain_narrator_reliability {
+  chain_narrator.reliability_id > reliability_tier.id
+}
+
+Ref fk_chain_narrator_transmission_method {
+  chain_narrator.transmission_method_id > transmission_method.id
+}
