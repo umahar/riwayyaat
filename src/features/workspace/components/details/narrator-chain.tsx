@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
-import { HadithInsight } from "@/lib/hadith/types";
+import { HadithInsight } from "@/features/hadith/types";
 import { workspaceCopy } from "@/content/text";
 
 type NarratorChainProps = {

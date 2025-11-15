@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent } from "react";
-import { Message } from "@/lib/hadith/types";
+import { Message } from "@/features/hadith/types";
 import { workspaceCopy } from "@/content/text";
 
 type ConversationPanelProps = {

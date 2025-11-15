@@ -11,12 +11,12 @@ import {
   useRef,
   useState,
 } from "react";
-import { HadithInsight, Message } from "@/lib/hadith/types";
+import { HadithInsight, Message } from "@/features/hadith/types";
 import { workspaceCopy } from "@/content/text";
-import { HadithSidebar, FilterGroup } from "@/components/workspace/sidebar/hadith-sidebar";
-import { ConversationPanel } from "@/components/workspace/chat/conversation-panel";
-import { HadithDetailsPanel } from "@/components/workspace/details/hadith-details-panel";
-import { useHadithData } from "@/hooks/use-hadith-data";
+import { HadithSidebar, FilterGroup } from "@/features/workspace/components/sidebar/hadith-sidebar";
+import { ConversationPanel } from "@/features/workspace/components/chat/conversation-panel";
+import { HadithDetailsPanel } from "@/features/workspace/components/details/hadith-details-panel";
+import { useHadithData } from "@/features/workspace/hooks/use-hadith-data";
 
 type ChatWorkspaceProps = {
   initialPrompt: string;

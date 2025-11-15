@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ChatPanel } from "@/components/sections/chat-panel";
-import { ChatWorkspace } from "@/components/workspace/chat-workspace";
+import { ChatWorkspace } from "@/features/workspace/components/chat-workspace";
 import { ProjectFooter } from "@/components/footer/project-footer";
 
 type Stage = "landing" | "workspace";

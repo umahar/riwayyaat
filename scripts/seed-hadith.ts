@@ -1,4 +1,4 @@
-import { hadithInsights } from "@/lib/hadith/data";
+import { hadithInsights } from "@/features/hadith/data";
 import {
   chainTypeInfo,
   sourceTypeInfo,
@@ -9,10 +9,10 @@ import {
   sourceAuthorMap,
   narratorLifespans,
   getGradingStyle,
-} from "@/lib/hadith/taxonomy";
+} from "@/features/hadith/taxonomy";
 import { getClient } from "@/server/db/client";
 
-import type { HadithInsight } from "@/lib/hadith/types";
+import type { HadithInsight } from "@/features/hadith/types";
 import type { PoolClient } from "pg";
 
 type IdCache = Map<string, number>;

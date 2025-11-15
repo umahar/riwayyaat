@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { hadithService } from "@/server/services/hadith-service";
+import { hadithService } from "@/features/hadith/server/hadith-service";
 
 export const dynamic = "force-dynamic";
 

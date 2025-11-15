@@ -7,7 +7,7 @@ Next.js 16 + React 19 entry point for Riwayyaat — a research surface focused o
 - **Next.js App Router** in `src/app`
 - **TypeScript** + absolute imports via `@/*`
 - **Tailwind CSS v4** (utility-first, no config file required)
-- **Component directories** under `src/components` and shared data in `src/lib`
+- **Feature modules** under `src/features` (e.g., `hadith`, `workspace`) plus shared primitives in `src/components`
 
 ### Local Development
 
@@ -21,15 +21,22 @@ npm run lint             # eslint -- respects next lint rules
 
 ```
 src/
-  app/                   # Next.js routes, layouts, and global styles
-    page.tsx             # Splash screen route
-    layout.tsx           # Root metadata + fonts
-    globals.css          # Tailwind + custom animations
-  components/
-    sections/            # Page-level sections (splash hero, etc.)
-    ui/                  # Reusable UI atoms
-  lib/                   # Site-wide config/constants
-public/                  # Static assets
+  app/                             # Next.js routes + global styles
+  components/                      # Shared UI primitives (ui, footer, sections, theme)
+  content/                         # Static copy
+  features/
+    hadith/                        # Domain types, dummy data, taxonomy helpers, server service
+      data.ts
+      taxonomy.ts
+      server/hadith-service.ts
+    workspace/                     # Feature-specific UI + hooks
+      components/                  # chat, sidebar, details, etc.
+      hooks/use-hadith-data.ts
+  server/
+    db/                            # Pool + config helpers
+    api/                           # Placeholder server APIs
+  theme/                           # Design tokens + globals
+public/                            # Static assets
 ```
 
 ### UI Notes
@@ -73,10 +80,10 @@ npx tsx scripts/check-db.ts        # optional sanity check
 npx tsx scripts/seed-hadith.ts     # inserts/updates 42 demo hadith
 ```
 
-If you add or tweak dummy data in `src/lib/hadith/data.ts`, re-run the seed script; subsequent runs only insert missing rows. The script uses transactions/savepoints, so any failure rolls back cleanly.
+If you add or tweak dummy data in `src/features/hadith/data.ts`, re-run the seed script; subsequent runs only insert missing rows. The script uses transactions/savepoints, so any failure rolls back cleanly.
 
 Helpers:
 
 - `src/server/db/config.ts` loads env vars and configures SSL/app name.
 - `src/server/db/client.ts` exposes a singleton PG Pool plus `query` and `healthcheck` helpers.
-- `src/server/api/hadith-service.ts` is the placeholder service layer to house SQL once the API is wired up.
+- `src/features/hadith/server/hadith-service.ts` powers `/api/hadith` and is the single source for domain queries.

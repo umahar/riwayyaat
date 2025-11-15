@@ -1,5 +1,5 @@
 import { query } from "@/server/db/client";
-import { HadithInsight } from "@/lib/hadith/types";
+import { HadithInsight } from "@/features/hadith/types";
 
 export async function fetchHadithInsights(): Promise<HadithInsight[]> {
   // Placeholder implementation. Once real tables are wired, replace with actual SQL.

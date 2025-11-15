@@ -5,7 +5,7 @@ import { Logo } from "@/components/ui/logo";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { IconButton } from "@/components/ui/button";
 import { FilterMenu, FilterOption } from "@/components/ui/filter-menu";
-import { HadithInsight } from "@/lib/hadith/types";
+import { HadithInsight } from "@/features/hadith/types";
 import { workspaceCopy } from "@/content/text";
 import { LoadingState } from "@/components/ui/state/loading-state";
 import { ErrorState } from "@/components/ui/state/error-state";

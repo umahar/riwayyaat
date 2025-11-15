@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { HadithInsight } from "@/lib/hadith/types";
+import { HadithInsight } from "@/features/hadith/types";
 
 type UseHadithDataResult = {
   data: HadithInsight[];

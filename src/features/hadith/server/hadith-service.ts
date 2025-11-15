@@ -6,7 +6,7 @@ import {
   ReliabilityDetail,
   TransmissionMethodDetail,
   NarrationLevel,
-} from "@/lib/hadith/types";
+} from "@/features/hadith/types";
 
 type HadithRow = {
   id: number;

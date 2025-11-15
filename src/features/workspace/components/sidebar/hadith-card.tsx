@@ -1,7 +1,7 @@
 "use client";
 
-import { HadithInsight } from "@/lib/hadith/types";
-import { formatGradingLabel } from "@/lib/hadith/taxonomy";
+import { HadithInsight } from "@/features/hadith/types";
+import { formatGradingLabel } from "@/features/hadith/taxonomy";
 import { Tag } from "@/components/ui/tag";
 import { workspaceCopy } from "@/content/text";
 
