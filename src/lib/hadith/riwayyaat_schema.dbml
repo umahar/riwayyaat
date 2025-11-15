@@ -8,7 +8,7 @@ Table hadith [headercolor: #175e7a] {
   book_id          integer                        // FK -> book.id
   chapter_id       integer                        // FK -> chapter.id
   source_id        integer [not null]             // FK -> source.id
-  grade_id         integer                        // FK -> grade.id
+  grade_id         integer                        // FK -> grade.id (nullable until scholars weigh in)
   matn_id          integer [not null]             // FK -> matn.id
   location         text                           // details.location (green tag)
   sanad            text                           // long sanad description (optional)
