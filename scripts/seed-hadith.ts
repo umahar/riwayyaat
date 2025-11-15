@@ -646,17 +646,15 @@ async function insertChainNarrators(client: PoolClient, chainId: number, narrato
         narrator_id,
         position,
         role,
-        descriptor,
         classification_id,
         reliability_id,
         transmission_method_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
         chainId,
         narratorId,
         index + 1,
         node.type === "prophet" ? "prophet" : "narrator",
-        node.descriptor ?? null,
         classificationId,
         reliabilityId,
         methodId,

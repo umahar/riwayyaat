@@ -44,7 +44,7 @@ type ChainNarratorRow = {
   chain_id: number;
   position: number;
   name: string;
-  descriptor: string | null;
+  narrator_descriptor: string | null;
   lifespan: string | null;
   role: string | null;
   tier_id: number | null;
@@ -152,7 +152,7 @@ async function fetchChainNarrators(client: Awaited<ReturnType<typeof getClient>>
         cn.chain_id,
         cn.position,
         n.name,
-        COALESCE(cn.descriptor, n.descriptor) AS descriptor,
+        n.descriptor AS narrator_descriptor,
         n.lifespan AS lifespan,
         cn.role,
         nt.id AS tier_id,
@@ -243,7 +243,7 @@ function mapHadithRow(
 function mapChainNodes(rows: ChainNarratorRow[] = []): HadithInsight["chain"] {
   return rows.map((row) => ({
     name: row.name,
-    descriptor: row.descriptor ?? undefined,
+    descriptor: row.narrator_descriptor ?? undefined,
     lifespan: row.lifespan ?? undefined,
     type: row.role === "prophet" ? "prophet" : undefined,
     classificationDetail: buildLookupDetail(row.tier_id, row.tier_name, row.tier_secondary, row.tier_description),

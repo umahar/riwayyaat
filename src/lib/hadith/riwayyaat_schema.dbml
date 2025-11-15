@@ -157,7 +157,6 @@ Table chain_narrator [headercolor: #175e7a] {
   narrator_id            integer [not null]   // FK -> narrator.id
   position               integer [not null]   // order in chain (1 = earliest)
   role                   text                // 'prophet' | 'narrator'
-  descriptor             text                // override subtitle if needed
   classification_id      integer             // FK -> narrator_tier.id
   reliability_id         integer             // FK -> reliability_tier.id
   transmission_method_id integer             // FK -> transmission_method.id
