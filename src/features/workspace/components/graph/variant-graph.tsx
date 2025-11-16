@@ -103,8 +103,12 @@ export function VariantGraph({ data }: VariantGraphProps) {
     drawLegendItem("Variant", "#16a34a", 28);
 
     const center = { x: canvas.width / 2, y: canvas.height / 2 };
-    const base = graphData.nodes.find((n) => n.type === "Hadith");
-    const variants = graphData.nodes.filter((n) => n.type !== "Hadith");
+    const nodes = graphData?.nodes ?? [];
+    const edges = graphData?.edges ?? [];
+    if (!nodes.length) return;
+
+    const base = nodes.find((n) => n.type === "Hadith");
+    const variants = nodes.filter((n) => n.type !== "Hadith");
 
     const positions = new Map<string, { x: number; y: number }>();
     if (base) positions.set(base.id, { x: center.x, y: center.y });
@@ -120,7 +124,7 @@ export function VariantGraph({ data }: VariantGraphProps) {
 
     ctx.strokeStyle = "#d97706";
     ctx.lineWidth = 2;
-    graphData.edges.forEach((edge) => {
+    edges.forEach((edge) => {
       const from = positions.get(edge.from);
       const to = positions.get(edge.to);
       if (!from || !to) return;
@@ -130,7 +134,7 @@ export function VariantGraph({ data }: VariantGraphProps) {
       ctx.stroke();
     });
 
-    graphData.nodes.forEach((node) => {
+    nodes.forEach((node) => {
       const pos = positions.get(node.id);
       if (!pos) return;
       ctx.fillStyle = getColor(node.type);

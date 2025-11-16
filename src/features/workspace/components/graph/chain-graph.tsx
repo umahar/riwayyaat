@@ -105,7 +105,10 @@ export function ChainGraph({ data, onNarratorSelect }: ChainGraphProps) {
     drawLegendItem("Narrators", "#0f766e", 28);
 
     const center = { x: canvas.width / 2, y: canvas.height / 2 };
-    const nodes = graphData.nodes;
+    const nodes = graphData?.nodes ?? [];
+    const edges = graphData?.edges ?? [];
+    if (!nodes.length) return;
+
     const others = nodes.filter((n) => n.type !== "Hadith");
 
     const positions = new Map<string, { x: number; y: number }>();
@@ -129,7 +132,7 @@ export function ChainGraph({ data, onNarratorSelect }: ChainGraphProps) {
 
     ctx.strokeStyle = "#94a3b8";
     ctx.lineWidth = 2;
-    graphData.edges.forEach((edge) => {
+    edges.forEach((edge) => {
       const from = positions.get(edge.from);
       const to = positions.get(edge.to);
       if (!from || !to) return;

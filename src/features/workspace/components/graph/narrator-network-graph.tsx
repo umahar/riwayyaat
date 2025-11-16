@@ -88,7 +88,9 @@ export function NarratorNetworkGraph({ data }: NarratorNetworkGraphProps) {
     ctx.fillText("Narrator network", 32, 40);
 
     const center = { x: canvas.width / 2, y: canvas.height / 2 };
-    const nodes = data.nodes;
+    const nodes = data?.nodes ?? [];
+    const edges = data?.edges ?? [];
+    if (!nodes.length) return;
     const radius = 330;
     const positions = new Map<string, { x: number; y: number }>();
 
@@ -101,7 +103,7 @@ export function NarratorNetworkGraph({ data }: NarratorNetworkGraphProps) {
 
     ctx.strokeStyle = "#94a3b8";
     ctx.lineWidth = 2;
-    data.edges.forEach((edge) => {
+    edges.forEach((edge) => {
       const from = positions.get(edge.from);
       const to = positions.get(edge.to);
       if (!from || !to) return;
