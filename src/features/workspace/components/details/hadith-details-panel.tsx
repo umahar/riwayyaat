@@ -34,7 +34,7 @@ export function HadithDetailsPanel({
   const sidebarCopy = workspaceCopy.sidebar;
 
   const [selectedGraderIndex, setSelectedGraderIndex] = useState(0);
-  const [showScholarInfo, setShowScholarInfo] = useState(false);
+  const [showGradeDetails, setShowGradeDetails] = useState(false);
 
   const gradeOptions = useMemo(() => {
     if (!hadith) return [] as Array<GradeAttribution & { scholarLabel: string; isPrimary: boolean }>;
@@ -78,7 +78,7 @@ export function HadithDetailsPanel({
   useEffect(() => {
     const primaryIndex = gradeOptions.findIndex((option) => option.isPrimary);
     setSelectedGraderIndex(primaryIndex >= 0 ? primaryIndex : 0);
-    setShowScholarInfo(false);
+    setShowGradeDetails(false);
   }, [hadith?.id, gradeOptions]);
 
   const activeGrade = useMemo(() => {
@@ -98,13 +98,13 @@ export function HadithDetailsPanel({
   const goPrevGrader = () => {
     if (!hasMultipleGraders) return;
     setSelectedGraderIndex((prev) => (prev - 1 + gradeOptions.length) % gradeOptions.length);
-    setShowScholarInfo(false);
+    setShowGradeDetails(false);
   };
 
   const goNextGrader = () => {
     if (!hasMultipleGraders) return;
     setSelectedGraderIndex((prev) => (prev + 1) % gradeOptions.length);
-    setShowScholarInfo(false);
+    setShowGradeDetails(false);
   };
 
   if (loading) {
@@ -261,21 +261,21 @@ export function HadithDetailsPanel({
               )}
               <button
                 type="button"
-                onClick={() => (hasMultipleGraders ? setShowScholarInfo((prev) => !prev) : undefined)}
+                onClick={() => setShowGradeDetails((prev) => !prev)}
                 className="focus:outline-none"
-                aria-expanded={hasMultipleGraders ? showScholarInfo : undefined}
+                aria-expanded={showGradeDetails}
               >
                 <Tag
                   tone="accent"
-                  className="inline-flex px-4 py-1 text-xs font-semibold uppercase tracking-[0.18em]"
+                  className="inline-flex items-center gap-2 px-4 py-1 text-xs font-semibold uppercase tracking-[0.18em]"
                   style={{
                     backgroundColor: activeGrade.backgroundColor,
                     color: activeGrade.textColor,
                     boxShadow: `0 10px 25px ${activeGrade.backgroundColor}1a`,
                   }}
                 >
-                  {activeGrade.label}
-                  {hasMultipleGraders && <span className="ml-2 text-[0.85em]">{showScholarInfo ? "▴" : "▾"}</span>}
+                  <span>{activeGrade.label}</span>
+                  <span className="text-[0.85em]">{showGradeDetails ? "▴" : "▾"}</span>
                 </Tag>
               </button>
               {hasMultipleGraders && (
@@ -289,10 +289,10 @@ export function HadithDetailsPanel({
                 </button>
               )}
             </div>
-            {activeGrade.description && (
+            {showGradeDetails && activeGrade.description && (
               <p className="mt-2 text-sm text-[var(--text-secondary)]">{activeGrade.description}</p>
             )}
-            {activeGrade.scholarLabel && (showScholarInfo || !hasMultipleGraders) && (
+            {showGradeDetails && activeGrade.scholarLabel && (
               <p className="mt-1 text-xs text-[var(--text-muted)]">Graded by {activeGrade.scholarLabel}</p>
             )}
           </div>
