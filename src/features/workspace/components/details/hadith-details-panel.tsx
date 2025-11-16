@@ -250,22 +250,28 @@ export function HadithDetailsPanel({
         )}
 
         {gradeOptions.length > 0 && (
-          <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-            <span className="font-semibold text-[var(--text-primary)]">{gradedByLabel}:</span>
-            {gradeOptions.length > 1 ? (
-              <select
-                value={selectedGraderIndex}
-                onChange={(event) => setSelectedGraderIndex(Number(event.target.value))}
-                className="rounded-md border border-[var(--border-soft)] bg-[var(--surface-card)] px-2 py-1 text-sm text-[var(--text-primary)] focus:outline-none"
-              >
-                {gradeOptions.map((option, index) => (
-                  <option key={`${option.scholar.name}-${index}`} value={index}>
-                    {option.scholarLabel}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <span className="text-[var(--text-primary)]">{gradeOptions[0].scholarLabel}</span>
+          <div className="mt-3 flex flex-col gap-1 rounded-lg border border-[var(--border-soft)] bg-[var(--surface-card)] px-3 py-2 text-sm text-[var(--text-secondary)]">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-semibold text-[var(--text-primary)]">{gradedByLabel}</span>
+              {gradeOptions.length > 1 ? (
+                <select
+                  value={selectedGraderIndex}
+                  aria-label={`${gradedByLabel} selector`}
+                  onChange={(event) => setSelectedGraderIndex(Number(event.target.value))}
+                  className="rounded-md border border-[var(--border-soft)] bg-[var(--background-alt)] px-2 py-1 text-sm text-[var(--text-primary)] focus:outline-none"
+                >
+                  {gradeOptions.map((option, index) => (
+                    <option key={`${option.scholar.name}-${index}`} value={index}>
+                      {option.scholarLabel}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span className="text-[var(--text-primary)]">{gradeOptions[0].scholarLabel}</span>
+              )}
+            </div>
+            {activeGrade?.scholarLabel && (
+              <p className="text-xs text-[var(--text-muted)]">Currently showing the grade attributed to {activeGrade.scholarLabel}.</p>
             )}
           </div>
         )}
