@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useEffect, useMemo, useState } from "react";
+import { ReactNode, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Disclosure } from "@/components/ui/disclosure";
 import { Tag } from "@/components/ui/tag";
@@ -33,8 +33,14 @@ export function HadithDetailsPanel({
   const detailsCopy = workspaceCopy.details;
   const sidebarCopy = workspaceCopy.sidebar;
 
-  const [selectedGraderIndex, setSelectedGraderIndex] = useState(0);
-  const [showGradeDetails, setShowGradeDetails] = useState(false);
+  const [graderSelection, setGraderSelection] = useState<{ hadithId: string | null; index: number }>({
+    hadithId: null,
+    index: 0,
+  });
+  const [gradeDetailState, setGradeDetailState] = useState<{ hadithId: string | null; open: boolean }>({
+    hadithId: null,
+    open: false,
+  });
 
   const gradeOptions = useMemo(() => {
     if (!hadith) return [] as Array<GradeAttribution & { scholarLabel: string; isPrimary: boolean }>;
@@ -75,11 +81,15 @@ export function HadithDetailsPanel({
     return ordered;
   }, [hadith, detailsCopy.gradedByFallback]);
 
-  useEffect(() => {
+  const defaultGradeIndex = useMemo(() => {
     const primaryIndex = gradeOptions.findIndex((option) => option.isPrimary);
-    setSelectedGraderIndex(primaryIndex >= 0 ? primaryIndex : 0);
-    setShowGradeDetails(false);
-  }, [hadith?.id, gradeOptions]);
+    return primaryIndex >= 0 ? primaryIndex : 0;
+  }, [gradeOptions]);
+
+  const selectedGraderIndex =
+    graderSelection.hadithId === hadith?.id ? graderSelection.index : defaultGradeIndex;
+
+  const showGradeDetails = gradeDetailState.hadithId === hadith?.id ? gradeDetailState.open : false;
 
   const activeGrade = useMemo(() => {
     if (!hadith || gradeOptions.length === 0) return null;
@@ -97,12 +107,16 @@ export function HadithDetailsPanel({
 
   const goPrevGrader = () => {
     if (!hasMultipleGraders) return;
-    setSelectedGraderIndex((prev) => (prev - 1 + gradeOptions.length) % gradeOptions.length);
+    const nextIndex = (selectedGraderIndex - 1 + gradeOptions.length) % gradeOptions.length;
+    setGraderSelection({ hadithId: hadith?.id ?? null, index: nextIndex });
+    setGradeDetailState({ hadithId: hadith?.id ?? null, open: false });
   };
 
   const goNextGrader = () => {
     if (!hasMultipleGraders) return;
-    setSelectedGraderIndex((prev) => (prev + 1) % gradeOptions.length);
+    const nextIndex = (selectedGraderIndex + 1) % gradeOptions.length;
+    setGraderSelection({ hadithId: hadith?.id ?? null, index: nextIndex });
+    setGradeDetailState({ hadithId: hadith?.id ?? null, open: false });
   };
 
   if (loading) {
@@ -152,7 +166,6 @@ export function HadithDetailsPanel({
   const displayNumber = hadith.details.displayNumber ?? String(hadith.details.hadithNumber);
   const narrationDetails = hadith.narrationLevelDetail;
   const sourceAuthor = hadith.details.author ?? null;
-  const gradedByLabel = detailsCopy.gradedByLabel ?? "Graded by";
 
   return (
     <PanelWrapper isDesktop={isDesktop} onResizeStart={onResizeStart}>
@@ -260,7 +273,12 @@ export function HadithDetailsPanel({
               )}
               <button
                 type="button"
-                onClick={() => setShowGradeDetails((prev) => !prev)}
+                onClick={() =>
+                  setGradeDetailState((prev) => ({
+                    hadithId: hadith?.id ?? null,
+                    open: prev.hadithId === hadith?.id ? !prev.open : true,
+                  }))
+                }
                 className="focus:outline-none"
                 aria-expanded={showGradeDetails}
               >

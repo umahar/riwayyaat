@@ -95,3 +95,11 @@ Helpers:
 - `hadith.display_number` (exposed as `details.displayNumber`) is the preferred human-facing label and can hold strings like `45`, `45a`, or `Vol. 2, p. 213, #5`. `details.displayLabel` renders “Book {bookNumber}, Hadith {displayNumber}` with fallback to the legacy number.
 - `hadith_identifier` stores scheme-aware identifiers (`schemeKey`, `identifier`, `isPrimary`, optional `notes`). Existing rows are pre-seeded under `schemeKey = legacy_source_number`.
 - API responses remain backward compatible: `details.hadithNumber` is preserved while `details.displayNumber`, `details.displayLabel`, and `identifiers` are additive.
+
+## Admin console
+
+- Protect access with `ADMIN_TOKEN` in `.env.local` (middleware checks `/admin/*` and `/api/admin/*`).
+- Run migrations in order, including `scripts/migrations/004_add_hadith_soft_delete_and_tags.sql` (adds `hadith.deleted_at`, tag tables).
+- Login at `/admin/login`, then manage records at `/admin/hadith` (list/search/filter by source/book/chapter/narrator/tag).
+- Create/edit hadith with primary chain, identifiers, tags, and grading; delete performs a soft-delete (`deleted_at`).
+- Back-end routes live under `/api/admin/*` with server validation; front-end uses the same Tailwind aesthetic as the main workspace.

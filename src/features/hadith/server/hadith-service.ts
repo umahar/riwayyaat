@@ -1,7 +1,6 @@
 import { getClient } from "@/server/db/client";
 import {
   HadithInsight,
-  GradeInfo,
   LookupDetail,
   ReliabilityDetail,
   TransmissionMethodDetail,
@@ -101,6 +100,9 @@ export async function getHadithById(id: string): Promise<HadithInsight | null> {
 async function fetchHadiths(whereClause = "", params: unknown[] = []): Promise<HadithInsight[]> {
   const client = await getClient();
   try {
+    const where = whereClause
+      ? `${whereClause} AND h.deleted_at IS NULL`
+      : "WHERE h.deleted_at IS NULL";
     const { rows } = await client.query<HadithRow>(
       `
         SELECT
@@ -173,7 +175,7 @@ async function fetchHadiths(whereClause = "", params: unknown[] = []): Promise<H
           FROM hadith_identifier hi
           WHERE hi.hadith_id = h.id
         ) AS ids ON TRUE
-        ${whereClause}
+        ${where}
         ORDER BY h.id
       `,
       params,

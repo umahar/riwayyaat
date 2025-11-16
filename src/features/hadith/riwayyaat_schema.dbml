@@ -12,10 +12,12 @@ Table hadith [headercolor: #175e7a] {
   matn_id          integer [not null]             // FK -> matn.id
   location         text                           // details.location (green tag)
   sanad            text                           // long sanad description (optional)
+  deleted_at       timestamptz                    // soft-delete marker
 
   indexes {
     (number)                         [name: 'hadith_index_number']
     (display_number)                 [name: 'hadith_index_display_number']
+    (deleted_at)                     [name: 'hadith_index_deleted_at']
     (source_id, book_id, chapter_id) [name: 'hadith_index_source_book_chapter']
     (matn_id)                        [name: 'hadith_index_matn']
   }
@@ -208,6 +210,21 @@ Table hadith_identifier [headercolor: #175e7a] {
   }
 }
 
+Table tag [headercolor: #175e7a] {
+  id   serial [pk, not null, unique]
+  name text   [not null, unique] // tag label
+}
+
+Table hadith_tag [headercolor: #175e7a] {
+  hadith_id  integer    [not null]           // FK -> hadith.id
+  tag_id     integer    [not null]           // FK -> tag.id
+  created_at timestamptz [default: `now()`]
+
+  indexes {
+    (hadith_id, tag_id) [name: 'hadith_tag_unique_hadith_tag', unique]
+  }
+}
+
 ////////////////////////////////////////////////////
 // Relationships
 ////////////////////////////////////////////////////
@@ -238,6 +255,14 @@ Ref fk_hadith_grade_hadith {
 
 Ref fk_hadith_identifier_hadith {
   hadith_identifier.hadith_id > hadith.id
+}
+
+Ref fk_hadith_tag_hadith {
+  hadith_tag.hadith_id > hadith.id
+}
+
+Ref fk_hadith_tag_tag {
+  hadith_tag.tag_id > tag.id
 }
 
 Ref fk_hadith_grade_scholar {

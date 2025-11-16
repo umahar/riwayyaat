@@ -705,8 +705,16 @@ async function upsertHadith(client: PoolClient, hadith: HadithInsight) {
     if (existing.rowCount) {
       hadithId = existing.rows[0].id;
       await client.query(
-        "UPDATE hadith SET book_id = $1, chapter_id = $2, matn_id = $3, location = $4, sanad = $5, display_number = COALESCE(display_number, $6) WHERE id = $7",
-        [bookId, chapterId, matnId, hadith.details.location ?? null, hadith.sanad ?? null, displayNumber, hadithId],
+        "UPDATE hadith SET book_id = $1, chapter_id = $2, matn_id = $3, location = $4, sanad = $5, display_number = COALESCE(display_number, $6), deleted_at = NULL WHERE id = $7",
+        [
+          bookId,
+          chapterId,
+          matnId,
+          hadith.details.location ?? null,
+          hadith.sanad ?? null,
+          displayNumber,
+          hadithId,
+        ],
       );
     } else {
       const result = await client.query<{ id: number }>(
