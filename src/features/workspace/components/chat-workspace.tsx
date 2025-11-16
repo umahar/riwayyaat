@@ -342,12 +342,6 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
         error={hadithError}
         onRetry={refreshHadith}
       />
-      <footer className="col-span-full border-t border-[var(--border-soft)] bg-[var(--surface-panel)] px-6 py-3 text-xs text-[var(--text-muted)]">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 text-left">
-          <span className="text-sm">ℹ️</span>
-          <span>{workspaceCopy.safety.disclaimer}</span>
-        </div>
-      </footer>
     </section>
   );
 }

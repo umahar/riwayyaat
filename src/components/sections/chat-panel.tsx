@@ -5,7 +5,7 @@ import { Logo } from "@/components/ui/logo";
 import { siteConfig } from "@/content/site";
 import { AuroraBackground } from "@/components/ui/aurora-background";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { chatPanelCopy, workspaceCopy } from "@/content/text";
+import { chatPanelCopy, contactCopy } from "@/content/text";
 
 type ChatPanelProps = {
   onSubmit?: (prompt: string) => void;
@@ -40,13 +40,13 @@ export function ChatPanel({ onSubmit }: ChatPanelProps) {
   return (
     <section
       id="copilot"
-      className="relative isolate flex min-h-[calc(100svh-140px)] items-center justify-center overflow-hidden px-6 pt-10 pb-28 text-[var(--text-primary)] md:min-h-[calc(100svh-180px)] md:px-12 md:pt-12 md:pb-32 lg:min-h-[calc(100svh-200px)] lg:px-20 lg:pb-36"
+      className="relative isolate flex min-h-[calc(100svh-160px)] items-center justify-center overflow-hidden px-6 pt-16 pb-12 text-[var(--text-primary)] md:min-h-[calc(100svh-200px)] md:px-12 md:pt-18 md:pb-14 lg:min-h-[calc(100svh-220px)] lg:px-20 lg:pt-20 lg:pb-16"
     >
       <AuroraBackground showSheen={false} />
       <ThemeToggle className="absolute right-6 top-6" />
 
       <div
-        className="relative flex w-full max-w-3xl flex-col items-center gap-8 rounded-[32px] border px-8 py-12 text-center shadow-2xl backdrop-blur-2xl sm:px-12"
+        className="relative flex w-full max-w-3xl flex-col items-center gap-4 rounded-[32px] border px-8 py-12 text-center shadow-2xl backdrop-blur-2xl sm:px-12"
         style={{
           borderColor: "var(--border-soft)",
           backgroundColor: "var(--surface-panel)",
@@ -54,19 +54,16 @@ export function ChatPanel({ onSubmit }: ChatPanelProps) {
         }}
       >
         <Logo />
+        <p className="mt-1 text-sm leading-tight text-[var(--text-muted)]">
+          {contactCopy.supervisorLabel}{" "}
+          <span className="font-semibold text-[var(--text-primary)]">{contactCopy.supervisorName}</span>
+        </p>
         <div className="space-y-4">
           <h1 className="text-4xl font-bold leading-tight tracking-[var(--tracking-tight)] text-balance text-[var(--text-primary)]">
             {chatPanelCopy.title}
           </h1>
           <p className="text-base text-[var(--text-secondary)]">{chatPanelCopy.description}</p>
         </div>
-        <div className="w-full rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-4 py-3 text-left text-xs text-[var(--text-muted)] shadow-sm">
-          <div className="flex items-start gap-2">
-            <span className="mt-0.5 text-sm">ℹ️</span>
-            <p>{workspaceCopy.safety.disclaimer}</p>
-          </div>
-        </div>
-
         <form className="w-full space-y-3" onSubmit={handleSubmit}>
           <div
             className="flex flex-col gap-3 rounded-[28px] border p-2 text-left shadow-inner sm:flex-row sm:items-center sm:p-3"
