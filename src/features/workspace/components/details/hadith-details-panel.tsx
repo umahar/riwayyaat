@@ -34,6 +34,7 @@ export function HadithDetailsPanel({
   const sidebarCopy = workspaceCopy.sidebar;
 
   const [selectedGraderIndex, setSelectedGraderIndex] = useState(0);
+  const [showScholarInfo, setShowScholarInfo] = useState(false);
 
   const gradeOptions = useMemo(() => {
     if (!hadith) return [] as Array<GradeAttribution & { scholarLabel: string; isPrimary: boolean }>;
@@ -77,6 +78,7 @@ export function HadithDetailsPanel({
   useEffect(() => {
     const primaryIndex = gradeOptions.findIndex((option) => option.isPrimary);
     setSelectedGraderIndex(primaryIndex >= 0 ? primaryIndex : 0);
+    setShowScholarInfo(false);
   }, [hadith?.id, gradeOptions]);
 
   const activeGrade = useMemo(() => {
@@ -90,6 +92,20 @@ export function HadithDetailsPanel({
       scholarLabel: selected.scholarLabel,
     };
   }, [gradeOptions, hadith, selectedGraderIndex]);
+
+  const hasMultipleGraders = gradeOptions.length > 1;
+
+  const goPrevGrader = () => {
+    if (!hasMultipleGraders) return;
+    setSelectedGraderIndex((prev) => (prev - 1 + gradeOptions.length) % gradeOptions.length);
+    setShowScholarInfo(false);
+  };
+
+  const goNextGrader = () => {
+    if (!hasMultipleGraders) return;
+    setSelectedGraderIndex((prev) => (prev + 1) % gradeOptions.length);
+    setShowScholarInfo(false);
+  };
 
   if (loading) {
     return (
@@ -232,19 +248,52 @@ export function HadithDetailsPanel({
 
         {activeGrade && (
           <div className="text-center text-xs text-[var(--text-secondary)]">
-            <Tag
-              tone="accent"
-              className="mt-2 inline-flex px-4 py-1 text-xs font-semibold uppercase tracking-[0.18em]"
-              style={{
-                backgroundColor: activeGrade.backgroundColor,
-                color: activeGrade.textColor,
-                boxShadow: `0 10px 25px ${activeGrade.backgroundColor}1a`,
-              }}
-            >
-              {activeGrade.label}
-            </Tag>
+            <div className="mt-2 inline-flex items-center gap-2">
+              {hasMultipleGraders && (
+                <button
+                  type="button"
+                  aria-label="Previous grader"
+                  onClick={goPrevGrader}
+                  className="rounded-full bg-[var(--surface-card)] px-2 py-1 text-sm font-semibold text-[var(--text-primary)] shadow-sm hover:bg-[var(--surface-card)]/80"
+                >
+                  ‹
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => (hasMultipleGraders ? setShowScholarInfo((prev) => !prev) : undefined)}
+                className="focus:outline-none"
+                aria-expanded={hasMultipleGraders ? showScholarInfo : undefined}
+              >
+                <Tag
+                  tone="accent"
+                  className="inline-flex px-4 py-1 text-xs font-semibold uppercase tracking-[0.18em]"
+                  style={{
+                    backgroundColor: activeGrade.backgroundColor,
+                    color: activeGrade.textColor,
+                    boxShadow: `0 10px 25px ${activeGrade.backgroundColor}1a`,
+                  }}
+                >
+                  {activeGrade.label}
+                  {hasMultipleGraders && <span className="ml-2 text-[0.85em]">{showScholarInfo ? "▴" : "▾"}</span>}
+                </Tag>
+              </button>
+              {hasMultipleGraders && (
+                <button
+                  type="button"
+                  aria-label="Next grader"
+                  onClick={goNextGrader}
+                  className="rounded-full bg-[var(--surface-card)] px-2 py-1 text-sm font-semibold text-[var(--text-primary)] shadow-sm hover:bg-[var(--surface-card)]/80"
+                >
+                  ›
+                </button>
+              )}
+            </div>
             {activeGrade.description && (
               <p className="mt-2 text-sm text-[var(--text-secondary)]">{activeGrade.description}</p>
+            )}
+            {activeGrade.scholarLabel && (showScholarInfo || !hasMultipleGraders) && (
+              <p className="mt-1 text-xs text-[var(--text-muted)]">Graded by {activeGrade.scholarLabel}</p>
             )}
           </div>
         )}
