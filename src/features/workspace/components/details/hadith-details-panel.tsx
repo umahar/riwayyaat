@@ -45,7 +45,11 @@ export function HadithDetailsPanel({
     hadithId: null,
     open: false,
   });
-  const [activeTab, setActiveTab] = useState<"details" | "graph">("details");
+  const [activeTab, setActiveTab] = useState<"details" | "graph">(() => {
+    if (typeof window === "undefined") return "details";
+    const saved = localStorage.getItem("hadith-details-active-tab");
+    return saved === "graph" ? "graph" : "details";
+  });
   const {
     chain,
     variants,
@@ -225,25 +229,47 @@ export function HadithDetailsPanel({
       <div className="mt-4 flex items-center gap-2">
         <button
           type="button"
-          onClick={() => setActiveTab("details")}
+          onClick={() => {
+            setActiveTab("details");
+            if (typeof window !== "undefined") localStorage.setItem("hadith-details-active-tab", "details");
+          }}
           className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
             activeTab === "details"
-              ? "bg-[var(--accent-emerald)] text-[var(--accent-contrast)]"
-              : "bg-[var(--surface-card)] text-[var(--text-primary)] border border-[var(--border-soft)]"
+              ? "bg-[var(--surface-card)] text-[var(--text-primary)] border border-[var(--accent-emerald)] shadow-[0_6px_16px_-10px_var(--accent-emerald)]"
+              : "bg-[var(--surface-card)]/90 text-[var(--text-secondary)] border border-[var(--border-soft)]"
           }`}
         >
-          Details
+          <span
+            className={
+              activeTab === "details"
+                ? "underline underline-offset-4 decoration-[var(--accent-emerald)]"
+                : "text-[var(--text-secondary)]"
+            }
+          >
+            Details
+          </span>
         </button>
         <button
           type="button"
-          onClick={() => setActiveTab("graph")}
+          onClick={() => {
+            setActiveTab("graph");
+            if (typeof window !== "undefined") localStorage.setItem("hadith-details-active-tab", "graph");
+          }}
           className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
             activeTab === "graph"
-              ? "bg-[var(--accent-emerald)] text-[var(--accent-contrast)]"
-              : "bg-[var(--surface-card)] text-[var(--text-primary)] border border-[var(--border-soft)]"
+              ? "bg-[var(--accent-emerald)] text-[var(--accent-contrast)] border border-[var(--accent-emerald)] shadow-[0_10px_24px_-12px_var(--accent-emerald)]"
+              : "bg-[var(--surface-card)]/90 text-[var(--text-secondary)] border border-[var(--border-soft)]"
           }`}
         >
-          Graph
+          <span
+            className={
+              activeTab === "graph"
+                ? "underline underline-offset-4 decoration-[var(--accent-contrast)]"
+                : "text-[var(--text-secondary)]"
+            }
+          >
+            Graph
+          </span>
         </button>
       </div>
 
