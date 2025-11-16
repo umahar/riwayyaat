@@ -203,3 +203,8 @@ body {
   border-color: var(--border-soft);
   background-color: rgba(255, 255, 255, 0.08);
 }
+
+/* Light-mode background for taxonomy cards */
+:root[data-theme="light"] .taxonomy-card {
+  background-color: #f4faf6;
+}
