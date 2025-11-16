@@ -6,7 +6,7 @@ type IconButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 const BASE_ICON_BUTTON =
-  "inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-soft)] bg-[#e5f6ef] text-base text-[var(--text-secondary)] shadow-sm transition hover:-translate-y-0.5 hover:text-[var(--accent-emerald)] dark:bg-[#0f2f24] dark:text-[#e2e8f0] dark:border-white/15";
+  "inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-soft)] bg-[#e5f6ef] text-base text-[var(--text-secondary)] shadow-sm transition hover:-translate-y-0.5 hover:text-[var(--accent-emerald)] dark:bg-[#0f2f24] dark:text-white dark:hover:text-[#34d399] dark:border-white/20";
 
 export function IconButton({
   label,
