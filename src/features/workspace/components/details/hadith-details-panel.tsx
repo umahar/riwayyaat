@@ -291,8 +291,9 @@ export function HadithDetailsPanel({
               <p className="mt-2 text-sm text-[var(--text-secondary)]">{activeGrade.description}</p>
             )}
             {showGradeDetails && activeGrade.scholarLabel && (
-              <p className="mt-1 text-xs font-semibold text-[var(--text-primary)]">
-                Graded by {activeGrade.scholarLabel}
+              <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                <span className="font-medium text-[var(--text-muted)]">Graded by:</span>{" "}
+                <span className="font-semibold text-[var(--text-primary)]">{activeGrade.scholarLabel}</span>
               </p>
             )}
           </div>
