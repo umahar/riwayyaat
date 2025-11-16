@@ -427,7 +427,7 @@ export async function softDeleteHadith(id: number): Promise<boolean> {
   const client = await getClient();
   try {
     const result = await client.query("UPDATE hadith SET deleted_at = NOW() WHERE id = $1", [id]);
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   } finally {
     client.release();
   }

@@ -241,7 +241,7 @@ function mapHadithRow(
   narratorsByChain: Map<number, ChainNarratorRow[]>,
 ): HadithInsight {
   const chainRows = row.chain_id ? narratorsByChain.get(row.chain_id) ?? [] : [];
-  const gradedGrades = mapGradedGrades(row.graded_grades);
+  const gradedGrades = mapGradedGrades(row.graded_grades) ?? [];
   const primaryGrade = gradedGrades.find((entry) => entry.isPrimary) ?? gradedGrades[0];
   const gradeInfo = primaryGrade?.grade;
   const gradingLabel = primaryGrade?.grade?.title ?? DEFAULT_GRADE;
@@ -348,6 +348,7 @@ function mapGradedBy(
     mapped.push({
       name: authorName,
       lifespan: authorLifespan ?? undefined,
+      isPrimary: undefined,
     });
   }
   return mapped.length ? mapped : undefined;

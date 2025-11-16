@@ -1,20 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { assertAdmin } from "@/server/auth/admin-auth";
-import {
-  getAdminHadith,
-  softDeleteHadith,
-  updateAdminHadith,
-} from "@/features/admin/server/hadith-admin-service";
+import { getAdminHadith, softDeleteHadith, updateAdminHadith } from "@/features/admin/server/hadith-admin-service";
 import { validateHadithPayload } from "@/features/admin/server/validate-hadith";
 
 type RouteParams = {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 };
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
   const auth = await assertAdmin(request);
   if (!auth.ok) return auth.response;
-  const id = Number(params.id);
+  const { id: rawId } = await params;
+  const id = Number(rawId);
   if (Number.isNaN(id)) {
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
@@ -28,7 +25,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   const auth = await assertAdmin(request);
   if (!auth.ok) return auth.response;
-  const id = Number(params.id);
+  const { id: rawId } = await params;
+  const id = Number(rawId);
   if (Number.isNaN(id)) {
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
@@ -49,7 +47,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   const auth = await assertAdmin(request);
   if (!auth.ok) return auth.response;
-  const id = Number(params.id);
+  const { id: rawId } = await params;
+  const id = Number(rawId);
   if (Number.isNaN(id)) {
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }

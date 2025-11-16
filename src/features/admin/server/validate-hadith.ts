@@ -16,9 +16,9 @@ export function validateHadithPayload(raw: unknown): { data?: AdminHadithPayload
   const matn = typeof body.matn === "string" ? body.matn.trim() : "";
   const sourceId = asNumber(body.sourceId);
   const sourceName = typeof body.sourceName === "string" ? body.sourceName.trim() : "";
-  const authorName = typeof body.authorName === "string" ? body.authorName.trim() : undefined;
+  const authorName = typeof body.authorName === "string" ? body.authorName.trim() || undefined : undefined;
   const authorLifespan =
-    typeof body.authorLifespan === "string" ? body.authorLifespan.trim() || null : body.authorLifespan ?? null;
+    typeof body.authorLifespan === "string" ? body.authorLifespan.trim() || null : body.authorLifespan == null ? null : undefined;
 
   if (!hadithNumber) errors.push("hadithNumber is required and must be a number");
   if (!matn) errors.push("matn is required");
@@ -74,39 +74,39 @@ function parseTags(raw: unknown): string[] {
 
 function parseNarrators(raw: unknown): AdminNarratorInput[] {
   if (!Array.isArray(raw)) return [];
-  return raw
-    .map((item) => {
-      if (!item || typeof item !== "object") return null;
-      const record = item as Record<string, unknown>;
-      const name = typeof record.name === "string" ? record.name.trim() : "";
-      if (!name) return null;
-      return {
-        name,
-        descriptor: typeof record.descriptor === "string" ? record.descriptor.trim() || null : null,
-        role: record.role === "prophet" ? "prophet" : "narrator",
-        classificationId: asNumber(record.classificationId),
-        reliabilityId: asNumber(record.reliabilityId),
-        transmissionMethodId: asNumber(record.transmissionMethodId),
-      };
-    })
-    .filter((item): item is AdminNarratorInput => Boolean(item));
+  const parsed: AdminNarratorInput[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const record = item as Record<string, unknown>;
+    const name = typeof record.name === "string" ? record.name.trim() : "";
+    if (!name) continue;
+    parsed.push({
+      name,
+      descriptor: typeof record.descriptor === "string" ? record.descriptor.trim() || null : null,
+      role: record.role === "prophet" ? "prophet" : "narrator",
+      classificationId: asNumber(record.classificationId),
+      reliabilityId: asNumber(record.reliabilityId),
+      transmissionMethodId: asNumber(record.transmissionMethodId),
+    });
+  }
+  return parsed;
 }
 
 function parseIdentifiers(raw: unknown): AdminIdentifierInput[] {
   if (!Array.isArray(raw)) return [];
-  return raw
-    .map((item) => {
-      if (!item || typeof item !== "object") return null;
-      const record = item as Record<string, unknown>;
-      const schemeKey = typeof record.schemeKey === "string" ? record.schemeKey.trim() : "";
-      const identifier = typeof record.identifier === "string" ? record.identifier.trim() : "";
-      if (!schemeKey || !identifier) return null;
-      return {
-        schemeKey,
-        identifier,
-        notes: typeof record.notes === "string" ? record.notes.trim() || null : null,
-        isPrimary: Boolean(record.isPrimary),
-      };
-    })
-    .filter((item): item is AdminIdentifierInput => Boolean(item));
+  const parsed: AdminIdentifierInput[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const record = item as Record<string, unknown>;
+    const schemeKey = typeof record.schemeKey === "string" ? record.schemeKey.trim() : "";
+    const identifier = typeof record.identifier === "string" ? record.identifier.trim() : "";
+    if (!schemeKey || !identifier) continue;
+    parsed.push({
+      schemeKey,
+      identifier,
+      notes: typeof record.notes === "string" ? record.notes.trim() || null : null,
+      isPrimary: Boolean(record.isPrimary),
+    });
+  }
+  return parsed;
 }
