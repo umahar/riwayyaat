@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { assertAdmin } from "@/server/auth/admin-auth";
-import { getAdminHadith, softDeleteHadith, updateAdminHadith } from "@/features/admin/server/hadith-admin-service";
+import {
+  AdminInputError,
+  getAdminHadith,
+  softDeleteHadith,
+  updateAdminHadith,
+} from "@/features/admin/server/hadith-admin-service";
 import { validateHadithPayload } from "@/features/admin/server/validate-hadith";
 
 type RouteParams = {
@@ -39,6 +44,12 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const updated = await updateAdminHadith(id, data);
     return NextResponse.json({ data: updated });
   } catch (error) {
+    if (error instanceof AdminInputError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+    }
+    if ((error as { code?: string }).code === "23503") {
+      return NextResponse.json({ error: "Select existing lookup values for all related fields." }, { status: 400 });
+    }
     console.error("[api/admin/hadith:id] Failed to update hadith", error);
     return NextResponse.json({ error: "Unable to update hadith" }, { status: 500 });
   }

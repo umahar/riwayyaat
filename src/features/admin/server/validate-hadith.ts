@@ -5,6 +5,12 @@ const asNumber = (value: unknown) => {
   return Number.isFinite(num) ? num : null;
 };
 
+const normalizeIdInput = (value: unknown) => {
+  const num = asNumber(value);
+  if (!num || num <= 0) return null;
+  return num;
+};
+
 export function validateHadithPayload(raw: unknown): { data?: AdminHadithPayload; errors: string[] } {
   const errors: string[] = [];
   if (!raw || typeof raw !== "object") {
@@ -14,15 +20,11 @@ export function validateHadithPayload(raw: unknown): { data?: AdminHadithPayload
   const body = raw as Record<string, unknown>;
   const hadithNumber = asNumber(body.hadithNumber);
   const matn = typeof body.matn === "string" ? body.matn.trim() : "";
-  const sourceId = asNumber(body.sourceId);
-  const sourceName = typeof body.sourceName === "string" ? body.sourceName.trim() : "";
-  const authorName = typeof body.authorName === "string" ? body.authorName.trim() || undefined : undefined;
-  const authorLifespan =
-    typeof body.authorLifespan === "string" ? body.authorLifespan.trim() || null : body.authorLifespan == null ? null : undefined;
+  const sourceId = normalizeIdInput(body.sourceId);
 
   if (!hadithNumber) errors.push("hadithNumber is required and must be a number");
   if (!matn) errors.push("matn is required");
-  if (!sourceId && !sourceName) errors.push("Provide either sourceId or sourceName");
+  if (!sourceId) errors.push("Select a source");
 
   const narrators = parseNarrators(body.narrators);
   const identifiers = parseIdentifiers(body.identifiers);
@@ -33,20 +35,13 @@ export function validateHadithPayload(raw: unknown): { data?: AdminHadithPayload
     matn,
     sanad: typeof body.sanad === "string" ? body.sanad.trim() || null : null,
     location: typeof body.location === "string" ? body.location.trim() || null : null,
-    sourceId,
-    sourceName: sourceName || undefined,
-    authorName,
-    authorLifespan,
-    bookId: asNumber(body.bookId),
-    bookName: typeof body.bookName === "string" ? body.bookName.trim() || undefined : undefined,
-    bookNumber: asNumber(body.bookNumber),
-    chapterId: asNumber(body.chapterId),
-    chapterName: typeof body.chapterName === "string" ? body.chapterName.trim() || undefined : undefined,
-    chapterNumber: asNumber(body.chapterNumber),
-    narrationLevelId: asNumber(body.narrationLevelId),
-    chainTypeId: asNumber(body.chainTypeId),
-    attributionTypeId: asNumber(body.attributionTypeId),
-    gradeId: asNumber(body.gradeId),
+    sourceId: sourceId ?? 0,
+    bookId: normalizeIdInput(body.bookId),
+    chapterId: normalizeIdInput(body.chapterId),
+    narrationLevelId: normalizeIdInput(body.narrationLevelId),
+    chainTypeId: normalizeIdInput(body.chainTypeId),
+    attributionTypeId: normalizeIdInput(body.attributionTypeId),
+    gradeId: normalizeIdInput(body.gradeId),
     grades: Array.isArray(body.grades) ? (body.grades as AdminHadithPayload["grades"]) : undefined,
     narrators,
     identifiers,
@@ -84,9 +79,9 @@ function parseNarrators(raw: unknown): AdminNarratorInput[] {
       name,
       descriptor: typeof record.descriptor === "string" ? record.descriptor.trim() || null : null,
       role: record.role === "prophet" ? "prophet" : "narrator",
-      classificationId: asNumber(record.classificationId),
-      reliabilityId: asNumber(record.reliabilityId),
-      transmissionMethodId: asNumber(record.transmissionMethodId),
+      classificationId: normalizeIdInput(record.classificationId),
+      reliabilityId: normalizeIdInput(record.reliabilityId),
+      transmissionMethodId: normalizeIdInput(record.transmissionMethodId),
     });
   }
   return parsed;

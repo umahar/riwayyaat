@@ -24,16 +24,9 @@ export type AdminGradeInput = {
 };
 
 export type AdminHadithPayload = {
-  sourceId?: number | null;
-  sourceName?: string;
-  authorName?: string;
-  authorLifespan?: string | null;
+  sourceId: number;
   bookId?: number | null;
-  bookName?: string;
-  bookNumber?: number | null;
   chapterId?: number | null;
-  chapterName?: string;
-  chapterNumber?: number | null;
   hadithNumber: number;
   displayNumber?: string | null;
   matn: string;
@@ -103,4 +96,8 @@ export type AdminLookups = {
   grades: LookupOption[];
   scholars: LookupOption[];
   tags: LookupOption[];
+  authors: LookupOption[];
+  narratorTiers: LookupOption[];
+  reliabilityTiers: LookupOption[];
+  transmissionMethods: LookupOption[];
 };

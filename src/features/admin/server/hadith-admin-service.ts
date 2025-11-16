@@ -14,6 +14,16 @@ import {
 } from "@/features/admin/types";
 
 const MATN_PREVIEW = 140;
+export class AdminInputError extends Error {
+  statusCode = 400;
+}
+
+const normalizeId = (value?: number | null) => {
+  if (value == null) return null;
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) return null;
+  return numeric;
+};
 
 export type ListHadithOptions = {
   page?: number;
@@ -325,12 +335,7 @@ export async function createAdminHadith(payload: AdminHadithPayload): Promise<Ad
   const client = await getClient();
   try {
     await client.query("BEGIN");
-    const {
-      sourceId,
-      bookId,
-      chapterId,
-      matnId,
-    } = await resolvePrimaryEntities(client, payload);
+    const { sourceId, bookId, chapterId, matnId } = await resolvePrimaryEntities(client, payload);
     const displayNumber = payload.displayNumber ?? String(payload.hadithNumber);
     const result = await client.query<{ id: number }>(
       `
@@ -372,12 +377,7 @@ export async function updateAdminHadith(id: number, payload: AdminHadithPayload)
   const client = await getClient();
   try {
     await client.query("BEGIN");
-    const {
-      sourceId,
-      bookId,
-      chapterId,
-      matnId,
-    } = await resolvePrimaryEntities(client, payload);
+    const { sourceId, bookId, chapterId, matnId } = await resolvePrimaryEntities(client, payload);
     const displayNumber = payload.displayNumber ?? String(payload.hadithNumber);
     await client.query(
       `
@@ -437,90 +437,40 @@ async function resolvePrimaryEntities(
   client: PoolClient,
   payload: AdminHadithPayload,
 ): Promise<{ sourceId: number; bookId: number | null; chapterId: number | null; matnId: number }> {
-  const sourceId =
-    payload.sourceId ??
-    (await ensureSource(client, payload.sourceName ?? "Unknown Source", payload.authorName, payload.authorLifespan));
-  const bookId = await ensureBook(client, sourceId, payload.bookId, payload.bookName, payload.bookNumber);
-  const chapterId = await ensureChapter(client, bookId, payload.chapterId, payload.chapterName, payload.chapterNumber);
+  const sourceId = await assertLookupExists(client, "source", payload.sourceId, "source");
+  const bookId = normalizeId(payload.bookId)
+    ? await assertLookupExists(client, "book", payload.bookId as number, "book")
+    : null;
+  const chapterId = normalizeId(payload.chapterId)
+    ? await assertLookupExists(client, "chapter", payload.chapterId as number, "chapter")
+    : null;
   const matnId = await ensureMatn(client, payload.matn);
   return { sourceId, bookId, chapterId, matnId };
 }
 
-async function ensureSource(client: PoolClient, name: string, authorName?: string, authorLifespan?: string | null): Promise<number> {
-  const trimmed = name.trim();
-  const existing = await client.query<{ id: number }>("SELECT id FROM source WHERE name = $1", [trimmed]);
-  if (existing.rowCount) return existing.rows[0].id;
-  const authorId = await ensureAuthor(client, authorName ?? "Unknown Author", authorLifespan);
-  const inserted = await client.query<{ id: number }>(
-    "INSERT INTO source (name, author_id) VALUES ($1, $2) RETURNING id",
-    [trimmed || "Unnamed Source", authorId],
-  );
-  return inserted.rows[0].id;
+async function assertLookupExists(client: PoolClient, table: string, id: number, label: string) {
+  const normalized = normalizeId(id);
+  if (!normalized) {
+    throw new AdminInputError(`Select a valid ${label} from the list.`);
+  }
+  const exists = await client.query<{ exists: boolean }>(`SELECT EXISTS (SELECT 1 FROM ${table} WHERE id = $1) AS exists`, [
+    normalized,
+  ]);
+  if (!exists.rows[0]?.exists) {
+    throw new AdminInputError(`Selected ${label} does not exist.`);
+  }
+  return normalized;
 }
 
-async function ensureAuthor(client: PoolClient, name: string, lifespan?: string | null): Promise<number> {
-  const trimmed = name.trim() || "Unknown Author";
-  const existing = await client.query<{ id: number }>(
-    "SELECT id FROM author WHERE name = $1 AND COALESCE(lifespan_label, '') = COALESCE($2, '')",
-    [trimmed, lifespan ?? null],
-  );
-  if (existing.rowCount) return existing.rows[0].id;
-  const inserted = await client.query<{ id: number }>(
-    "INSERT INTO author (name, lifespan_label) VALUES ($1, $2) RETURNING id",
-    [trimmed, lifespan ?? null],
-  );
-  return inserted.rows[0].id;
-}
-
-async function ensureBook(
+async function assertOptionalLookup(
   client: PoolClient,
-  sourceId: number,
-  bookId?: number | null,
-  name?: string,
-  number?: number | null,
+  table: string,
+  id: number | null | undefined,
+  label: string,
 ): Promise<number | null> {
-  if (bookId) {
-    return bookId;
-  }
-  if (!name && number == null) return null;
-  const trimmed = name?.trim() || null;
-  if (trimmed) {
-    const existing = await client.query<{ id: number }>(
-      "SELECT id FROM book WHERE source_id = $1 AND name = $2",
-      [sourceId, trimmed],
-    );
-    if (existing.rowCount) return existing.rows[0].id;
-  }
-  const inserted = await client.query<{ id: number }>(
-    "INSERT INTO book (source_id, name, number) VALUES ($1, $2, $3) RETURNING id",
-    [sourceId, trimmed, number ?? null],
-  );
-  return inserted.rows[0].id;
-}
-
-async function ensureChapter(
-  client: PoolClient,
-  bookId: number | null,
-  chapterId?: number | null,
-  name?: string,
-  number?: number | null,
-): Promise<number | null> {
-  if (!bookId) return null;
-  if (chapterId) return chapterId;
-  if (!name && number == null) return null;
-  const trimmed = name?.trim() || null;
-  if (trimmed) {
-    const existing = await client.query<{ id: number }>(
-      "SELECT id FROM chapter WHERE book_id = $1 AND name = $2",
-      [bookId, trimmed],
-    );
-    if (existing.rowCount) return existing.rows[0].id;
-  }
-  const inserted = await client.query<{ id: number }>(
-    "INSERT INTO chapter (book_id, name, number) VALUES ($1, $2, $3) RETURNING id",
-    [bookId, trimmed, number ?? null],
-  );
-  return inserted.rows[0].id;
+  const normalized = normalizeId(id);
+  if (!normalized) return null;
+  return assertLookupExists(client, table, normalized, label);
 }
 
 async function ensureMatn(client: PoolClient, text: string): Promise<number> {
@@ -531,9 +481,14 @@ async function ensureMatn(client: PoolClient, text: string): Promise<number> {
 }
 
 async function upsertChainAndNarrators(client: PoolClient, hadithId: number, payload: AdminHadithPayload) {
-  const narrationLevelId = payload.narrationLevelId ?? null;
-  const chainTypeId = payload.chainTypeId ?? null;
-  const attributionTypeId = payload.attributionTypeId ?? null;
+  const narrationLevelId = await assertOptionalLookup(
+    client,
+    "narration_level",
+    payload.narrationLevelId,
+    "narration level",
+  );
+  const chainTypeId = await assertOptionalLookup(client, "chain_type", payload.chainTypeId, "chain type");
+  const attributionTypeId = await assertOptionalLookup(client, "attribution_type", payload.attributionTypeId, "attribution");
 
   const existing = await client.query<{ id: number }>(
     "SELECT id FROM hadith_chain WHERE hadith_id = $1 AND is_primary = true",
@@ -567,6 +522,24 @@ async function upsertChainAndNarrators(client: PoolClient, hadithId: number, pay
   for (let index = 0; index < narrators.length; index += 1) {
     const narrator = narrators[index];
     const narratorId = await ensureNarrator(client, narrator.name, narrator.descriptor ?? undefined);
+    const classificationId = await assertOptionalLookup(
+      client,
+      "narrator_tier",
+      narrator.classificationId,
+      "narrator tier",
+    );
+    const reliabilityId = await assertOptionalLookup(
+      client,
+      "reliability_tier",
+      narrator.reliabilityId,
+      "reliability tier",
+    );
+    const transmissionMethodId = await assertOptionalLookup(
+      client,
+      "transmission_method",
+      narrator.transmissionMethodId,
+      "transmission method",
+    );
     await client.query(
       `
         INSERT INTO chain_narrator (
@@ -584,9 +557,9 @@ async function upsertChainAndNarrators(client: PoolClient, hadithId: number, pay
         narratorId,
         index + 1,
         narrator.role === "prophet" ? "prophet" : "narrator",
-        narrator.classificationId ?? null,
-        narrator.reliabilityId ?? null,
-        narrator.transmissionMethodId ?? null,
+        classificationId,
+        reliabilityId,
+        transmissionMethodId,
       ],
     );
   }
@@ -643,24 +616,25 @@ async function replaceIdentifiers(client: PoolClient, hadithId: number, identifi
 
 async function replaceGrades(client: PoolClient, hadithId: number, payload: AdminHadithPayload) {
   await client.query("DELETE FROM hadith_grade WHERE hadith_id = $1", [hadithId]);
-  const primaryGrade = payload.gradeId;
+  const primaryGrade = normalizeId(payload.gradeId);
   const gradeEntries =
     payload.grades && payload.grades.length > 0
       ? payload.grades
       : primaryGrade
-        ? [{ gradeId: primaryGrade, scholarName: "Unspecified grader", scholarLifespan: null, isPrimary: true }]
+        ? [{ gradeId: primaryGrade, scholarId: null, isPrimary: true }]
         : [];
 
   for (let index = 0; index < gradeEntries.length; index += 1) {
     const entry = gradeEntries[index];
-    const gradeId =
-      entry.gradeId ??
-      (entry.gradeTitle ? await ensureGrade(client, entry.gradeTitle) : primaryGrade ?? null);
+    const gradeId = normalizeId(entry.gradeId) ?? primaryGrade;
     if (!gradeId) continue;
-    const scholarId =
-      entry.scholarId ??
-      (entry.scholarName ? await ensureScholar(client, entry.scholarName, entry.scholarLifespan) : null);
-    if (!scholarId) continue;
+    await assertLookupExists(client, "grade", gradeId, "grade");
+
+    const scholarId = normalizeId(entry.scholarId);
+    if (!scholarId) {
+      throw new AdminInputError("Select a scholar when assigning a grade.");
+    }
+    await assertLookupExists(client, "scholar", scholarId, "scholar");
     const isPrimary = entry.isPrimary ?? index === 0;
     await client.query(
       `
@@ -674,35 +648,24 @@ async function replaceGrades(client: PoolClient, hadithId: number, payload: Admi
   }
 }
 
-async function ensureGrade(client: PoolClient, title: string): Promise<number> {
-  const normalized = title.trim();
-  const existing = await client.query<{ id: number }>("SELECT id FROM grade WHERE name = $1", [normalized]);
-  if (existing.rowCount) return existing.rows[0].id;
-  const inserted = await client.query<{ id: number }>(
-    "INSERT INTO grade (name, description) VALUES ($1, $2) RETURNING id",
-    [normalized, normalized],
-  );
-  return inserted.rows[0].id;
-}
-
-async function ensureScholar(client: PoolClient, name: string, lifespan?: string | null): Promise<number> {
-  const trimmed = name.trim();
-  const existing = await client.query<{ id: number }>(
-    "SELECT id FROM scholar WHERE name = $1 AND COALESCE(lifespan_label, '') = COALESCE($2, '')",
-    [trimmed, lifespan ?? null],
-  );
-  if (existing.rowCount) return existing.rows[0].id;
-  const inserted = await client.query<{ id: number }>(
-    "INSERT INTO scholar (name, lifespan_label) VALUES ($1, $2) RETURNING id",
-    [trimmed, lifespan ?? null],
-  );
-  return inserted.rows[0].id;
-}
-
 export async function fetchAdminLookups(): Promise<AdminLookups> {
   const client = await getClient();
   try {
-    const [sources, books, chapters, narrationLevels, chainTypes, attributionTypes, grades, scholars, tags] =
+    const [
+      sources,
+      books,
+      chapters,
+      narrationLevels,
+      chainTypes,
+      attributionTypes,
+      grades,
+      scholars,
+      tags,
+      authors,
+      narratorTiers,
+      reliabilityTiers,
+      transmissionMethods,
+    ] =
       await Promise.all([
         client.query<LookupOption>("SELECT id, name AS label FROM source ORDER BY name"),
         client.query<BookLookup>(
@@ -721,6 +684,16 @@ export async function fetchAdminLookups(): Promise<AdminLookups> {
         client.query<LookupOption>("SELECT id, name AS label, description AS secondary FROM grade ORDER BY name"),
         client.query<LookupOption>("SELECT id, name AS label, lifespan_label AS secondary FROM scholar ORDER BY name"),
         client.query<LookupOption>("SELECT id, name AS label FROM tag ORDER BY name"),
+        client.query<LookupOption>("SELECT id, name AS label, lifespan_label AS secondary FROM author ORDER BY name"),
+        client.query<LookupOption>(
+          "SELECT id, name AS label, secondary_label AS secondary FROM narrator_tier ORDER BY id",
+        ),
+        client.query<LookupOption>(
+          "SELECT id, name AS label, secondary_label AS secondary FROM reliability_tier ORDER BY id",
+        ),
+        client.query<LookupOption>(
+          "SELECT id, name AS label, description AS secondary FROM transmission_method ORDER BY id",
+        ),
       ]);
 
     return {
@@ -733,6 +706,10 @@ export async function fetchAdminLookups(): Promise<AdminLookups> {
       grades: grades.rows,
       scholars: scholars.rows,
       tags: tags.rows,
+      authors: authors.rows,
+      narratorTiers: narratorTiers.rows,
+      reliabilityTiers: reliabilityTiers.rows,
+      transmissionMethods: transmissionMethods.rows,
     };
   } finally {
     client.release();

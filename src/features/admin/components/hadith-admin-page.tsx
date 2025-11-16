@@ -11,16 +11,9 @@ import {
 } from "@/features/admin/types";
 
 type FormState = {
-  sourceId?: number | null;
-  sourceName: string;
-  authorName: string;
-  authorLifespan: string;
-  bookId?: number | null;
-  bookName: string;
-  bookNumber: string;
-  chapterId?: number | null;
-  chapterName: string;
-  chapterNumber: string;
+  sourceId: number | null;
+  bookId: number | null;
+  chapterId: number | null;
   hadithNumber: string;
   displayNumber: string;
   matn: string;
@@ -32,19 +25,14 @@ type FormState = {
   narrators: AdminNarratorInput[];
   tags: string;
   identifiers: AdminIdentifierInput[];
-  gradeTitle: string;
-  scholarName: string;
-  scholarLifespan: string;
+  gradeId: number | null;
+  scholarId: number | null;
 };
 
 const EMPTY_FORM: FormState = {
-  sourceName: "",
-  authorName: "",
-  authorLifespan: "",
-  bookName: "",
-  bookNumber: "",
-  chapterName: "",
-  chapterNumber: "",
+  sourceId: null,
+  bookId: null,
+  chapterId: null,
   hadithNumber: "",
   displayNumber: "",
   matn: "",
@@ -53,9 +41,8 @@ const EMPTY_FORM: FormState = {
   narrators: [{ name: "", role: "narrator" }],
   tags: "",
   identifiers: [],
-  gradeTitle: "",
-  scholarName: "",
-  scholarLifespan: "",
+  gradeId: null,
+  scholarId: null,
 };
 
 export function HadithAdminPage() {
@@ -79,6 +66,7 @@ export function HadithAdminPage() {
   const [formState, setFormState] = useState<FormState>(EMPTY_FORM);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
 
   useEffect(() => {
@@ -102,6 +90,14 @@ export function HadithAdminPage() {
   }, [page, search, filters.book, filters.chapter, filters.tag, filters.narrator, filters.source]);
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / pageSize)), [total, pageSize]);
+  const booksForSource = useMemo(
+    () => (formState.sourceId ? lookups?.books.filter((book) => book.sourceId === formState.sourceId) ?? [] : []),
+    [lookups, formState.sourceId],
+  );
+  const chaptersForBook = useMemo(
+    () => (formState.bookId ? lookups?.chapters.filter((ch) => ch.bookId === formState.bookId) ?? [] : []),
+    [lookups, formState.bookId],
+  );
 
   async function loadList() {
     setLoading(true);
@@ -135,6 +131,7 @@ export function HadithAdminPage() {
     setEditingId(id);
     setFormOpen(true);
     setSaving(false);
+    setFormError(null);
     try {
       const res = await fetch(`/api/admin/hadith/${id}`);
       if (!res.ok) throw new Error(`Failed to load hadith (${res.status})`);
@@ -153,12 +150,19 @@ export function HadithAdminPage() {
     setFormState(EMPTY_FORM);
     setFormOpen(true);
     setNotification(null);
+    setFormError(null);
   }
 
   async function handleSave() {
     if (saving) return;
     setSaving(true);
     setNotification(null);
+    setFormError(null);
+    if (formState.gradeId && !formState.scholarId) {
+      setFormError("Select a scholar for the chosen grade or remove the grade.");
+      setSaving(false);
+      return;
+    }
     const payload = toPayload(formState);
     try {
       const res = await fetch(editingId ? `/api/admin/hadith/${editingId}` : "/api/admin/hadith", {
@@ -168,7 +172,9 @@ export function HadithAdminPage() {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? `Save failed (${res.status})`);
+        const reason = body?.error ?? `Save failed (${res.status})`;
+        setFormError(reason);
+        throw new Error(reason);
       }
       setNotification(editingId ? "Hadith updated" : "Hadith created");
       setFormOpen(false);
@@ -400,9 +406,7 @@ export function HadithAdminPage() {
                 <h2 className="text-xl font-semibold">
                   {formMode === "edit" ? "Edit hadith" : "Create hadith"}
                 </h2>
-                <p className="text-sm text-[var(--text-muted)]">
-                  Fill in source, book/chapter, matn, chain, tags, and identifiers.
-                </p>
+                <p className="text-sm text-[var(--text-muted)]">Fill in source, book/chapter, matn, chain, tags, and identifiers.</p>
               </div>
               <button
                 onClick={() => setFormOpen(false)}
@@ -411,82 +415,73 @@ export function HadithAdminPage() {
                 Close
               </button>
             </div>
+            {formError && (
+              <div className="mb-4 rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+                {formError}
+              </div>
+            )}
             <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Source" description="Pick an existing source or enter a new one.">
-                <div className="flex gap-2">
-                  <select
-                    value={formState.sourceId ?? ""}
-                    onChange={(e) =>
-                      setFormState((prev) => ({
-                        ...prev,
-                        sourceId: e.target.value ? Number(e.target.value) : undefined,
-                        sourceName: "",
-                      }))
-                    }
-                    className="w-1/2 rounded-xl border border-[var(--border-soft)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)]"
-                  >
-                    <option value="">Select source</option>
-                    {lookups?.sources.map((source) => (
-                      <option key={source.id} value={source.id}>
-                        {source.label}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    value={formState.sourceName}
-                    onChange={(e) =>
-                      setFormState((prev) => ({
-                        ...prev,
-                        sourceName: e.target.value,
-                        sourceId: undefined,
-                      }))
-                    }
-                    placeholder="Or type new source name"
-                    className="w-1/2 rounded-xl border border-[var(--border-soft)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)]"
-                  />
-                </div>
-                <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
-                  <input
-                    value={formState.authorName}
-                    onChange={(e) => setFormState((prev) => ({ ...prev, authorName: e.target.value }))}
-                    placeholder="Author (optional)"
-                    className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)]"
-                  />
-                  <input
-                    value={formState.authorLifespan}
-                    onChange={(e) => setFormState((prev) => ({ ...prev, authorLifespan: e.target.value }))}
-                    placeholder="Author lifespan"
-                    className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)]"
-                  />
-                </div>
+              <Field label="Source" description="Select an existing source (cannot add new here).">
+                <select
+                  value={formState.sourceId ?? ""}
+                  onChange={(e) =>
+                    setFormState((prev) => ({
+                      ...prev,
+                      sourceId: e.target.value ? Number(e.target.value) : null,
+                      bookId: null,
+                      chapterId: null,
+                    }))
+                  }
+                  className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)]"
+                >
+                  <option value="">Select source</option>
+                  {lookups?.sources.map((source) => (
+                    <option key={source.id} value={source.id}>
+                      {source.label}
+                    </option>
+                  ))}
+                </select>
               </Field>
 
               <Field label="Book & chapter">
                 <div className="grid grid-cols-2 gap-2">
-                  <input
-                    value={formState.bookName}
-                    onChange={(e) => setFormState((prev) => ({ ...prev, bookName: e.target.value }))}
-                    placeholder="Book name"
-                    className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)]"
-                  />
-                  <input
-                    value={formState.bookNumber}
-                    onChange={(e) => setFormState((prev) => ({ ...prev, bookNumber: e.target.value }))}
-                    placeholder="Book number"
-                    className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)]"
-                  />
-                  <input
-                    value={formState.chapterName}
-                    onChange={(e) => setFormState((prev) => ({ ...prev, chapterName: e.target.value }))}
-                    placeholder="Chapter name"
-                    className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)]"
-                  />
-                  <input
-                    value={formState.chapterNumber}
-                    onChange={(e) => setFormState((prev) => ({ ...prev, chapterNumber: e.target.value }))}
-                    placeholder="Chapter number"
-                    className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)]"
-                  />
+                  <select
+                    value={formState.bookId ?? ""}
+                    onChange={(e) =>
+                      setFormState((prev) => ({
+                        ...prev,
+                        bookId: e.target.value ? Number(e.target.value) : null,
+                        chapterId: null,
+                      }))
+                    }
+                    disabled={!formState.sourceId}
+                    className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)] disabled:opacity-50"
+                  >
+                    <option value="">{formState.sourceId ? "Select book (optional)" : "Select a source first"}</option>
+                    {booksForSource.map((book) => (
+                      <option key={book.id} value={book.id}>
+                        {book.label}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={formState.chapterId ?? ""}
+                    onChange={(e) =>
+                      setFormState((prev) => ({
+                        ...prev,
+                        chapterId: e.target.value ? Number(e.target.value) : null,
+                      }))
+                    }
+                    disabled={!formState.bookId}
+                    className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)] disabled:opacity-50"
+                  >
+                    <option value="">{formState.bookId ? "Select chapter (optional)" : "Select a book first"}</option>
+                    {chaptersForBook.map((chapter) => (
+                      <option key={chapter.id} value={chapter.id}>
+                        {chapter.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </Field>
 
@@ -599,16 +594,67 @@ export function HadithAdminPage() {
                       <select
                         value={narrator.role ?? "narrator"}
                         onChange={(e) => updateNarrator(idx, { ...narrator, role: e.target.value as "prophet" | "narrator" })}
-                        className="rounded-lg border border-[var(--border-soft)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)]"
-                      >
-                        <option value="narrator">Narrator</option>
-                        <option value="prophet">Prophet</option>
-                      </select>
-                      <button
-                        onClick={() => removeNarrator(idx)}
-                        className="rounded-full border border-[var(--border-soft)] px-3 py-1 text-xs text-[var(--text-secondary)]"
-                      >
-                        Remove
+                    className="rounded-lg border border-[var(--border-soft)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)]"
+                  >
+                    <option value="narrator">Narrator</option>
+                    <option value="prophet">Prophet</option>
+                  </select>
+                  <select
+                    value={narrator.classificationId ?? ""}
+                    onChange={(e) =>
+                      updateNarrator(idx, {
+                        ...narrator,
+                        classificationId: e.target.value ? Number(e.target.value) : null,
+                      })
+                    }
+                    className="rounded-lg border border-[var(--border-soft)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)]"
+                  >
+                    <option value="">Narrator tier</option>
+                    {lookups?.narratorTiers.map((tier) => (
+                      <option key={tier.id} value={tier.id}>
+                        {tier.label}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={narrator.reliabilityId ?? ""}
+                    onChange={(e) =>
+                      updateNarrator(idx, {
+                        ...narrator,
+                        reliabilityId: e.target.value ? Number(e.target.value) : null,
+                      })
+                    }
+                    className="rounded-lg border border-[var(--border-soft)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)]"
+                  >
+                    <option value="">Reliability tier</option>
+                    {lookups?.reliabilityTiers.map((tier) => (
+                      <option key={tier.id} value={tier.id}>
+                        {tier.label}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={narrator.transmissionMethodId ?? ""}
+                    onChange={(e) =>
+                      updateNarrator(idx, {
+                        ...narrator,
+                        transmissionMethodId: e.target.value ? Number(e.target.value) : null,
+                      })
+                    }
+                    className="rounded-lg border border-[var(--border-soft)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)]"
+                  >
+                    <option value="">Transmission method</option>
+                    {lookups?.transmissionMethods.map((method) => (
+                      <option key={method.id} value={method.id}>
+                        {method.label}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => removeNarrator(idx)}
+                    className="rounded-full border border-[var(--border-soft)] px-3 py-1 text-xs text-[var(--text-secondary)]"
+                  >
+                    Remove
                       </button>
                     </div>
                   ))}
@@ -677,26 +723,42 @@ export function HadithAdminPage() {
                 </div>
               </Field>
 
-              <Field label="Primary grading" description="Optional grade + scholar attribution.">
+              <Field label="Primary grading" description="Pick existing grade and scholar (optional).">
                 <div className="grid grid-cols-2 gap-2">
-                  <input
-                    value={formState.gradeTitle}
-                    onChange={(e) => setFormState((prev) => ({ ...prev, gradeTitle: e.target.value }))}
-                    placeholder="Grade title"
+                  <select
+                    value={formState.gradeId ?? ""}
+                    onChange={(e) =>
+                      setFormState((prev) => ({
+                        ...prev,
+                        gradeId: e.target.value ? Number(e.target.value) : null,
+                      }))
+                    }
                     className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)]"
-                  />
-                  <input
-                    value={formState.scholarName}
-                    onChange={(e) => setFormState((prev) => ({ ...prev, scholarName: e.target.value }))}
-                    placeholder="Scholar name"
+                  >
+                    <option value="">No grade</option>
+                    {lookups?.grades.map((grade) => (
+                      <option key={grade.id} value={grade.id}>
+                        {grade.label}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={formState.scholarId ?? ""}
+                    onChange={(e) =>
+                      setFormState((prev) => ({
+                        ...prev,
+                        scholarId: e.target.value ? Number(e.target.value) : null,
+                      }))
+                    }
                     className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)]"
-                  />
-                  <input
-                    value={formState.scholarLifespan}
-                    onChange={(e) => setFormState((prev) => ({ ...prev, scholarLifespan: e.target.value }))}
-                    placeholder="Scholar lifespan"
-                    className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)]"
-                  />
+                  >
+                    <option value="">No scholar</option>
+                    {lookups?.scholars.map((scholar) => (
+                      <option key={scholar.id} value={scholar.id}>
+                        {scholar.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </Field>
             </div>
@@ -783,16 +845,9 @@ function toPayload(form: FormState): AdminHadithPayload {
     .filter((id) => id.schemeKey && id.identifier);
 
   return {
-    sourceId: form.sourceId ?? null,
-    sourceName: form.sourceName || undefined,
-    authorName: form.authorName || undefined,
-    authorLifespan: form.authorLifespan || null,
+    sourceId: form.sourceId ?? 0,
     bookId: form.bookId ?? null,
-    bookName: form.bookName || undefined,
-    bookNumber: form.bookNumber ? Number(form.bookNumber) : null,
     chapterId: form.chapterId ?? null,
-    chapterName: form.chapterName || undefined,
-    chapterNumber: form.chapterNumber ? Number(form.chapterNumber) : null,
     hadithNumber: Number(form.hadithNumber) || 0,
     displayNumber: form.displayNumber || null,
     matn: form.matn,
@@ -807,13 +862,13 @@ function toPayload(form: FormState): AdminHadithPayload {
       .filter(Boolean),
     narrators,
     identifiers,
+    gradeId: form.gradeId ?? null,
     grades:
-      form.gradeTitle || form.scholarName
+      form.gradeId != null
         ? [
             {
-              gradeTitle: form.gradeTitle || undefined,
-              scholarName: form.scholarName || undefined,
-              scholarLifespan: form.scholarLifespan || undefined,
+              gradeId: form.gradeId ?? undefined,
+              scholarId: form.scholarId ?? undefined,
               isPrimary: true,
             },
           ]
@@ -824,29 +879,21 @@ function toPayload(form: FormState): AdminHadithPayload {
 function toFormState(detail: AdminHadithDetail): FormState {
   return {
     sourceId: detail.sourceId,
-    sourceName: detail.source,
-    authorName: "",
-    authorLifespan: "",
-    bookId: detail.bookId ?? undefined,
-    bookName: detail.book ?? "",
-    bookNumber: detail.bookNumber?.toString() ?? "",
-    chapterId: detail.chapterId ?? undefined,
-    chapterName: detail.chapter ?? "",
-    chapterNumber: detail.chapterNumber?.toString() ?? "",
+    bookId: detail.bookId ?? null,
+    chapterId: detail.chapterId ?? null,
     hadithNumber: detail.hadithNumber.toString(),
     displayNumber: detail.displayNumber ?? "",
     matn: detail.matn,
     sanad: detail.sanad ?? "",
     location: detail.location ?? "",
-    narrationLevelId: detail.narrationLevelId ?? undefined,
-    chainTypeId: detail.chainTypeId ?? undefined,
-    attributionTypeId: detail.attributionTypeId ?? undefined,
+    narrationLevelId: detail.narrationLevelId ?? null,
+    chainTypeId: detail.chainTypeId ?? null,
+    attributionTypeId: detail.attributionTypeId ?? null,
     narrators: detail.narrators ?? [],
     tags: detail.tags.join(", "),
     identifiers: detail.identifiers ?? [],
-    gradeTitle: detail.grades?.[0]?.gradeTitle ?? "",
-    scholarName: detail.grades?.[0]?.scholarName ?? "",
-    scholarLifespan: detail.grades?.[0]?.scholarLifespan ?? "",
+    gradeId: detail.grades?.[0]?.gradeId ?? null,
+    scholarId: detail.grades?.[0]?.scholarId ?? null,
   };
 }
 
