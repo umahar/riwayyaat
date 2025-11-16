@@ -1,9 +1,9 @@
-import { useMemo } from "react";
-import dynamic from "next/dynamic";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { GraphData } from "@/features/workspace/hooks/use-graph";
+import dynamic from "next/dynamic";
 
-// react-force-graph needs window; load dynamically client-side.
-const ForceGraph2D = dynamic(() => import("react-force-graph").then((mod) => mod.ForceGraph2D), {
+// Force 2D-only bundle to avoid AFRAME/global usage and load client-side.
+const ForceGraph2D = dynamic(() => import("react-force-graph-2d").then((mod) => mod.default), {
   ssr: false,
 });
 
@@ -13,6 +13,21 @@ type ChainGraphProps = {
 };
 
 export function ChainGraph({ data, onNarratorSelect }: ChainGraphProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const measure = () => {
+      if (!containerRef.current) return;
+      const { clientWidth, clientHeight } = containerRef.current;
+      setSize({ width: clientWidth, height: clientHeight });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    if (containerRef.current) observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
   const graphData = useMemo(() => {
     return {
       nodes: data.nodes.map((n) => ({
@@ -37,20 +52,27 @@ export function ChainGraph({ data, onNarratorSelect }: ChainGraphProps) {
   };
 
   return (
-    <div className="h-80 w-full overflow-hidden rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)]">
+    <div
+      ref={containerRef}
+      className="h-80 w-full overflow-hidden rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)]"
+    >
       <ForceGraph2D
+        width={size.width || undefined}
+        height={size.height || undefined}
         graphData={graphData}
         nodeCanvasObject={(node: any, ctx: CanvasRenderingContext2D) => {
           const label = node.name || node.id;
-          ctx.fillStyle = node.type === "Narrator" ? "#10b981" : node.type === "Hadith" ? "#2563eb" : "#6b7280";
+          const nodeColor =
+            node.type === "Narrator" ? "#0f766e" : node.type === "Hadith" ? "#2563eb" : "#475569";
+          ctx.fillStyle = nodeColor;
           ctx.beginPath();
-          ctx.arc(node.x!, node.y!, 6, 0, 2 * Math.PI, false);
+          ctx.arc(node.x!, node.y!, 7, 0, 2 * Math.PI, false);
           ctx.fill();
-          ctx.font = "12px sans-serif";
-          ctx.fillStyle = "#e5e7eb";
-          ctx.fillText(label, node.x! + 8, node.y! + 4);
+          ctx.font = "12px Inter, sans-serif";
+          ctx.fillStyle = "#0f172a";
+          ctx.fillText(label, node.x! + 10, node.y! + 4);
         }}
-        linkColor={() => "#94a3b8"}
+        linkColor={() => "#cbd5e1"}
         linkDirectionalParticles={0}
         onNodeClick={handleNodeClick}
       />

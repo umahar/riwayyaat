@@ -1,4 +1,10 @@
-import "server-only";
+// Hint for Next.js; skipped when running in script contexts (tsx/node).
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires, import/no-extraneous-dependencies
+  require("server-only");
+} catch {
+  /* noop */
+}
 import {
   GraphNode,
   GraphRelationship,

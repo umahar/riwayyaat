@@ -1,4 +1,10 @@
-import "server-only";
+// Hint for Next.js; ignored when running in scripts.
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires, import/no-extraneous-dependencies
+  require("server-only");
+} catch {
+  /* noop */
+}
 import neo4j, { Driver, Session, SessionConfig } from "neo4j-driver";
 
 /**

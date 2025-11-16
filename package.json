@@ -14,12 +14,14 @@
   "dependencies": {
     "dotenv": "^17.2.3",
     "neo4j-driver": "^5.23.0",
-    "openai": "^4.83.0",
-    "react-force-graph": "^1.45.1",
     "next": "16.0.2",
+    "openai": "^4.83.0",
     "pg": "^8.16.3",
     "react": "19.2.0",
-    "react-dom": "19.2.0"
+    "react-dom": "19.2.0",
+    "react-force-graph": "^1.45.1",
+    "react-force-graph-2d": "^1.29.0",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
