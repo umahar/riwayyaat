@@ -50,6 +50,8 @@ export function HadithDetailsPanel({
     const saved = localStorage.getItem("hadith-details-active-tab");
     return saved === "graph" ? "graph" : "details";
   });
+  const [variantFilter, setVariantFilter] = useState<"all" | "shared matn" | "shared narrator">("all");
+  const [variantSourceFilter, setVariantSourceFilter] = useState<string>("all");
   const {
     chain,
     variants,
@@ -126,6 +128,15 @@ export function HadithDetailsPanel({
 
   const hasMultipleGraders = gradeOptions.length > 1;
 
+  const filteredVariants = useMemo(() => {
+    if (!variants) return [];
+    return variants.variants.filter((v) => {
+      const reasonMatch = variantFilter === "all" ? true : v.similarityReason === variantFilter;
+      const sourceMatch = variantSourceFilter === "all" ? true : v.source === variantSourceFilter;
+      return reasonMatch && sourceMatch;
+    });
+  }, [variants, variantFilter, variantSourceFilter]);
+
   const goPrevGrader = () => {
     if (!hasMultipleGraders) return;
     const nextIndex = (selectedGraderIndex - 1 + gradeOptions.length) % gradeOptions.length;
@@ -196,6 +207,11 @@ export function HadithDetailsPanel({
       resetVariants();
     }
   }, [activeTab, hadith?.id, loadChainGraph, resetNetwork, resetVariants]);
+
+  useEffect(() => {
+    setVariantFilter("all");
+    setVariantSourceFilter("all");
+  }, [hadith?.id]);
 
   return (
     <PanelWrapper isDesktop={isDesktop} onResizeStart={onResizeStart}>
@@ -419,7 +435,19 @@ export function HadithDetailsPanel({
           {graphLoading && <LoadingState message="Loading graph…" />}
           {chain ? (
             <>
-              <h4 className="text-sm font-semibold text-[var(--text-primary)]">Isnād Graph</h4>
+              <div className="flex items-center gap-2">
+                <h4 className="text-sm font-semibold text-[var(--text-primary)]">Isnād Graph</h4>
+                <button
+                  type="button"
+                  title="Visualize the primary chain and narrators; click a narrator to explore their network."
+                  className="text-[var(--text-muted)] transition hover:text-[var(--text-primary)]"
+                >
+                  ℹ︎
+                </button>
+                <span className="rounded-full bg-[var(--surface-card)] px-2 py-1 text-[10px] text-[var(--text-muted)]">
+                  Drag to pan, scroll/pinch or use +/– to zoom.
+                </span>
+              </div>
               <ChainGraph
                 data={chain}
                 onNarratorSelect={(narratorId) => loadNarratorNetwork(narratorId, 2)}
@@ -430,8 +458,104 @@ export function HadithDetailsPanel({
           )}
           {variants && variants.variants.length > 0 && (
             <>
-              <h4 className="text-sm font-semibold text-[var(--text-primary)]">Variants</h4>
-              <VariantGraph data={variants} />
+              <div className="flex flex-wrap items-center gap-2">
+                <h4 className="text-sm font-semibold text-[var(--text-primary)]">Variants</h4>
+                <button
+                  type="button"
+                  title="See parallel narrations from other collections; filter by shared matn or narrators."
+                  className="text-[var(--text-muted)] transition hover:text-[var(--text-primary)]"
+                >
+                  ℹ︎
+                </button>
+                <span className="rounded-full bg-[var(--surface-card)] px-2 py-1 text-[10px] text-[var(--text-muted)]">
+                  Other collections narrating this hadith.
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-secondary)]">
+                <button
+                  type="button"
+                  onClick={() => setVariantFilter("all")}
+                  className={`rounded-full border px-2 py-1 font-semibold transition ${
+                    variantFilter === "all"
+                      ? "border-[var(--accent-emerald)] bg-[var(--surface-card)] text-[var(--text-primary)]"
+                      : "border-[var(--border-soft)] text-[var(--text-secondary)]"
+                  }`}
+                >
+                  All
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVariantFilter("shared matn")}
+                  className={`rounded-full border px-2 py-1 font-semibold transition ${
+                    variantFilter === "shared matn"
+                      ? "border-[var(--accent-emerald)] bg-[var(--surface-card)] text-[var(--text-primary)]"
+                      : "border-[var(--border-soft)] text-[var(--text-secondary)]"
+                  }`}
+                >
+                  Shared matn
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVariantFilter("shared narrator")}
+                  className={`rounded-full border px-2 py-1 font-semibold transition ${
+                    variantFilter === "shared narrator"
+                      ? "border-[var(--accent-emerald)] bg-[var(--surface-card)] text-[var(--text-primary)]"
+                      : "border-[var(--border-soft)] text-[var(--text-secondary)]"
+                  }`}
+                >
+                  Shared narrator
+                </button>
+                <div className="ml-auto flex flex-wrap items-center gap-2">
+                  <span className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Sources</span>
+                  <button
+                    type="button"
+                    onClick={() => setVariantSourceFilter("all")}
+                    className={`rounded-full border px-2 py-1 font-semibold transition ${
+                      variantSourceFilter === "all"
+                        ? "border-[var(--accent-emerald)] bg-[var(--surface-card)] text-[var(--text-primary)]"
+                        : "border-[var(--border-soft)] text-[var(--text-secondary)]"
+                    }`}
+                  >
+                    All
+                  </button>
+                  {Array.from(new Set(variants.variants.map((v) => v.source))).map((source) => (
+                    <button
+                      key={`source-filter-${source}`}
+                      type="button"
+                      onClick={() => setVariantSourceFilter(source)}
+                      className={`rounded-full border px-2 py-1 font-semibold transition ${
+                        variantSourceFilter === source
+                          ? "border-[var(--accent-emerald)] bg-[var(--surface-card)] text-[var(--text-primary)]"
+                          : "border-[var(--border-soft)] text-[var(--text-secondary)]"
+                      }`}
+                    >
+                      {source}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <VariantGraph
+                data={{
+                  ...variants,
+                  variants: filteredVariants,
+                }}
+              />
+              <ul className="space-y-2 text-xs text-[var(--text-primary)]">
+                {filteredVariants.map((v) => (
+                  <li
+                    key={`variant-row-${v.hadithId}`}
+                    className="flex items-center justify-between rounded-xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-3 py-2 shadow-sm"
+                  >
+                    <div>
+                      <p className="font-semibold">{v.source}</p>
+                      <p className="text-[var(--text-muted)] text-[11px]">Hadith {v.displayNumber}</p>
+                    </div>
+                    <span className="rounded-full bg-[var(--surface-panel)] px-2 py-1 text-[10px] text-[var(--text-secondary)]">
+                      {v.similarityReason}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </>
           )}
           {network && (
