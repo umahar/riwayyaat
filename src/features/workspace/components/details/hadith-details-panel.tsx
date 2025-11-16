@@ -149,6 +149,7 @@ export function HadithDetailsPanel({
             description: detailsCopy.fallbackDescription,
           },
         ];
+  const displayNumber = hadith.details.displayNumber ?? String(hadith.details.hadithNumber);
   const narrationDetails = hadith.narrationLevelDetail;
   const sourceAuthor = hadith.details.author ?? null;
   const gradedByLabel = detailsCopy.gradedByLabel ?? "Graded by";
@@ -162,7 +163,7 @@ export function HadithDetailsPanel({
           </h3>
           <p className="text-sm font-semibold text-[var(--text-secondary)]">
             {detailsCopy.bookLabel} {hadith.details.bookNumber}, {detailsCopy.hadithLabel}{" "}
-            {hadith.details.hadithNumber}
+            {displayNumber}
           </p>
         </div>
         <div className="flex flex-col items-end gap-1 text-xs font-semibold text-[var(--text-secondary)]">

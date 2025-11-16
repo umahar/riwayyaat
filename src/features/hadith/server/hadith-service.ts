@@ -11,6 +11,8 @@ import {
 type HadithRow = {
   id: number;
   number: number;
+  display_number: string | null;
+  identifiers: IdentifierRow[] | null;
   source_name: string;
   book_name: string | null;
   book_number: number | null;
@@ -44,6 +46,13 @@ type GradedGradeRow = {
   grade_description: string | null;
   grade_background: string | null;
   grade_text_color: string | null;
+  is_primary: boolean | null;
+};
+
+type IdentifierRow = {
+  scheme_key: string;
+  identifier: string;
+  notes: string | null;
   is_primary: boolean | null;
 };
 
@@ -97,6 +106,7 @@ async function fetchHadiths(whereClause = "", params: unknown[] = []): Promise<H
         SELECT
           h.id,
           h.number,
+          h.display_number,
           s.name AS source_name,
           b.name AS book_name,
           b.number AS book_number,
@@ -119,7 +129,8 @@ async function fetchHadiths(whereClause = "", params: unknown[] = []): Promise<H
           at.description AS attribution_type_description,
           a.name AS author_name,
           a.lifespan_label AS author_lifespan,
-          grades.rollup AS graded_grades
+          grades.rollup AS graded_grades,
+          ids.identifiers AS identifiers
         FROM hadith h
         JOIN source s ON s.id = h.source_id
         LEFT JOIN author a ON a.id = s.author_id
@@ -149,6 +160,19 @@ async function fetchHadiths(whereClause = "", params: unknown[] = []): Promise<H
           JOIN grade g ON g.id = hg.grade_id
           WHERE hg.hadith_id = h.id
         ) AS grades ON TRUE
+        LEFT JOIN LATERAL (
+          SELECT json_agg(
+                   json_build_object(
+                     'scheme_key', hi.scheme_key,
+                     'identifier', hi.identifier,
+                     'notes', hi.notes,
+                     'is_primary', hi.is_primary
+                   )
+                   ORDER BY hi.scheme_key, hi.identifier
+                 ) AS identifiers
+          FROM hadith_identifier hi
+          WHERE hi.hadith_id = h.id
+        ) AS ids ON TRUE
         ${whereClause}
         ORDER BY h.id
       `,
@@ -220,6 +244,7 @@ function mapHadithRow(
   const gradeInfo = primaryGrade?.grade;
   const gradingLabel = primaryGrade?.grade?.title ?? DEFAULT_GRADE;
   const gradedBy = mapGradedBy(gradedGrades, row.author_name, row.author_lifespan);
+  const displayNumber = row.display_number ?? String(row.number);
   const narrationLevelDetail = buildLookupDetail(
     row.narration_level_id,
     row.narration_level_name,
@@ -238,6 +263,8 @@ function mapHadithRow(
     row.attribution_type_secondary,
     row.attribution_type_description,
   );
+  const identifiers = mapIdentifiers(row.identifiers, row.id);
+  const displayLabel = `Book ${row.book_number ?? row.number}, Hadith ${displayNumber}`;
   return {
     id: String(row.id),
     matn: row.matn_text,
@@ -250,13 +277,16 @@ function mapHadithRow(
       grading: gradingLabel,
       gradeInfo,
       hadithNumber: row.number,
-      location: row.location ?? `${DEFAULT_LOCATION_PREFIX} ${row.number}`,
+      displayNumber,
+      displayLabel,
+      location: row.location ?? `${DEFAULT_LOCATION_PREFIX} ${displayNumber}`,
       author: row.author_name
         ? { name: row.author_name, lifespan: row.author_lifespan ?? undefined }
         : undefined,
     },
     gradedBy,
     gradedGrades,
+    identifiers,
     chain: mapChainNodes(chainRows),
     sourceTypes: attributionDetail ? [attributionDetail.title] : [],
     sourceTypeDetails: attributionDetail ? [attributionDetail] : undefined,
@@ -318,6 +348,18 @@ function mapGradedBy(
       lifespan: authorLifespan ?? undefined,
     });
   }
+  return mapped.length ? mapped : undefined;
+}
+
+function mapIdentifiers(rows: IdentifierRow[] | null, hadithId: number): HadithInsight["identifiers"] {
+  const mapped =
+    rows?.map((row) => ({
+      hadithId,
+      schemeKey: row.scheme_key,
+      identifier: row.identifier,
+      notes: row.notes ?? undefined,
+      isPrimary: row.is_primary ?? undefined,
+    })) ?? [];
   return mapped.length ? mapped : undefined;
 }
 

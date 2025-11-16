@@ -54,6 +54,14 @@ export type GradeAttribution = {
   isPrimary?: boolean;
 };
 
+export type HadithIdentifier = {
+  hadithId: number;
+  schemeKey: string;
+  identifier: string;
+  notes?: string | null;
+  isPrimary?: boolean | null;
+};
+
 export type HadithInsight = {
   id: string;
   matn: string;
@@ -66,6 +74,8 @@ export type HadithInsight = {
     grading: string;
     gradeInfo?: GradeInfo;
     hadithNumber: number;
+    displayNumber?: string;
+    displayLabel?: string;
     location: string;
     author?: {
       name: string;
@@ -75,6 +85,7 @@ export type HadithInsight = {
   chain: ChainNode[];
   gradedBy?: ScholarGrade[];
   gradedGrades?: GradeAttribution[];
+  identifiers?: HadithIdentifier[];
   sourceTypes: string[];
   sourceTypeDetails?: LookupDetail[];
   chainTypes: string[];

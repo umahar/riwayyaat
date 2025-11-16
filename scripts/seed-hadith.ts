@@ -693,6 +693,7 @@ async function upsertHadith(client: PoolClient, hadith: HadithInsight) {
   const graders = getGradersForHadith(hadith);
   const matnId = await insertMatn(client, hadith.matn);
   const hadithNumber = hadith.details.hadithNumber ?? null;
+  const displayNumber = hadithNumber != null ? String(hadithNumber) : null;
 
   const hadithCacheKey = `${hadith.details.source}:${hadithNumber ?? ""}:${matnId}`;
   let hadithId = caches.hadith.get(hadithCacheKey);
@@ -704,13 +705,13 @@ async function upsertHadith(client: PoolClient, hadith: HadithInsight) {
     if (existing.rowCount) {
       hadithId = existing.rows[0].id;
       await client.query(
-        "UPDATE hadith SET book_id = $1, chapter_id = $2, matn_id = $3, location = $4, sanad = $5 WHERE id = $6",
-        [bookId, chapterId, matnId, hadith.details.location ?? null, hadith.sanad ?? null, hadithId],
+        "UPDATE hadith SET book_id = $1, chapter_id = $2, matn_id = $3, location = $4, sanad = $5, display_number = COALESCE(display_number, $6) WHERE id = $7",
+        [bookId, chapterId, matnId, hadith.details.location ?? null, hadith.sanad ?? null, displayNumber, hadithId],
       );
     } else {
       const result = await client.query<{ id: number }>(
-        `INSERT INTO hadith (number, book_id, chapter_id, source_id, matn_id, location, sanad)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `INSERT INTO hadith (number, book_id, chapter_id, source_id, matn_id, location, sanad, display_number)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING id`,
         [
           hadithNumber,
@@ -720,6 +721,7 @@ async function upsertHadith(client: PoolClient, hadith: HadithInsight) {
           matnId,
           hadith.details.location ?? null,
           hadith.sanad ?? null,
+          displayNumber,
         ],
       );
       hadithId = result.rows[0].id;

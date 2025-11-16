@@ -5,6 +5,7 @@
 Table hadith [headercolor: #175e7a] {
   id               serial  [pk, not null, unique]
   number           integer [not null]             // details.hadithNumber
+  display_number   text                           // human-facing label (e.g., 45a, Vol. 2, p. 213, #5)
   book_id          integer                        // FK -> book.id
   chapter_id       integer                        // FK -> chapter.id
   source_id        integer [not null]             // FK -> source.id
@@ -14,6 +15,7 @@ Table hadith [headercolor: #175e7a] {
 
   indexes {
     (number)                         [name: 'hadith_index_number']
+    (display_number)                 [name: 'hadith_index_display_number']
     (source_id, book_id, chapter_id) [name: 'hadith_index_source_book_chapter']
     (matn_id)                        [name: 'hadith_index_matn']
   }
@@ -191,6 +193,21 @@ Table hadith_grade [headercolor: #175e7a] {
   }
 }
 
+Table hadith_identifier [headercolor: #175e7a] {
+  id          serial  [pk, not null, unique]
+  hadith_id   integer [not null]           // FK -> hadith.id
+  scheme_key  text    [not null]           // e.g., legacy_source_number, darussalam, shamela
+  identifier  text    [not null]           // free-form label within the scheme
+  notes       text                         // optional notes
+  is_primary  boolean [default: false]     // single primary per scheme per hadith
+
+  indexes {
+    (hadith_id, scheme_key, identifier) [name: 'hadith_identifier_unique_hadith_scheme_identifier', unique]
+    (hadith_id, scheme_key)             [name: 'hadith_identifier_unique_primary_per_scheme', unique, where: 'is_primary = true']
+    (scheme_key, identifier)            [name: 'hadith_identifier_index_scheme_identifier']
+  }
+}
+
 ////////////////////////////////////////////////////
 // Relationships
 ////////////////////////////////////////////////////
@@ -217,6 +234,10 @@ Ref fk_hadith_grade_grade {
 
 Ref fk_hadith_grade_hadith {
   hadith_grade.hadith_id > hadith.id
+}
+
+Ref fk_hadith_identifier_hadith {
+  hadith_identifier.hadith_id > hadith.id
 }
 
 Ref fk_hadith_grade_scholar {

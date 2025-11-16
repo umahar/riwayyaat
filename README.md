@@ -68,6 +68,7 @@ These TS scripts rely on the same `.env.local` credentials and can be executed w
 - `scripts/list-tables.ts` – list public schema tables.
 - `scripts/show-narration-levels.ts` – inspect narration-level lookup rows.
 - `scripts/seed-hadith.ts` – load the dummy hadithInsights data into the normalized schema.
+- `scripts/test-numbering.ts` – verifies hadith numbering backfill (`display_number`) and API payload shape (`displayNumber`, `displayLabel`, `identifiers`).
 
 The `/api/hadith` route and accompanying hooks always read from Postgres, so keep the database running and seeded before launching the UI. Labels for narration levels, attribution types, chain types, narrator tiers, reliability badges, transmission methods, and grade colors/descriptions now come straight from their respective lookup tables — edit those rows to see changes reflected instantly in the UI.
 
@@ -87,3 +88,10 @@ Helpers:
 - `src/server/db/config.ts` loads env vars and configures SSL/app name.
 - `src/server/db/client.ts` exposes a singleton PG Pool plus `query` and `healthcheck` helpers.
 - `src/features/hadith/server/hadith-service.ts` powers `/api/hadith` and is the single source for domain queries.
+
+### Hadith numbering model
+
+- `hadith.id` remains the stable internal identifier; `hadith.number` is a legacy/internal integer kept for ordering/backcompat.
+- `hadith.display_number` (exposed as `details.displayNumber`) is the preferred human-facing label and can hold strings like `45`, `45a`, or `Vol. 2, p. 213, #5`. `details.displayLabel` renders “Book {bookNumber}, Hadith {displayNumber}` with fallback to the legacy number.
+- `hadith_identifier` stores scheme-aware identifiers (`schemeKey`, `identifier`, `isPrimary`, optional `notes`). Existing rows are pre-seeded under `schemeKey = legacy_source_number`.
+- API responses remain backward compatible: `details.hadithNumber` is preserved while `details.displayNumber`, `details.displayLabel`, and `identifiers` are additive.
