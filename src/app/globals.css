@@ -186,3 +186,20 @@ body {
     transform: translateX(130%);
   }
 }
+
+/* Dark-mode icon legibility tweaks */
+[data-theme="dark"] .icon-button {
+  color: #f8fafc;
+  border-color: var(--border-soft);
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="dark"] .icon-button:hover {
+  color: var(--accent-emerald);
+}
+
+[data-theme="dark"] .theme-toggle-btn {
+  color: #f8fafc;
+  border-color: var(--border-soft);
+  background-color: rgba(255, 255, 255, 0.08);
+}
