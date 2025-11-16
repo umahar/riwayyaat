@@ -77,6 +77,93 @@ export function ChainGraph({ data, onNarratorSelect }: ChainGraphProps) {
     graphRef.current.centerAt(0, 0, 400);
   };
 
+  const handleDownload = () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1600;
+    canvas.height = 900;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.font = "18px Inter, sans-serif";
+    ctx.fillStyle = "#111827";
+
+    const legendX = 32;
+    const legendY = 40;
+
+    const drawLegendItem = (label: string, color: string, offset: number) => {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(legendX, legendY + offset, 10, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#111827";
+      ctx.fillText(label, legendX + 18, legendY + offset + 6);
+    };
+
+    drawLegendItem("Hadith / chain root", "#2563eb", 0);
+    drawLegendItem("Narrators", "#0f766e", 28);
+
+    const center = { x: canvas.width / 2, y: canvas.height / 2 };
+    const nodes = graphData.nodes;
+    const others = nodes.filter((n) => n.type !== "Hadith");
+
+    const positions = new Map<string, { x: number; y: number }>();
+    // Place hadith root at center-left slightly to give labels space.
+    const hadithNode = nodes.find((n) => n.type === "Hadith");
+    if (hadithNode) positions.set(hadithNode.id, { x: center.x - 120, y: center.y });
+
+    const radius = 280;
+    others.forEach((node, index) => {
+      const angle = (index / Math.max(1, others.length)) * Math.PI * 2;
+      const x = center.x + radius * Math.cos(angle);
+      const y = center.y + radius * Math.sin(angle);
+      positions.set(node.id, { x, y });
+    });
+
+    const getColor = (type: string) => {
+      if (type === "Narrator") return "#0f766e";
+      if (type === "Hadith") return "#2563eb";
+      return "#475569";
+    };
+
+    ctx.strokeStyle = "#94a3b8";
+    ctx.lineWidth = 2;
+    graphData.edges.forEach((edge) => {
+      const from = positions.get(edge.from);
+      const to = positions.get(edge.to);
+      if (!from || !to) return;
+      if (edge.type === "HAS_CHAIN") {
+        ctx.strokeStyle = "#2563eb";
+        ctx.lineWidth = 3;
+      } else {
+        ctx.strokeStyle = "#94a3b8";
+        ctx.lineWidth = 2;
+      }
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x, to.y);
+      ctx.stroke();
+    });
+
+    nodes.forEach((node) => {
+      const pos = positions.get(node.id);
+      if (!pos) return;
+      ctx.fillStyle = getColor(node.type);
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, 10, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.font = "14px Inter, sans-serif";
+      ctx.fillStyle = "#111827";
+      ctx.fillText(node.name || node.id, pos.x + 14, pos.y + 4);
+    });
+
+    const link = document.createElement("a");
+    link.href = canvas.toDataURL("image/png");
+    link.download = "isnad-graph.png";
+    link.click();
+  };
+
   const handleNodeClick = (node: any) => {
     if (node?.type === "Narrator" && node.id) {
       const pgId = Number(String(node.id).split(":").pop());
@@ -118,6 +205,14 @@ export function ChainGraph({ data, onNarratorSelect }: ChainGraphProps) {
           className="rounded-full bg-[var(--surface-card)] px-2 py-1 text-xs font-semibold text-[var(--text-secondary)] shadow-sm ring-1 ring-[var(--border-soft)] transition hover:bg-[var(--surface-card)]/80"
         >
           Reset
+        </button>
+        <button
+          type="button"
+          onClick={handleDownload}
+          className="rounded-full bg-[var(--surface-card)] px-2 py-1 text-xs font-semibold text-[var(--text-secondary)] shadow-sm ring-1 ring-[var(--border-soft)] transition hover:bg-[var(--surface-card)]/80"
+          title="Download graph as PNG"
+        >
+          ⬇
         </button>
       </div>
       <ForceGraph2D

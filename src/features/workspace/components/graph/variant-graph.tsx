@@ -77,6 +77,77 @@ export function VariantGraph({ data }: VariantGraphProps) {
     graphRef.current.centerAt(0, 0, 400);
   };
 
+  const handleDownload = () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1600;
+    canvas.height = 900;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.font = "18px Inter, sans-serif";
+    ctx.fillStyle = "#111827";
+
+    const legendX = 32;
+    const legendY = 40;
+    const drawLegendItem = (label: string, color: string, offset: number) => {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(legendX, legendY + offset, 10, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#111827";
+      ctx.fillText(label, legendX + 18, legendY + offset + 6);
+    };
+    drawLegendItem("Base hadith", "#2563eb", 0);
+    drawLegendItem("Variant", "#16a34a", 28);
+
+    const center = { x: canvas.width / 2, y: canvas.height / 2 };
+    const base = graphData.nodes.find((n) => n.type === "Hadith");
+    const variants = graphData.nodes.filter((n) => n.type !== "Hadith");
+
+    const positions = new Map<string, { x: number; y: number }>();
+    if (base) positions.set(base.id, { x: center.x, y: center.y });
+    const radius = 320;
+    variants.forEach((node, index) => {
+      const angle = (index / Math.max(1, variants.length)) * Math.PI * 2;
+      const x = center.x + radius * Math.cos(angle);
+      const y = center.y + radius * Math.sin(angle);
+      positions.set(node.id, { x, y });
+    });
+
+    const getColor = (type: string) => (type === "Hadith" ? "#2563eb" : "#16a34a");
+
+    ctx.strokeStyle = "#d97706";
+    ctx.lineWidth = 2;
+    graphData.edges.forEach((edge) => {
+      const from = positions.get(edge.from);
+      const to = positions.get(edge.to);
+      if (!from || !to) return;
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x, to.y);
+      ctx.stroke();
+    });
+
+    graphData.nodes.forEach((node) => {
+      const pos = positions.get(node.id);
+      if (!pos) return;
+      ctx.fillStyle = getColor(node.type);
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, 10, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.font = "14px Inter, sans-serif";
+      ctx.fillStyle = "#111827";
+      ctx.fillText(node.name || node.id, pos.x + 14, pos.y + 4);
+    });
+
+    const link = document.createElement("a");
+    link.href = canvas.toDataURL("image/png");
+    link.download = "variants-graph.png";
+    link.click();
+  };
+
   return (
     <div
       ref={containerRef}
@@ -111,6 +182,14 @@ export function VariantGraph({ data }: VariantGraphProps) {
           className="rounded-full bg-[var(--surface-card)] px-2 py-1 text-xs font-semibold text-[var(--text-secondary)] shadow-sm ring-1 ring-[var(--border-soft)] transition hover:bg-[var(--surface-card)]/80"
         >
           Reset
+        </button>
+        <button
+          type="button"
+          onClick={handleDownload}
+          className="rounded-full bg-[var(--surface-card)] px-2 py-1 text-xs font-semibold text-[var(--text-secondary)] shadow-sm ring-1 ring-[var(--border-soft)] transition hover:bg-[var(--surface-card)]/80"
+          title="Download graph as PNG"
+        >
+          ⬇
         </button>
       </div>
       <ForceGraph2D
