@@ -18,6 +18,7 @@ export function ChainGraph({ data, onNarratorSelect }: ChainGraphProps) {
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [hoverNode, setHoverNode] = useState<any | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
+  const isDark = typeof document !== "undefined" && document.documentElement.dataset.theme === "dark";
 
   useEffect(() => {
     const measure = () => {
@@ -89,10 +90,10 @@ export function ChainGraph({ data, onNarratorSelect }: ChainGraphProps) {
       className="relative h-80 w-full overflow-hidden rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] p-3 shadow-sm transition hover:shadow-md"
     >
       <div className="pointer-events-none absolute left-3 top-3 z-10 flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
-        <span className="flex items-center gap-1 rounded-full bg-white/80 px-2 py-1 shadow-sm">
+        <span className="graph-legend flex items-center gap-1 rounded-full px-2 py-1 shadow-sm">
           <span className="h-2 w-2 rounded-full bg-[#2563eb]" /> Hadith / chain root
         </span>
-        <span className="flex items-center gap-1 rounded-full bg-white/80 px-2 py-1 shadow-sm">
+        <span className="graph-legend flex items-center gap-1 rounded-full px-2 py-1 shadow-sm">
           <span className="h-2 w-2 rounded-full bg-[#0f766e]" /> Narrators
         </span>
       </div>
@@ -137,7 +138,7 @@ export function ChainGraph({ data, onNarratorSelect }: ChainGraphProps) {
           ctx.arc(node.x!, node.y!, 7, 0, 2 * Math.PI, false);
           ctx.fill();
           ctx.font = "12px Inter, sans-serif";
-          ctx.fillStyle = "#0f172a";
+          ctx.fillStyle = isDark ? "#e2e8f0" : "#0f172a";
           ctx.fillText(label, node.x! + 10, node.y! + 4);
           ctx.globalAlpha = 1;
         }}

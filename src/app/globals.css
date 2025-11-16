@@ -208,3 +208,10 @@ body {
 :root[data-theme="light"] .taxonomy-card {
   background-color: #f4faf6;
 }
+
+/* Graph legend & controls contrast in dark mode */
+[data-theme="dark"] .graph-legend {
+  background-color: rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}

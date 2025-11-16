@@ -16,6 +16,7 @@ export function NarratorNetworkGraph({ data }: NarratorNetworkGraphProps) {
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [hoverNode, setHoverNode] = useState<any | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
+  const isDark = typeof document !== "undefined" && document.documentElement.dataset.theme === "dark";
 
   useEffect(() => {
     const measure = () => {
@@ -78,7 +79,7 @@ export function NarratorNetworkGraph({ data }: NarratorNetworkGraphProps) {
       ref={containerRef}
       className="relative h-64 w-full overflow-hidden rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] p-3 shadow-sm transition hover:shadow-md"
     >
-      <div className="pointer-events-none absolute left-3 top-3 z-10 rounded-full bg-white/80 px-3 py-1 text-xs text-[var(--text-muted)] shadow-sm">
+      <div className="pointer-events-none absolute left-3 top-3 z-10 rounded-full bg-white/80 px-3 py-1 text-xs text-[var(--text-muted)] shadow-sm graph-legend">
         Narrators connected by shared chains
       </div>
       <div className="absolute right-3 top-3 z-10 flex items-center gap-2">
@@ -120,7 +121,7 @@ export function NarratorNetworkGraph({ data }: NarratorNetworkGraphProps) {
           ctx.arc(node.x!, node.y!, 7, 0, 2 * Math.PI, false);
           ctx.fill();
           ctx.font = "12px Inter, sans-serif";
-          ctx.fillStyle = "#0f172a";
+          ctx.fillStyle = isDark ? "#e2e8f0" : "#0f172a";
           ctx.fillText(label, node.x! + 10, node.y! + 4);
           ctx.globalAlpha = 1;
         }}
