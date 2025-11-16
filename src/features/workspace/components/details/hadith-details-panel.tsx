@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useMemo, useState } from "react";
+import { ReactNode, useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Disclosure } from "@/components/ui/disclosure";
 import { Tag } from "@/components/ui/tag";
@@ -11,6 +11,10 @@ import { LoadingState } from "@/components/ui/state/loading-state";
 import { ErrorState } from "@/components/ui/state/error-state";
 import { EmptyState } from "@/components/ui/state/empty-state";
 import { NarratorChain } from "./narrator-chain";
+import { useGraph } from "@/features/workspace/hooks/use-graph";
+import { ChainGraph } from "@/features/workspace/components/graph/chain-graph";
+import { VariantGraph } from "@/features/workspace/components/graph/variant-graph";
+import { NarratorNetworkGraph } from "@/features/workspace/components/graph/narrator-network-graph";
 
 type HadithDetailsPanelProps = {
   hadith: HadithInsight | null;
@@ -41,6 +45,19 @@ export function HadithDetailsPanel({
     hadithId: null,
     open: false,
   });
+  const [activeTab, setActiveTab] = useState<"details" | "graph">("details");
+  const {
+    chain,
+    variants,
+    network,
+    loading: graphLoading,
+    error: graphError,
+    loadChainGraph,
+    loadVariants,
+    loadNarratorNetwork,
+    resetNetwork,
+    resetVariants,
+  } = useGraph();
 
   const gradeOptions = useMemo(() => {
     if (!hadith) return [] as Array<GradeAttribution & { scholarLabel: string; isPrimary: boolean }>;
@@ -167,6 +184,15 @@ export function HadithDetailsPanel({
   const narrationDetails = hadith.narrationLevelDetail;
   const sourceAuthor = hadith.details.author ?? null;
 
+  // Auto-load chain graph when entering Graph tab or when hadith changes.
+  useEffect(() => {
+    if (activeTab === "graph" && hadith?.id) {
+      loadChainGraph(Number(hadith.id));
+      resetNetwork();
+      resetVariants();
+    }
+  }, [activeTab, hadith?.id, loadChainGraph, resetNetwork, resetVariants]);
+
   return (
     <PanelWrapper isDesktop={isDesktop} onResizeStart={onResizeStart}>
       <header className="flex items-center justify-between gap-2">
@@ -175,8 +201,7 @@ export function HadithDetailsPanel({
             {hadith.details.source}
           </h3>
           <p className="text-sm font-semibold text-[var(--text-secondary)]">
-            {detailsCopy.bookLabel} {hadith.details.bookNumber}, {detailsCopy.hadithLabel}{" "}
-            {displayNumber}
+            {detailsCopy.bookLabel} {hadith.details.bookNumber}, {detailsCopy.hadithLabel} {displayNumber}
           </p>
         </div>
         <div className="flex flex-col items-end gap-1 text-xs font-semibold text-[var(--text-secondary)]">
@@ -197,9 +222,35 @@ export function HadithDetailsPanel({
         </div>
       </header>
 
+      <div className="mt-4 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab("details")}
+          className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+            activeTab === "details"
+              ? "bg-[var(--accent-emerald)] text-[var(--accent-contrast)]"
+              : "bg-[var(--surface-card)] text-[var(--text-primary)] border border-[var(--border-soft)]"
+          }`}
+        >
+          Details
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("graph")}
+          className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+            activeTab === "graph"
+              ? "bg-[var(--accent-emerald)] text-[var(--accent-contrast)]"
+              : "bg-[var(--surface-card)] text-[var(--text-primary)] border border-[var(--border-soft)]"
+          }`}
+        >
+          Graph
+        </button>
+      </div>
+
       <div className="my-4 h-px w-full bg-[var(--border-soft)]" />
 
-      <div className="scrollbar-hide mt-4 space-y-6 overflow-y-auto pr-2">
+      {activeTab === "details" ? (
+        <div className="scrollbar-hide mt-4 space-y-6 overflow-y-auto pr-2">
         <section className="grid gap-4 text-left text-xs text-[var(--text-secondary)] sm:grid-cols-2 lg:grid-cols-3">
           <Card className="px-4 py-3 text-[var(--text-secondary)]" tone="surface">
             <p className="text-[0.6rem] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
@@ -320,6 +371,60 @@ export function HadithDetailsPanel({
 
         <NarratorChain hadith={hadith} />
       </div>
+      ) : (
+        <div className="scrollbar-hide mt-4 space-y-4 overflow-y-auto pr-2">
+          {graphError && <ErrorState message={graphError} />}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => loadChainGraph(Number(hadith.id))}
+              className="rounded-full border border-[var(--border-soft)] bg-[var(--surface-card)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] shadow-sm transition hover:-translate-y-0.5"
+            >
+              Load Isnād Graph
+            </button>
+            <button
+              type="button"
+              onClick={() => loadVariants(Number(hadith.id))}
+              className="rounded-full border border-[var(--border-soft)] bg-[var(--surface-card)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] shadow-sm transition hover:-translate-y-0.5"
+            >
+              Show Variants
+            </button>
+          </div>
+          {graphLoading && <LoadingState message="Loading graph…" />}
+          {chain ? (
+            <>
+              <h4 className="text-sm font-semibold text-[var(--text-primary)]">Isnād Graph</h4>
+              <ChainGraph
+                data={chain}
+                onNarratorSelect={(narratorId) => loadNarratorNetwork(narratorId, 2)}
+              />
+            </>
+          ) : (
+            <p className="text-sm text-[var(--text-muted)]">Load the chain graph to visualize narrators.</p>
+          )}
+          {variants && variants.variants.length > 0 && (
+            <>
+              <h4 className="text-sm font-semibold text-[var(--text-primary)]">Variants</h4>
+              <VariantGraph data={variants} />
+            </>
+          )}
+          {network && (
+            <>
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-semibold text-[var(--text-primary)]">Narrator Network</h4>
+                <button
+                  type="button"
+                  onClick={resetNetwork}
+                  className="text-xs text-[var(--text-muted)] underline"
+                >
+                  Clear
+                </button>
+              </div>
+              <NarratorNetworkGraph data={network} />
+            </>
+          )}
+        </div>
+      )}
     </PanelWrapper>
   );
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { assertAdmin } from "@/server/auth/admin-auth";
 import { AdminInputError, createAdminHadith, listAdminHadiths } from "@/features/admin/server/hadith-admin-service";
 import { validateHadithPayload } from "@/features/admin/server/validate-hadith";
+import { enqueueHadithSync } from "@/server/sync/hadith-sync";
 
 export async function GET(request: NextRequest) {
   const auth = await assertAdmin(request);
@@ -41,6 +42,7 @@ export async function POST(request: NextRequest) {
   }
   try {
     const created = await createAdminHadith(data);
+    await enqueueHadithSync(created.id, { graph: true, embedding: true });
     return NextResponse.json({ data: created }, { status: 201 });
   } catch (error) {
     if (error instanceof AdminInputError) {

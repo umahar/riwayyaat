@@ -25,7 +25,7 @@ export function useHadithData(): UseHadithDataResult {
       setData(payload.data ?? []);
     } catch (error) {
       console.error("[useHadithData] Failed to load hadith", error);
-      setError("Unable to load hadith data.");
+      setError("Unable to load hadith data. Please try again.");
       setData([]);
     } finally {
       setLoading(false);

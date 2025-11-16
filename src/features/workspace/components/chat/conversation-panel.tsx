@@ -1,17 +1,28 @@
 "use client";
 
 import { FormEvent } from "react";
-import { Message } from "@/features/hadith/types";
 import { workspaceCopy } from "@/content/text";
+import { ChatMessage } from "@/features/workspace/hooks/use-rag-chat";
 
 type ConversationPanelProps = {
-  messages: Message[];
+  messages: ChatMessage[];
+  loading: boolean;
+  error: string | null;
   input: string;
   onInputChange: (value: string) => void;
   onSend: () => void;
+  onCitationSelect?: (hadithId: string) => void;
 };
 
-export function ConversationPanel({ messages, input, onInputChange, onSend }: ConversationPanelProps) {
+export function ConversationPanel({
+  messages,
+  loading,
+  error,
+  input,
+  onInputChange,
+  onSend,
+  onCitationSelect,
+}: ConversationPanelProps) {
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     onSend();
@@ -25,26 +36,58 @@ export function ConversationPanel({ messages, input, onInputChange, onSend }: Co
         <p className="text-sm text-[var(--text-muted)]">{copy.description}</p>
       </header>
       <div className="scrollbar-hide flex-1 space-y-5 overflow-y-auto px-8 py-6">
+        {error && (
+          <div className="rounded-xl border border-red-400/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+            {error}
+          </div>
+        )}
         {messages.map((message) => (
           <article
             key={message.id}
             className={`flex flex-col ${message.role === "user" ? "items-end" : "items-start"}`}
           >
-              <div
-                className={`max-w-[90%] rounded-3xl border px-4 py-3 text-sm leading-relaxed shadow-sm ${
-                  message.role === "user"
-                    ? "bg-[var(--accent-emerald)] text-[var(--accent-contrast)] border-transparent"
-                    : "bg-[var(--surface-card)] text-[var(--text-primary)] border-[var(--border-soft)]"
-                }`}
-              >
-                {message.content}
+            <div
+              className={`max-w-[90%] rounded-3xl border px-4 py-3 text-sm leading-relaxed shadow-sm ${
+                message.role === "user"
+                  ? "bg-[var(--accent-emerald)] text-[var(--accent-contrast)] border-transparent"
+                  : "bg-[var(--surface-card)] text-[var(--text-primary)] border-[var(--border-soft)]"
+              }`}
+            >
+              {message.content}
+            </div>
+            {message.role === "assistant" && (
+              <div className="mt-2 space-y-2 text-xs text-[var(--text-muted)]">
+                {message.citations && message.citations.length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold text-[var(--text-secondary)]">Sources</span>
+                    {message.citations.map((citation) => (
+                      <button
+                        key={`${citation.hadithId}-${citation.displayNumber ?? "?"}`}
+                        type="button"
+                        className="rounded-full border border-[var(--border-soft)] bg-[var(--surface-card)] px-3 py-1 text-xs text-[var(--text-primary)] shadow-sm transition hover:-translate-y-0.5"
+                        onClick={() => onCitationSelect?.(String(citation.hadithId))}
+                      >
+                        {citation.source} — {citation.displayNumber ?? citation.hadithId}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[var(--text-muted)]">No direct hadith found for this question.</p>
+                )}
               </div>
-              <span className="mt-1 text-xs text-[var(--text-subtle)]">
-                {message.role === "user" ? copy.userLabel : copy.assistantLabel} · {message.timestamp}
-              </span>
-            </article>
-          ))}
-        </div>
+            )}
+            <span className="mt-1 text-xs text-[var(--text-subtle)]">
+              {message.role === "user" ? copy.userLabel : copy.assistantLabel} · {message.timestamp}
+            </span>
+          </article>
+        ))}
+        {loading && (
+          <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
+            <span className="h-2 w-2 animate-ping rounded-full bg-[var(--accent-emerald)]" />
+            Thinking…
+          </div>
+        )}
+      </div>
       <footer className="border-t border-[var(--border-soft)] px-8 py-5">
         <form className="flex gap-3" onSubmit={handleSubmit}>
           <label className="sr-only" htmlFor="workspace-input">
@@ -56,13 +99,15 @@ export function ConversationPanel({ messages, input, onInputChange, onSend }: Co
             value={input}
             onChange={(event) => onInputChange(event.target.value)}
             placeholder={copy.placeholder}
-            className="flex-1 rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-4 py-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-emerald)] focus:outline-none"
+            disabled={loading}
+            className="flex-1 rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-4 py-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-emerald)] focus:outline-none disabled:opacity-60"
           />
           <button
             type="submit"
-            className="rounded-2xl bg-[var(--accent-emerald)] px-5 py-3 text-sm font-semibold text-[var(--accent-contrast)] transition hover:opacity-90"
+            disabled={loading}
+            className="rounded-2xl bg-[var(--accent-emerald)] px-5 py-3 text-sm font-semibold text-[var(--accent-contrast)] transition hover:opacity-90 disabled:opacity-60"
           >
-            {copy.sendLabel}
+            {loading ? "Thinking…" : copy.sendLabel}
           </button>
         </form>
       </footer>

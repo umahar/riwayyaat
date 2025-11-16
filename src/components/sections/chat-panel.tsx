@@ -5,7 +5,7 @@ import { Logo } from "@/components/ui/logo";
 import { siteConfig } from "@/content/site";
 import { AuroraBackground } from "@/components/ui/aurora-background";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { chatPanelCopy } from "@/content/text";
+import { chatPanelCopy, workspaceCopy } from "@/content/text";
 
 type ChatPanelProps = {
   onSubmit?: (prompt: string) => void;
@@ -59,6 +59,12 @@ export function ChatPanel({ onSubmit }: ChatPanelProps) {
             {chatPanelCopy.title}
           </h1>
           <p className="text-base text-[var(--text-secondary)]">{chatPanelCopy.description}</p>
+        </div>
+        <div className="w-full rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-4 py-3 text-left text-xs text-[var(--text-muted)] shadow-sm">
+          <div className="flex items-start gap-2">
+            <span className="mt-0.5 text-sm">ℹ️</span>
+            <p>{workspaceCopy.safety.disclaimer}</p>
+          </div>
         </div>
 
         <form className="w-full space-y-3" onSubmit={handleSubmit}>

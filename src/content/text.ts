@@ -55,6 +55,10 @@ export const heroCopy = {
 };
 
 export const workspaceCopy = {
+  safety: {
+    disclaimer:
+      "This workspace is for study and exploration only. It uses the hadith available in this database and may be incomplete. It does not issue fatwas or rulings—please consult qualified scholars for religious guidance. AI answers can be wrong; always verify.",
+  },
   system: {
     placeholderResponse:
       "Here is a synthesized response referencing the narrations and highlighting sanad integrity. (Placeholder response until backend is wired.)",

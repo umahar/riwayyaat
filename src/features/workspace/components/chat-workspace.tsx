@@ -2,49 +2,22 @@
 
 /* eslint-disable react-hooks/set-state-in-effect */
 
-import {
-  Dispatch,
-  SetStateAction,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import { HadithInsight, Message } from "@/features/hadith/types";
+import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { HadithInsight } from "@/features/hadith/types";
 import { workspaceCopy } from "@/content/text";
 import { HadithSidebar, FilterGroup } from "@/features/workspace/components/sidebar/hadith-sidebar";
 import { ConversationPanel } from "@/features/workspace/components/chat/conversation-panel";
 import { HadithDetailsPanel } from "@/features/workspace/components/details/hadith-details-panel";
 import { useHadithData } from "@/features/workspace/hooks/use-hadith-data";
+import { useRagChat } from "@/features/workspace/hooks/use-rag-chat";
 
 type ChatWorkspaceProps = {
   initialPrompt: string;
   onNewChat: () => void;
 };
 
-const createSeedMessages = (prompt: string): Message[] =>
-  prompt
-    ? [
-        {
-          id: "user-initial",
-          role: "user",
-          content: prompt,
-          timestamp: new Date().toLocaleTimeString(),
-        },
-        {
-          id: "assistant-initial",
-          role: "assistant",
-          content: workspaceCopy.system.placeholderResponse,
-          timestamp: new Date().toLocaleTimeString(),
-        },
-      ]
-    : [];
-
 export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) {
-  const [messages, setMessages] = useState<Message[]>(() =>
-    createSeedMessages(initialPrompt),
-  );
+  const { messages, isLoading, error, submitQuestion } = useRagChat();
   const [input, setInput] = useState("");
   const [selectedHadithId, setSelectedHadithId] = useState<string | null>(null);
   const [selectedGradings, setSelectedGradings] = useState<Set<string>>(
@@ -85,19 +58,20 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
   const handleSend = () => {
     const trimmed = input.trim();
     if (!trimmed) return;
-    const timestamp = new Date().toLocaleTimeString();
-    setMessages((prev) => [
-      ...prev,
-      { id: `user-${prev.length}`, role: "user", content: trimmed, timestamp },
-      {
-        id: `assistant-${prev.length}`,
-        role: "assistant",
-        content: workspaceCopy.system.placeholderResponse,
-        timestamp,
-      },
-    ]);
+    submitQuestion(trimmed, { limit: 6 });
     setInput("");
   };
+
+  // Auto-run initial prompt if provided
+  const initialPromptRan = useRef(false);
+  useEffect(() => {
+    if (initialPromptRan.current) return;
+    if (initialPrompt?.trim()) {
+      initialPromptRan.current = true;
+      submitQuestion(initialPrompt, { limit: 6 });
+      setInput("");
+    }
+  }, [initialPrompt, submitQuestion]);
 
   const { data: hadithData, loading: hadithLoading, error: hadithError, refresh: refreshHadith } =
     useHadithData();
@@ -317,6 +291,9 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
   const handleSelectHadith = (id: string) => {
     setSelectedHadithId(id);
   };
+  const handleCitationSelect = (id: string) => {
+    setSelectedHadithId(id);
+  };
 
   const activeHadithId = currentHadith?.id ?? null;
 
@@ -348,9 +325,12 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
 
       <ConversationPanel
         messages={messages}
+        loading={isLoading}
+        error={error}
         input={input}
         onInputChange={setInput}
         onSend={handleSend}
+        onCitationSelect={handleCitationSelect}
       />
 
       <HadithDetailsPanel
@@ -362,6 +342,12 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
         error={hadithError}
         onRetry={refreshHadith}
       />
+      <footer className="col-span-full border-t border-[var(--border-soft)] bg-[var(--surface-panel)] px-6 py-3 text-xs text-[var(--text-muted)]">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 text-left">
+          <span className="text-sm">ℹ️</span>
+          <span>{workspaceCopy.safety.disclaimer}</span>
+        </div>
+      </footer>
     </section>
   );
 }

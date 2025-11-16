@@ -7,6 +7,7 @@ import {
   updateAdminHadith,
 } from "@/features/admin/server/hadith-admin-service";
 import { validateHadithPayload } from "@/features/admin/server/validate-hadith";
+import { enqueueHadithSync } from "@/server/sync/hadith-sync";
 
 type RouteParams = {
   params: Promise<{ id: string }>;
@@ -42,6 +43,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   }
   try {
     const updated = await updateAdminHadith(id, data);
+    await enqueueHadithSync(id, { graph: true, embedding: true });
     return NextResponse.json({ data: updated });
   } catch (error) {
     if (error instanceof AdminInputError) {
@@ -65,6 +67,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   }
   try {
     await softDeleteHadith(id);
+    await enqueueHadithSync(id, { graph: true, embedding: true });
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("[api/admin/hadith:id] Failed to delete hadith", error);
