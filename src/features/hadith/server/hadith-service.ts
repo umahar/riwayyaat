@@ -15,11 +15,6 @@ type HadithRow = {
   book_name: string | null;
   book_number: number | null;
   chapter_name: string | null;
-  grade_id: number | null;
-  grade_name: string | null;
-  grade_description: string | null;
-  grade_background: string | null;
-  grade_text_color: string | null;
   matn_text: string;
   location: string | null;
   sanad: string | null;
@@ -106,11 +101,6 @@ async function fetchHadiths(whereClause = "", params: unknown[] = []): Promise<H
           b.name AS book_name,
           b.number AS book_number,
           c.name AS chapter_name,
-          g.id AS grade_id,
-          g.name AS grade_name,
-          g.description AS grade_description,
-          g.background_color AS grade_background,
-          g.text_color AS grade_text_color,
           m.text_en AS matn_text,
           h.location,
           h.sanad,
@@ -135,7 +125,6 @@ async function fetchHadiths(whereClause = "", params: unknown[] = []): Promise<H
         LEFT JOIN author a ON a.id = s.author_id
         LEFT JOIN book b ON b.id = h.book_id
         LEFT JOIN chapter c ON c.id = h.chapter_id
-        LEFT JOIN grade g ON g.id = h.grade_id
         JOIN matn m ON m.id = h.matn_id
         LEFT JOIN hadith_chain hc ON hc.hadith_id = h.id AND hc.is_primary = true
         LEFT JOIN narration_level nl ON nl.id = hc.narration_level_id
@@ -227,7 +216,9 @@ function mapHadithRow(
 ): HadithInsight {
   const chainRows = row.chain_id ? narratorsByChain.get(row.chain_id) ?? [] : [];
   const gradedGrades = mapGradedGrades(row.graded_grades);
-  const gradeInfo = gradedGrades.find((entry) => entry.isPrimary)?.grade ?? buildGradeInfo(row);
+  const primaryGrade = gradedGrades.find((entry) => entry.isPrimary) ?? gradedGrades[0];
+  const gradeInfo = primaryGrade?.grade;
+  const gradingLabel = primaryGrade?.grade?.title ?? DEFAULT_GRADE;
   const gradedBy = mapGradedBy(gradedGrades, row.author_name, row.author_lifespan);
   const narrationLevelDetail = buildLookupDetail(
     row.narration_level_id,
@@ -256,7 +247,7 @@ function mapHadithRow(
       book: row.book_name ?? DEFAULT_BOOK,
       bookNumber: row.book_number ?? row.number,
       chapter: row.chapter_name ?? DEFAULT_CHAPTER,
-      grading: row.grade_name ?? DEFAULT_GRADE,
+      grading: gradingLabel,
       gradeInfo,
       hadithNumber: row.number,
       location: row.location ?? `${DEFAULT_LOCATION_PREFIX} ${row.number}`,
@@ -342,17 +333,6 @@ function buildLookupDetail(
     title,
     secondary: secondary ?? undefined,
     description: description ?? undefined,
-  };
-}
-
-function buildGradeInfo(row: HadithRow): GradeInfo | undefined {
-  if (!row.grade_id || !row.grade_name) return undefined;
-  return {
-    id: row.grade_id,
-    title: row.grade_name,
-    description: row.grade_description ?? undefined,
-    backgroundColor: row.grade_background ?? undefined,
-    textColor: row.grade_text_color ?? undefined,
   };
 }
 

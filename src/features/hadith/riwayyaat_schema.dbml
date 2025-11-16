@@ -8,7 +8,6 @@ Table hadith [headercolor: #175e7a] {
   book_id          integer                        // FK -> book.id
   chapter_id       integer                        // FK -> chapter.id
   source_id        integer [not null]             // FK -> source.id
-  grade_id         integer                        // FK -> grade.id (legacy overall grade; prefer hadith_grade)
   matn_id          integer [not null]             // FK -> matn.id
   location         text                           // details.location (green tag)
   sanad            text                           // long sanad description (optional)
@@ -184,7 +183,7 @@ Table hadith_grade [headercolor: #175e7a] {
   grade_id    integer [not null]           // FK -> grade.id
   scholar_id  integer [not null]           // FK -> scholar.id
   notes       text
-  is_primary  boolean [default: false]     // marks the grade shown in legacy hadith.grade_id
+  is_primary  boolean [default: false]     // marks the grade highlighted by default
 
   indexes {
     (hadith_id, scholar_id) [name: 'hadith_grade_unique_hadith_scholar', unique]
@@ -195,10 +194,6 @@ Table hadith_grade [headercolor: #175e7a] {
 ////////////////////////////////////////////////////
 // Relationships
 ////////////////////////////////////////////////////
-
-Ref fk_hadith_grade {
-  hadith.grade_id > grade.id
-}
 
 Ref fk_hadith_source {
   hadith.source_id > source.id
