@@ -278,7 +278,7 @@ export function HadithDetailsPanel({
       {activeTab === "details" ? (
         <div className="scrollbar-hide mt-4 space-y-6 overflow-y-auto pr-2">
         <section className="grid gap-4 text-left text-xs text-[var(--text-secondary)] sm:grid-cols-2 lg:grid-cols-3">
-          <Card className="px-4 py-3 text-[var(--text-secondary)]" tone="surface">
+          <Card className="px-4 py-3 text-[var(--text-secondary)]" tone="surface" style={{ backgroundColor: "var(--surface-card)" }}>
             <p className="text-[0.6rem] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
               {detailsCopy.narrationHeading}
             </p>
@@ -308,7 +308,7 @@ export function HadithDetailsPanel({
             )}
           </Card>
 
-          <Card className="px-4 py-3 text-[var(--text-secondary)]" tone="surface">
+          <Card className="px-4 py-3 text-[var(--text-secondary)]" tone="surface" style={{ backgroundColor: "var(--surface-card)" }}>
             <p className="text-[0.6rem] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
               {detailsCopy.attributionHeading}
             </p>
@@ -321,7 +321,7 @@ export function HadithDetailsPanel({
             </div>
           </Card>
 
-          <Card className="px-4 py-3 text-[var(--text-secondary)]" tone="surface">
+          <Card className="px-4 py-3 text-[var(--text-secondary)]" tone="surface" style={{ backgroundColor: "var(--surface-card)" }}>
             <p className="text-[0.6rem] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
               {detailsCopy.chainHeading}
             </p>
