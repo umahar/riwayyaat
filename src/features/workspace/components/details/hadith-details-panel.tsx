@@ -251,19 +251,11 @@ export function HadithDetailsPanel({
           }}
           className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
             activeTab === "details"
-              ? "bg-[var(--surface-card)] text-[var(--text-primary)] border border-[var(--accent-emerald)] shadow-[0_6px_16px_-10px_var(--accent-emerald)]"
+              ? "bg-[var(--accent-emerald)]/15 text-[var(--text-primary)] border border-[var(--accent-emerald)] shadow-[0_6px_16px_-10px_var(--accent-emerald)]"
               : "bg-[var(--surface-card)]/90 text-[var(--text-secondary)] border border-[var(--border-soft)]"
           }`}
         >
-          <span
-            className={
-              activeTab === "details"
-                ? "underline underline-offset-4 decoration-[var(--accent-emerald)]"
-                : "text-[var(--text-secondary)]"
-            }
-          >
-            Details
-          </span>
+          <span className="text-[var(--text-primary)]">Details</span>
         </button>
         <button
           type="button"
@@ -273,19 +265,11 @@ export function HadithDetailsPanel({
           }}
           className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
             activeTab === "graph"
-              ? "bg-[var(--accent-emerald)] text-[var(--accent-contrast)] border border-[var(--accent-emerald)] shadow-[0_10px_24px_-12px_var(--accent-emerald)]"
+              ? "bg-[var(--accent-emerald)]/15 text-[var(--text-primary)] border border-[var(--accent-emerald)] shadow-[0_6px_16px_-10px_var(--accent-emerald)]"
               : "bg-[var(--surface-card)]/90 text-[var(--text-secondary)] border border-[var(--border-soft)]"
           }`}
         >
-          <span
-            className={
-              activeTab === "graph"
-                ? "underline underline-offset-4 decoration-[var(--accent-contrast)]"
-                : "text-[var(--text-secondary)]"
-            }
-          >
-            Graph
-          </span>
+          <span className="text-[var(--text-primary)]">Graph</span>
         </button>
       </div>
 
