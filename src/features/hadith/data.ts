@@ -24,6 +24,11 @@ export const hadithInsights: HadithInsight[] = [
       { name: "Umar ibn al-Khattab", descriptor: "Companion", classification: "sahabi", reliability: "thiqah" },
       { name: "Muhammad ibn Abdullah", descriptor: "Messenger of Allah", type: "prophet" },
     ],
+    gradedBy: [
+      { name: "Imam al-Bukhari", lifespan: "194–256 AH", gradeTitle: "Ṣaḥīḥ li-dhātih", isPrimary: true },
+      { name: "Al-Albani", lifespan: "1914–1999 CE", gradeTitle: "Ṣaḥīḥ" },
+      { name: "Ibn Hajar al-Asqalani", lifespan: "773–852 AH", gradeTitle: "Ḥasan li-ghayrih" },
+    ],
     sourceTypes: ["marfu"],
     chainTypes: ["musnad", "muannan"],
     narrationLevel: "gharib",

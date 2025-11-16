@@ -1,11 +1,11 @@
 "use client";
 
-import { ReactNode, useMemo, useState } from "react";
+import { ReactNode, useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Disclosure } from "@/components/ui/disclosure";
 import { Tag } from "@/components/ui/tag";
 import { formatGradingLabel } from "@/features/hadith/taxonomy";
-import { HadithInsight } from "@/features/hadith/types";
+import { GradeAttribution, HadithInsight } from "@/features/hadith/types";
 import { workspaceCopy } from "@/content/text";
 import { LoadingState } from "@/components/ui/state/loading-state";
 import { ErrorState } from "@/components/ui/state/error-state";
@@ -33,15 +33,63 @@ export function HadithDetailsPanel({
   const detailsCopy = workspaceCopy.details;
   const sidebarCopy = workspaceCopy.sidebar;
 
-  const gradingData = useMemo(() => {
-    if (!hadith) return null;
+  const [selectedGraderIndex, setSelectedGraderIndex] = useState(0);
+
+  const gradeOptions = useMemo(() => {
+    if (!hadith) return [] as Array<GradeAttribution & { scholarLabel: string; isPrimary: boolean }>;
+    const options: Array<GradeAttribution & { scholarLabel: string; isPrimary: boolean }> =
+      hadith.gradedGrades?.map((entry) => ({
+        scholarLabel: entry.scholar.lifespan ? `${entry.scholar.name} (${entry.scholar.lifespan})` : entry.scholar.name,
+        scholar: entry.scholar,
+        grade: entry.grade,
+        isPrimary: entry.isPrimary ?? entry.scholar.isPrimary ?? false,
+      })) ?? [];
+
+    if (options.length === 0) {
+      const fallbackScholar =
+        hadith.gradedBy && hadith.gradedBy.length
+          ? hadith.gradedBy[0]
+          : hadith.details.author
+            ? { name: hadith.details.author.name, lifespan: hadith.details.author.lifespan }
+            : null;
+      options.push({
+        scholarLabel: fallbackScholar
+          ? fallbackScholar.lifespan
+            ? `${fallbackScholar.name} (${fallbackScholar.lifespan})`
+            : fallbackScholar.name
+          : detailsCopy.gradedByFallback ?? "Unattributed",
+        scholar: fallbackScholar ?? { name: detailsCopy.gradedByFallback ?? "Unattributed" },
+        grade: {
+          id: hadith.details.gradeInfo?.id ?? -1,
+          title: hadith.details.gradeInfo?.title ?? hadith.details.grading,
+          description: hadith.details.gradeInfo?.description,
+          backgroundColor: hadith.details.gradeInfo?.backgroundColor ?? "var(--accent-emerald)",
+          textColor: hadith.details.gradeInfo?.textColor ?? "#041b11",
+        },
+        isPrimary: true,
+      } as GradeAttribution & { scholarLabel: string; isPrimary: boolean });
+    }
+    const primaryIndex = options.findIndex((option) => option.isPrimary);
+    const ordered = primaryIndex > 0 ? [options[primaryIndex], ...options.filter((_, idx) => idx !== primaryIndex)] : options;
+    return ordered;
+  }, [hadith, detailsCopy.gradedByFallback]);
+
+  useEffect(() => {
+    const primaryIndex = gradeOptions.findIndex((option) => option.isPrimary);
+    setSelectedGraderIndex(primaryIndex >= 0 ? primaryIndex : 0);
+  }, [hadith?.id, gradeOptions]);
+
+  const activeGrade = useMemo(() => {
+    if (!hadith || gradeOptions.length === 0) return null;
+    const selected = gradeOptions[selectedGraderIndex] ?? gradeOptions[0];
     return {
-      label: formatGradingLabel(hadith.details.grading),
-      backgroundColor: hadith.details.gradeInfo?.backgroundColor ?? "var(--accent-emerald)",
-      textColor: hadith.details.gradeInfo?.textColor ?? "#041b11",
-      description: hadith.details.gradeInfo?.description,
+      label: formatGradingLabel(selected.grade.title),
+      backgroundColor: selected.grade.backgroundColor ?? "var(--accent-emerald)",
+      textColor: selected.grade.textColor ?? "#041b11",
+      description: selected.grade.description,
+      scholarLabel: selected.scholarLabel,
     };
-  }, [hadith]);
+  }, [gradeOptions, hadith, selectedGraderIndex]);
 
   if (loading) {
     return (
@@ -89,6 +137,7 @@ export function HadithDetailsPanel({
         ];
   const narrationDetails = hadith.narrationLevelDetail;
   const sourceAuthor = hadith.details.author ?? null;
+  const gradedByLabel = detailsCopy.gradedByLabel ?? "Graded by";
 
   return (
     <PanelWrapper isDesktop={isDesktop} onResizeStart={onResizeStart}>
@@ -181,21 +230,42 @@ export function HadithDetailsPanel({
           </Card>
         </section>
 
-        {gradingData && (
+        {activeGrade && (
           <div className="text-center text-xs text-[var(--text-secondary)]">
             <Tag
               tone="accent"
               className="mt-2 inline-flex px-4 py-1 text-xs font-semibold uppercase tracking-[0.18em]"
               style={{
-                backgroundColor: gradingData.backgroundColor,
-                color: gradingData.textColor,
-                boxShadow: `0 10px 25px ${gradingData.backgroundColor}1a`,
+                backgroundColor: activeGrade.backgroundColor,
+                color: activeGrade.textColor,
+                boxShadow: `0 10px 25px ${activeGrade.backgroundColor}1a`,
               }}
             >
-              {gradingData.label}
+              {activeGrade.label}
             </Tag>
-            {gradingData.description && (
-              <p className="mt-2 text-sm text-[var(--text-secondary)]">{gradingData.description}</p>
+            {activeGrade.description && (
+              <p className="mt-2 text-sm text-[var(--text-secondary)]">{activeGrade.description}</p>
+            )}
+          </div>
+        )}
+
+        {gradeOptions.length > 0 && (
+          <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+            <span className="font-semibold text-[var(--text-primary)]">{gradedByLabel}:</span>
+            {gradeOptions.length > 1 ? (
+              <select
+                value={selectedGraderIndex}
+                onChange={(event) => setSelectedGraderIndex(Number(event.target.value))}
+                className="rounded-md border border-[var(--border-soft)] bg-[var(--surface-card)] px-2 py-1 text-sm text-[var(--text-primary)] focus:outline-none"
+              >
+                {gradeOptions.map((option, index) => (
+                  <option key={`${option.scholar.name}-${index}`} value={index}>
+                    {option.scholarLabel}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="text-[var(--text-primary)]">{gradeOptions[0].scholarLabel}</span>
             )}
           </div>
         )}

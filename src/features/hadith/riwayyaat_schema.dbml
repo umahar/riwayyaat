@@ -8,7 +8,7 @@ Table hadith [headercolor: #175e7a] {
   book_id          integer                        // FK -> book.id
   chapter_id       integer                        // FK -> chapter.id
   source_id        integer [not null]             // FK -> source.id
-  grade_id         integer                        // FK -> grade.id (nullable until scholars weigh in)
+  grade_id         integer                        // FK -> grade.id (legacy overall grade; prefer hadith_grade)
   matn_id          integer [not null]             // FK -> matn.id
   location         text                           // details.location (green tag)
   sanad            text                           // long sanad description (optional)
@@ -166,6 +166,32 @@ Table chain_narrator [headercolor: #175e7a] {
   }
 }
 
+Table scholar [headercolor: #175e7a] {
+  id             serial [pk, not null, unique]
+  name           text  [not null]
+  lifespan_label text
+  notes          text
+
+  indexes {
+    (name, lifespan_label) [name: 'scholar_unique_name_lifespan', unique]
+    (name) [name: 'scholar_index_name']
+  }
+}
+
+Table hadith_grade [headercolor: #175e7a] {
+  id          serial  [pk, not null, unique]
+  hadith_id   integer [not null]           // FK -> hadith.id
+  grade_id    integer [not null]           // FK -> grade.id
+  scholar_id  integer [not null]           // FK -> scholar.id
+  notes       text
+  is_primary  boolean [default: false]     // marks the grade shown in legacy hadith.grade_id
+
+  indexes {
+    (hadith_id, scholar_id) [name: 'hadith_grade_unique_hadith_scholar', unique]
+    (hadith_id)             [name: 'hadith_grade_index_hadith']
+  }
+}
+
 ////////////////////////////////////////////////////
 // Relationships
 ////////////////////////////////////////////////////
@@ -188,6 +214,18 @@ Ref fk_hadith_chapter {
 
 Ref fk_hadith_matn {
   hadith.matn_id > matn.id
+}
+
+Ref fk_hadith_grade_grade {
+  hadith_grade.grade_id > grade.id
+}
+
+Ref fk_hadith_grade_hadith {
+  hadith_grade.hadith_id > hadith.id
+}
+
+Ref fk_hadith_grade_scholar {
+  hadith_grade.scholar_id > scholar.id
 }
 
 Ref fk_source_author {

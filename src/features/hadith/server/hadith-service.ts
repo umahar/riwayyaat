@@ -38,6 +38,18 @@ type HadithRow = {
   attribution_type_description: string | null;
   author_name: string | null;
   author_lifespan: string | null;
+  graded_grades: GradedGradeRow[] | null;
+};
+
+type GradedGradeRow = {
+  scholar_name: string;
+  scholar_lifespan: string | null;
+  grade_id: number | null;
+  grade_name: string | null;
+  grade_description: string | null;
+  grade_background: string | null;
+  grade_text_color: string | null;
+  is_primary: boolean | null;
 };
 
 type ChainNarratorRow = {
@@ -116,7 +128,8 @@ async function fetchHadiths(whereClause = "", params: unknown[] = []): Promise<H
           at.name_ar AS attribution_type_secondary,
           at.description AS attribution_type_description,
           a.name AS author_name,
-          a.lifespan_label AS author_lifespan
+          a.lifespan_label AS author_lifespan,
+          grades.rollup AS graded_grades
         FROM hadith h
         JOIN source s ON s.id = h.source_id
         LEFT JOIN author a ON a.id = s.author_id
@@ -128,6 +141,25 @@ async function fetchHadiths(whereClause = "", params: unknown[] = []): Promise<H
         LEFT JOIN narration_level nl ON nl.id = hc.narration_level_id
         LEFT JOIN chain_type ct ON ct.id = hc.chain_type_id
         LEFT JOIN attribution_type at ON at.id = hc.attribution_type_id
+        LEFT JOIN LATERAL (
+          SELECT json_agg(
+                   json_build_object(
+                     'scholar_name', sc.name,
+                     'scholar_lifespan', sc.lifespan_label,
+                     'grade_id', g.id,
+                     'grade_name', g.name,
+                     'grade_description', g.description,
+                     'grade_background', g.background_color,
+                     'grade_text_color', g.text_color,
+                     'is_primary', hg.is_primary
+                   )
+                   ORDER BY hg.is_primary DESC, sc.name
+                 ) AS rollup
+          FROM hadith_grade hg
+          JOIN scholar sc ON sc.id = hg.scholar_id
+          JOIN grade g ON g.id = hg.grade_id
+          WHERE hg.hadith_id = h.id
+        ) AS grades ON TRUE
         ${whereClause}
         ORDER BY h.id
       `,
@@ -194,7 +226,9 @@ function mapHadithRow(
   narratorsByChain: Map<number, ChainNarratorRow[]>,
 ): HadithInsight {
   const chainRows = row.chain_id ? narratorsByChain.get(row.chain_id) ?? [] : [];
-  const gradeInfo = buildGradeInfo(row);
+  const gradedGrades = mapGradedGrades(row.graded_grades);
+  const gradeInfo = gradedGrades.find((entry) => entry.isPrimary)?.grade ?? buildGradeInfo(row);
+  const gradedBy = mapGradedBy(gradedGrades, row.author_name, row.author_lifespan);
   const narrationLevelDetail = buildLookupDetail(
     row.narration_level_id,
     row.narration_level_name,
@@ -230,6 +264,8 @@ function mapHadithRow(
         ? { name: row.author_name, lifespan: row.author_lifespan ?? undefined }
         : undefined,
     },
+    gradedBy,
+    gradedGrades,
     chain: mapChainNodes(chainRows),
     sourceTypes: attributionDetail ? [attributionDetail.title] : [],
     sourceTypeDetails: attributionDetail ? [attributionDetail] : undefined,
@@ -250,6 +286,48 @@ function mapChainNodes(rows: ChainNarratorRow[] = []): HadithInsight["chain"] {
     reliabilityDetail: buildReliabilityDetail(row),
     transmissionMethodDetail: buildTransmissionDetail(row),
   }));
+}
+
+function mapGradedGrades(rows: GradedGradeRow[] | null): HadithInsight["gradedGrades"] {
+  const mapped = (rows ?? []).map((row) => ({
+    scholar: {
+      name: row.scholar_name,
+      lifespan: row.scholar_lifespan ?? undefined,
+      isPrimary: row.is_primary ?? undefined,
+    },
+    grade:
+      row.grade_id && row.grade_name
+        ? {
+            id: row.grade_id,
+            title: row.grade_name,
+            description: row.grade_description ?? undefined,
+            backgroundColor: row.grade_background ?? undefined,
+            textColor: row.grade_text_color ?? undefined,
+          }
+        : undefined,
+    isPrimary: row.is_primary ?? undefined,
+  }));
+  return mapped.filter((item) => item.grade) as HadithInsight["gradedGrades"];
+}
+
+function mapGradedBy(
+  gradedGrades: HadithInsight["gradedGrades"],
+  authorName?: string | null,
+  authorLifespan?: string | null,
+): HadithInsight["gradedBy"] {
+  const mapped =
+    gradedGrades?.map((grader) => ({
+      name: grader.scholar.name,
+      lifespan: grader.scholar.lifespan,
+      isPrimary: grader.isPrimary,
+    })) ?? [];
+  if (mapped.length === 0 && authorName) {
+    mapped.push({
+      name: authorName,
+      lifespan: authorLifespan ?? undefined,
+    });
+  }
+  return mapped.length ? mapped : undefined;
 }
 
 function buildLookupDetail(

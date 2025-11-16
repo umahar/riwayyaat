@@ -19,6 +19,7 @@ type IdCache = Map<string, number>;
 
 type LookupCaches = {
   authors: IdCache;
+  scholars: IdCache;
   sources: IdCache;
   books: IdCache;
   chapters: IdCache;
@@ -35,8 +36,16 @@ type LookupCaches = {
   hadithChain: IdCache;
 };
 
+type ScholarInput = {
+  name: string;
+  lifespan?: string | null;
+  gradeTitle?: string | null;
+  isPrimary?: boolean | null;
+};
+
 const caches: LookupCaches = {
   authors: new Map(),
+  scholars: new Map(),
   sources: new Map(),
   books: new Map(),
   chapters: new Map(),
@@ -52,6 +61,8 @@ const caches: LookupCaches = {
   hadith: new Map(),
   hadithChain: new Map(),
 };
+
+let gradingTablesReady: boolean | null = null;
 
 const isUniqueViolation = (error: unknown) =>
   Boolean(error && typeof error === "object" && (error as { code?: string }).code === "23505");
@@ -123,6 +134,17 @@ async function tableExists(client: PoolClient, table: string) {
   return Boolean(result.rows[0]?.exists);
 }
 
+async function gradingTablesAvailable(client: PoolClient) {
+  if (gradingTablesReady !== null) return gradingTablesReady;
+  const hasScholars = await tableExists(client, "scholar");
+  const hasHadithGrades = await tableExists(client, "hadith_grade");
+  gradingTablesReady = hasScholars && hasHadithGrades;
+  if (!gradingTablesReady) {
+    console.warn("[seed] Grading tables missing (scholar/hadith_grade); skipping graded-by data");
+  }
+  return gradingTablesReady;
+}
+
 async function getNextManualId(client: PoolClient, table: string) {
   const result = await client.query<{ next: number }>(`SELECT COALESCE(MAX(id), 0) + 1 AS next FROM ${table}`);
   return result.rows[0]?.next ?? 1;
@@ -145,6 +167,8 @@ async function seedStaticLookups(client: PoolClient) {
     "narrator",
     "matn",
     "hadith",
+    "scholar",
+    "hadith_grade",
     "hadith_chain",
     "chain_narrator",
   ]);
@@ -225,6 +249,31 @@ async function getAuthorId(client: PoolClient, sourceName: string) {
     id = result.rows[0].id;
   }
   caches.authors.set(cacheKey, id);
+  return id;
+}
+
+async function getScholarId(client: PoolClient, scholar: ScholarInput) {
+  const name = scholar.name.trim();
+  const lifespan = scholar.lifespan ?? null;
+  const cacheKey = `${name}:${lifespan ?? ""}`;
+  if (caches.scholars.has(cacheKey)) {
+    return caches.scholars.get(cacheKey)!;
+  }
+  const existing = await client.query<{ id: number }>(
+    "SELECT id FROM scholar WHERE name = $1 AND lifespan_label IS NOT DISTINCT FROM $2",
+    [name, lifespan],
+  );
+  let id: number;
+  if (existing.rowCount) {
+    id = existing.rows[0].id;
+  } else {
+    const result = await client.query<{ id: number }>(
+      "INSERT INTO scholar (name, lifespan_label) VALUES ($1, $2) RETURNING id",
+      [name, lifespan],
+    );
+    id = result.rows[0].id;
+  }
+  caches.scholars.set(cacheKey, id);
   return id;
 }
 
@@ -549,11 +598,99 @@ async function insertMatn(client: PoolClient, text: string) {
   return id;
 }
 
+function getGradersForHadith(hadith: HadithInsight): ScholarInput[] {
+  if (hadith.gradedGrades && hadith.gradedGrades.length > 0) {
+    return hadith.gradedGrades.map((entry) => ({
+      name: entry.scholar.name,
+      lifespan: entry.scholar.lifespan ?? null,
+      gradeTitle: entry.grade?.title ?? entry.scholar.gradeTitle ?? null,
+      isPrimary: entry.isPrimary ?? entry.scholar.isPrimary ?? null,
+    }));
+  }
+  if (hadith.gradedBy && hadith.gradedBy.length > 0) {
+    return hadith.gradedBy.map((grader) => ({
+      name: grader.name,
+      lifespan: grader.lifespan ?? null,
+      gradeTitle: grader.gradeTitle ?? null,
+      isPrimary: grader.isPrimary ?? null,
+    }));
+  }
+  if (hadith.details.author) {
+    return [
+      {
+        name: hadith.details.author.name,
+        lifespan: hadith.details.author.lifespan ?? null,
+      },
+    ];
+  }
+  const authorInfo = sourceAuthorMap[hadith.details.source];
+  if (authorInfo) {
+    return [
+      {
+        name: authorInfo.name,
+        lifespan: authorInfo.lifespan ?? null,
+      },
+    ];
+  }
+  return [];
+}
+
+async function upsertHadithGrades(
+  client: PoolClient,
+  hadithId: number,
+  gradeId: number | null,
+  graders: ScholarInput[],
+) {
+  if (!(await gradingTablesAvailable(client))) return;
+  const seen = new Set<string>();
+  const normalizedGraders =
+    graders.length > 0
+      ? graders
+      : [
+          {
+            name: "Unspecified grader",
+            lifespan: null,
+          },
+        ];
+
+  for (let index = 0; index < normalizedGraders.length; index += 1) {
+    const grader = normalizedGraders[index];
+    const cacheKey = `${grader.name}:${grader.lifespan ?? ""}`;
+    if (seen.has(cacheKey)) continue;
+    seen.add(cacheKey);
+    const effectiveGradeId = grader.gradeTitle ? await getGradeId(client, grader.gradeTitle) : gradeId;
+    if (!effectiveGradeId) continue;
+    const scholarId = await getScholarId(client, grader);
+    await client.query(
+      `INSERT INTO hadith_grade (hadith_id, grade_id, scholar_id, is_primary)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (hadith_id, scholar_id)
+       DO UPDATE SET grade_id = EXCLUDED.grade_id, is_primary = EXCLUDED.is_primary`,
+      [hadithId, effectiveGradeId, scholarId, grader.isPrimary ?? index === 0],
+    );
+  }
+
+  await client.query(
+    `WITH ranked AS (
+       SELECT id, hadith_id, ROW_NUMBER() OVER (PARTITION BY hadith_id ORDER BY is_primary DESC, id) AS rn
+       FROM hadith_grade
+       WHERE hadith_id = $1
+     )
+     UPDATE hadith_grade hg
+     SET is_primary = ranked.rn = 1
+     FROM ranked
+     WHERE hg.id = ranked.id
+       AND hg.hadith_id = ranked.hadith_id`,
+    [hadithId],
+  );
+}
+
 async function upsertHadith(client: PoolClient, hadith: HadithInsight) {
   const sourceId = await getSourceId(client, hadith.details.source);
   const bookId = await getBookId(client, sourceId, hadith.details.book, hadith.details.bookNumber);
   const chapterId = await getChapterId(client, bookId, hadith.details.chapter);
   const gradeId = await getGradeId(client, hadith.details.grading);
+  const graders = getGradersForHadith(hadith);
   const matnId = await insertMatn(client, hadith.matn);
   const hadithNumber = hadith.details.hadithNumber ?? null;
 
@@ -591,6 +728,7 @@ async function upsertHadith(client: PoolClient, hadith: HadithInsight) {
     caches.hadith.set(hadithCacheKey, hadithId);
   }
 
+  await upsertHadithGrades(client, hadithId!, gradeId, graders);
   await upsertChain(client, hadith, hadithId!);
 }
 

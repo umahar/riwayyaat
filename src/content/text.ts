@@ -95,6 +95,8 @@ export const workspaceCopy = {
     authorFallback: "Author not specified",
     bookLabel: "Book",
     hadithLabel: "Hadith",
+    gradedByLabel: "Graded by",
+    gradedByFallback: "No scholar attribution provided",
   },
   narratorChain: {
     sectionTitle: "Isnad chain",

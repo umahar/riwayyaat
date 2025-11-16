@@ -41,6 +41,19 @@ export type ChainNode = {
   transmissionMethodDetail?: TransmissionMethodDetail;
 };
 
+export type ScholarGrade = {
+  name: string;
+  lifespan?: string;
+  gradeTitle?: string;
+  isPrimary?: boolean;
+};
+
+export type GradeAttribution = {
+  scholar: ScholarGrade;
+  grade: GradeInfo;
+  isPrimary?: boolean;
+};
+
 export type HadithInsight = {
   id: string;
   matn: string;
@@ -60,6 +73,8 @@ export type HadithInsight = {
     };
   };
   chain: ChainNode[];
+  gradedBy?: ScholarGrade[];
+  gradedGrades?: GradeAttribution[];
   sourceTypes: string[];
   sourceTypeDetails?: LookupDetail[];
   chainTypes: string[];
@@ -134,6 +149,7 @@ export type LookupDetail = {
 export type GradeInfo = LookupDetail & {
   backgroundColor?: string | null;
   textColor?: string | null;
+  description?: string | null;
 };
 
 export type ReliabilityDetail = LookupDetail & {
