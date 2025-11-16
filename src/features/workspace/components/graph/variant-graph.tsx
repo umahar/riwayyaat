@@ -31,12 +31,12 @@ export function VariantGraph({ data }: VariantGraphProps) {
 
   useEffect(() => {
     if (!graphRef.current) return;
-    const linkForce = graphRef.current.d3Force("link");
+    const linkForce = graphRef.current.d3Force?.("link");
     if (linkForce?.distance) linkForce.distance(160);
-    const charge = graphRef.current.d3Force("charge");
+    const charge = graphRef.current.d3Force?.("charge");
     if (charge?.strength) charge.strength(-180);
-    graphRef.current.d3VelocityDecay(0.92);
-    graphRef.current.numDimensions(2);
+    if (graphRef.current.d3VelocityDecay) graphRef.current.d3VelocityDecay(0.92);
+    if (graphRef.current.numDimensions) graphRef.current.numDimensions(2);
   }, [data]);
 
   const graphData = useMemo(() => {

@@ -33,12 +33,12 @@ export function ChainGraph({ data, onNarratorSelect }: ChainGraphProps) {
 
   useEffect(() => {
     if (!graphRef.current) return;
-    const linkForce = graphRef.current.d3Force("link");
+    const linkForce = graphRef.current.d3Force?.("link");
     if (linkForce?.distance) linkForce.distance(140);
-    const charge = graphRef.current.d3Force("charge");
+    const charge = graphRef.current.d3Force?.("charge");
     if (charge?.strength) charge.strength(-260);
-    graphRef.current.d3VelocityDecay(0.9);
-    graphRef.current.numDimensions(2);
+    if (graphRef.current.d3VelocityDecay) graphRef.current.d3VelocityDecay(0.9);
+    if (graphRef.current.numDimensions) graphRef.current.numDimensions(2);
   }, [data]);
 
   const graphData = useMemo(() => {
