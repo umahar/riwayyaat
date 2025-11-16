@@ -98,13 +98,11 @@ export function HadithDetailsPanel({
   const goPrevGrader = () => {
     if (!hasMultipleGraders) return;
     setSelectedGraderIndex((prev) => (prev - 1 + gradeOptions.length) % gradeOptions.length);
-    setShowGradeDetails(false);
   };
 
   const goNextGrader = () => {
     if (!hasMultipleGraders) return;
     setSelectedGraderIndex((prev) => (prev + 1) % gradeOptions.length);
-    setShowGradeDetails(false);
   };
 
   if (loading) {
