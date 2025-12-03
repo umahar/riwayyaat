@@ -9,6 +9,8 @@ const ForceGraph2D = dynamic(() => import("react-force-graph-2d").then((mod) => 
 type VariantGraphProps = {
   data: VariantsData;
 };
+type VariantNode = { id: string; name: string; type: string; reason?: string };
+type VariantLink = { source: string; target: string; type: string };
 
 export function VariantGraph({ data }: VariantGraphProps) {
   const graphRef = useRef<any>(null);
@@ -40,8 +42,8 @@ export function VariantGraph({ data }: VariantGraphProps) {
     if (graphRef.current.numDimensions) graphRef.current.numDimensions(2);
   }, [data]);
 
-  const graphData = useMemo(() => {
-    const nodes = [
+  const graphData = useMemo<{ nodes: VariantNode[]; links: VariantLink[] }>(() => {
+    const nodes: VariantNode[] = [
       { id: `Hadith:${data.baseHadithId}`, name: `Base #${data.baseHadithId}`, type: "Hadith" },
       ...data.variants.map((v) => ({
         id: `Hadith:${v.hadithId}`,
@@ -50,7 +52,7 @@ export function VariantGraph({ data }: VariantGraphProps) {
         reason: v.similarityReason,
       })),
     ];
-    const links = data.variants.map((v) => ({
+    const links: VariantLink[] = data.variants.map((v) => ({
       source: `Hadith:${data.baseHadithId}`,
       target: `Hadith:${v.hadithId}`,
       type: v.similarityReason,
@@ -103,8 +105,8 @@ export function VariantGraph({ data }: VariantGraphProps) {
     drawLegendItem("Variant", "#16a34a", 28);
 
     const center = { x: canvas.width / 2, y: canvas.height / 2 };
-    const nodes = graphData?.nodes ?? [];
-    const edges = graphData?.edges ?? [];
+    const nodes = graphData.nodes ?? [];
+    const edges = graphData.links ?? [];
     if (!nodes.length) return;
 
     const base = nodes.find((n) => n.type === "Hadith");
@@ -125,8 +127,8 @@ export function VariantGraph({ data }: VariantGraphProps) {
     ctx.strokeStyle = "#d97706";
     ctx.lineWidth = 2;
     edges.forEach((edge) => {
-      const from = positions.get(edge.from);
-      const to = positions.get(edge.to);
+      const from = positions.get(edge.source);
+      const to = positions.get(edge.target);
       if (!from || !to) return;
       ctx.beginPath();
       ctx.moveTo(from.x, from.y);

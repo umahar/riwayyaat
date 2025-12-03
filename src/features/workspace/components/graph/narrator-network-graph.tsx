@@ -88,7 +88,7 @@ export function NarratorNetworkGraph({ data }: NarratorNetworkGraphProps) {
     ctx.fillText("Narrator network", 32, 40);
 
     const center = { x: canvas.width / 2, y: canvas.height / 2 };
-    const nodes = data?.nodes ?? [];
+    const nodes = graphData.nodes ?? [];
     const edges = data?.edges ?? [];
     if (!nodes.length) return;
     const radius = 330;

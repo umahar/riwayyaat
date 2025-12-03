@@ -1,6 +1,6 @@
 import "server-only";
 import { embedTextsDirect, DEFAULT_EMBEDDING_MODEL } from "@/server/rag/embeddings";
-import { RagFilters, RagRetrievalParams, RagResult } from "@/server/rag/types";
+import { RagFilters, RagRetrievalParams, RagResult } from "@/types/rag";
 import { getClient } from "@/server/db/client";
 
 /**

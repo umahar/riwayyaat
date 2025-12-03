@@ -28,6 +28,7 @@ Graph-native workspace for studying hadith: isnād visualizations (Neo4j), RAG a
   - `scripts/seed-hadith.ts` — load demo dataset.
   - `scripts/test-numbering.ts` — validate display numbers/identifiers.
   - `scripts/hadith-sync-process.ts` — process pending graph/embedding jobs.
+  - `scripts/run-evaluation.ts` — replay the evaluation set and recompute KG + retrieval + faithfulness metrics (mirrors the `/admin/eval` dashboard).
 
 ### UI/feature notes
 
@@ -40,3 +41,4 @@ Graph-native workspace for studying hadith: isnād visualizations (Neo4j), RAG a
 
 - `docs/ARCHITECTURE.md` — system overview, RAG + graph flows, key commands.
 - `docs/SCHEMA.md` — migration order and schema notes (embeddings, sync queue, audit log).
+- `docs/EVALUATION.md` — how to define the evaluation dataset, run it from CLI/admin, and interpret the metrics for demos.

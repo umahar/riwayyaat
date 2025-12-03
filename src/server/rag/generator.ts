@@ -1,6 +1,6 @@
 import "server-only";
 import OpenAI from "openai";
-import { RagResult, RagAnswer, RagCitation } from "@/server/rag/types";
+import { RagResult, RagAnswer, RagCitation } from "@/types/rag";
 import { DEFAULT_EMBEDDING_MODEL } from "@/server/rag/embeddings";
 
 type GenerateParams = {

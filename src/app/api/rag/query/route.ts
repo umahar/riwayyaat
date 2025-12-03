@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { retrieveHadithForQuestion } from "@/server/rag/retriever";
 import { generateRagAnswer } from "@/server/rag/generator";
-import { RagFilters } from "@/server/rag/types";
+import { RagFilters } from "@/types/rag";
 import { getClient } from "@/server/db/client";
 
 const SAFE_FALLBACK =

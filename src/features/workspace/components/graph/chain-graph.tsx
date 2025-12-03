@@ -57,6 +57,15 @@ export function ChainGraph({ data, onNarratorSelect }: ChainGraphProps) {
       })),
     };
   }, [data]);
+  const exportEdges = useMemo(
+    () =>
+      data.edges.map((edge) => ({
+        from: edge.from,
+        to: edge.to,
+        type: edge.type as string,
+      })),
+    [data],
+  );
 
   const truncateLabel = (label: string, max = 26) => {
     if (!label) return "";
@@ -106,7 +115,7 @@ export function ChainGraph({ data, onNarratorSelect }: ChainGraphProps) {
 
     const center = { x: canvas.width / 2, y: canvas.height / 2 };
     const nodes = graphData?.nodes ?? [];
-    const edges = graphData?.edges ?? [];
+    const edges = exportEdges ?? [];
     if (!nodes.length) return;
 
     const others = nodes.filter((n) => n.type !== "Hadith");

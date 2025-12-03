@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ReactNode, useEffect, useMemo, useState } from "react";
 import {
   AdminHadithDetail,
@@ -215,7 +216,13 @@ export function HadithAdminPage() {
             Add, edit, filter, and softly delete hadith records with primary chain + tags.
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
+          <Link
+            href="/admin/eval"
+            className="rounded-full border border-[var(--border-soft)] px-4 py-2 text-sm font-medium text-[var(--text-secondary)] transition hover:border-[var(--text-primary)]"
+          >
+            Evaluation runner
+          </Link>
           <button
             onClick={loadList}
             className="rounded-full border border-[var(--border-soft)] px-4 py-2 text-sm font-medium text-[var(--text-secondary)] transition hover:border-[var(--text-primary)]"

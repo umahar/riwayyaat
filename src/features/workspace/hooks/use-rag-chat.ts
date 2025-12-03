@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { RagCitation } from "@/server/rag/types";
+import { RagCitation } from "@/types/rag";
 
 export type ChatMessage = {
   id: string;

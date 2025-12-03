@@ -9,7 +9,8 @@
     "lint": "eslint",
     "graph:sync": "tsx scripts/graph-sync.ts",
     "rag:backfill": "tsx scripts/rag-backfill.ts",
-    "sync:delta": "tsx scripts/hadith-sync-process.ts"
+    "sync:delta": "tsx scripts/hadith-sync-process.ts",
+    "eval:run": "tsx scripts/run-evaluation.ts"
   },
   "dependencies": {
     "dotenv": "^17.2.3",
