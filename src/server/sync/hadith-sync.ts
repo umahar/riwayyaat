@@ -11,6 +11,7 @@ import {
   linkHadithGrade,
   linkGradeToScholar,
   linkHadithIdentifier,
+  mapAuthorToNode,
   mapHadithToNode,
   mapIdentifierToNode,
   mapMatnToNode,
@@ -25,6 +26,9 @@ import {
   linkHadithChapter,
   linkHadithBook,
   linkHadithSource,
+  linkSourceAuthor,
+  linkBookSource,
+  linkChapterBook,
   linkHadithToMatn,
   linkHadithChain,
   linkHadithTag,
@@ -163,6 +167,7 @@ async function fetchGraphDataForHadith(client: PoolClient, hadithId: number) {
 
   const [
     sources,
+    authors,
     books,
     chapters,
     narrationLevels,
@@ -182,7 +187,8 @@ async function fetchGraphDataForHadith(client: PoolClient, hadithId: number) {
     hadithTags,
     hadithGrades,
   ] = await Promise.all([
-    client.query<{ id: number; name: string }>("SELECT id, name FROM source"),
+    client.query<{ id: number; name: string; author_id: number | null }>("SELECT id, name, author_id FROM source"),
+    client.query<{ id: number; name: string; lifespan_label: string | null }>("SELECT id, name, lifespan_label FROM author"),
     client.query<{ id: number; name: string | null; number: number | null; source_id: number }>(
       "SELECT id, name, number, source_id FROM book",
     ),
@@ -243,6 +249,7 @@ async function fetchGraphDataForHadith(client: PoolClient, hadithId: number) {
       chapter_name: string | null;
       matn_id: number;
       location: string | null;
+      sanad: string | null;
       matn_text: string;
       deleted_at: Date | null;
     }>(
@@ -260,6 +267,7 @@ async function fetchGraphDataForHadith(client: PoolClient, hadithId: number) {
           c.name AS chapter_name,
           h.matn_id,
           h.location,
+          h.sanad,
           m.text_en AS matn_text,
           h.deleted_at
         FROM hadith h
@@ -283,7 +291,11 @@ async function fetchGraphDataForHadith(client: PoolClient, hadithId: number) {
       attribution_type_id: number | null;
       is_primary: boolean | null;
       label: string | null;
-    }>("SELECT id, hadith_id, narration_level_id, chain_type_id, attribution_type_id, is_primary, label FROM hadith_chain WHERE hadith_id = $1", [hadithId]),
+      notes: string | null;
+    }>(
+      "SELECT id, hadith_id, narration_level_id, chain_type_id, attribution_type_id, is_primary, label, notes FROM hadith_chain WHERE hadith_id = $1",
+      [hadithId],
+    ),
     client.query<{
       chain_id: number;
       position: number;
@@ -325,8 +337,8 @@ async function fetchGraphDataForHadith(client: PoolClient, hadithId: number) {
       [hadithId],
     ),
     client.query<{ hadith_id: number; tag_id: number }>("SELECT hadith_id, tag_id FROM hadith_tag WHERE hadith_id = $1", [hadithId]),
-    client.query<{ hadith_id: number; grade_id: number; scholar_id: number; is_primary: boolean | null }>(
-      "SELECT hadith_id, grade_id, scholar_id, is_primary FROM hadith_grade WHERE hadith_id = $1",
+    client.query<{ hadith_id: number; grade_id: number; scholar_id: number; is_primary: boolean | null; notes: string | null }>(
+      "SELECT hadith_id, grade_id, scholar_id, is_primary, notes FROM hadith_grade WHERE hadith_id = $1",
       [hadithId],
     ),
   ]);
@@ -341,6 +353,9 @@ async function fetchGraphDataForHadith(client: PoolClient, hadithId: number) {
   // Lookup nodes
   sources.rows.forEach((row) =>
     addNode(nodes, mapSourceToNode({ pgId: row.id, title: row.name, secondary: null, description: null })),
+  );
+  authors.rows.forEach((row) =>
+    addNode(nodes, mapAuthorToNode({ pgId: row.id, name: row.name, lifespan: row.lifespan_label })),
   );
   books.rows.forEach((row) =>
     addNode(nodes, mapBookToNode({ pgId: row.id, title: row.name ?? "Book", secondary: row.number?.toString() })),
@@ -451,25 +466,50 @@ async function fetchGraphDataForHadith(client: PoolClient, hadithId: number) {
     chapterName: hadith.chapter_name,
     matnPreview: hadith.matn_text?.slice(0, 200) ?? null,
     location: hadith.location,
+    sanad: hadith.sanad,
   };
   addNode(nodes, mapHadithToNode(hadithNode));
 
   const matn = matnMap.get(hadith.matn_id);
   if (matn) addRel(rels, linkHadithToMatn(hadithNode, matn));
   const sourceRow = sources.rows.find((s) => s.id === hadith.source_id);
-  if (sourceRow)
+  if (sourceRow) {
     addRel(
       rels,
       linkHadithSource(hadithNode, { pgId: sourceRow.id, title: sourceRow.name, secondary: null, description: null }),
     );
+    if (sourceRow.author_id) {
+      const authorRow = authors.rows.find((author) => author.id === sourceRow.author_id);
+      if (authorRow) {
+        addRel(
+          rels,
+          linkSourceAuthor(
+            { pgId: sourceRow.id, title: sourceRow.name, secondary: null, description: null },
+            { pgId: authorRow.id, name: authorRow.name, lifespan: authorRow.lifespan_label },
+          ),
+        );
+      }
+    }
+  }
   const bookRow = books.rows.find((b) => b.id === hadith.book_id);
-  if (bookRow)
+  if (bookRow) {
     addRel(
       rels,
       linkHadithBook(hadithNode, { pgId: bookRow.id, title: bookRow.name ?? "Book", secondary: bookRow.number?.toString() }),
     );
+    const bookSource = sources.rows.find((s) => s.id === bookRow.source_id);
+    if (bookSource) {
+      addRel(
+        rels,
+        linkBookSource(
+          { pgId: bookRow.id, title: bookRow.name ?? "Book", secondary: bookRow.number?.toString() },
+          { pgId: bookSource.id, title: bookSource.name, secondary: null, description: null },
+        ),
+      );
+    }
+  }
   const chapterRow = chapters.rows.find((c) => c.id === hadith.chapter_id);
-  if (chapterRow)
+  if (chapterRow) {
     addRel(
       rels,
       linkHadithChapter(hadithNode, {
@@ -478,6 +518,17 @@ async function fetchGraphDataForHadith(client: PoolClient, hadithId: number) {
         secondary: chapterRow.number?.toString(),
       }),
     );
+    const chapterBook = books.rows.find((b) => b.id === chapterRow.book_id);
+    if (chapterBook) {
+      addRel(
+        rels,
+        linkChapterBook(
+          { pgId: chapterRow.id, title: chapterRow.name ?? "Chapter", secondary: chapterRow.number?.toString() },
+          { pgId: chapterBook.id, title: chapterBook.name ?? "Book", secondary: chapterBook.number?.toString() },
+        ),
+      );
+    }
+  }
 
   // Identifiers
   identifiers.rows.forEach((row) => {
@@ -505,6 +556,7 @@ async function fetchGraphDataForHadith(client: PoolClient, hadithId: number) {
       pgId: row.id,
       label: row.label,
       isPrimary: row.is_primary,
+      notes: row.notes,
     };
     addNode(nodes, mapChainToNode(node));
     chainMap.set(row.id, node);
@@ -620,7 +672,7 @@ async function fetchGraphDataForHadith(client: PoolClient, hadithId: number) {
         backgroundColor: gradeRow.background_color,
         textColor: gradeRow.text_color,
       };
-      addRel(rels, linkHadithGrade(hadithNode, gradeNode, row.is_primary));
+      addRel(rels, linkHadithGrade(hadithNode, gradeNode, row.is_primary, row.notes));
       if (scholarRow) {
         const scholarNode = {
           pgId: scholarRow.id,

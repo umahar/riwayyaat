@@ -5,6 +5,7 @@
  * - Hadith: { pgId, number, displayNumber, displayLabel, sourceName, bookName, chapterName, matnPreview, location }
  * - Matn: { pgId, textEn, textAr?, summary? }
  * - Source: { pgId, name }
+ * - Author: { pgId, name, lifespan? }
  * - Book: { pgId, name, number, sourceName }
  * - Chapter: { pgId, name, number, bookName }
  * - Chain: { pgId, label, isPrimary, narrationLevel?, chainType?, attributionType? }
@@ -25,10 +26,13 @@
  * - Hadith -[:FROM_SOURCE]-> Source
  * - Hadith -[:IN_BOOK]-> Book
  * - Hadith -[:IN_CHAPTER]-> Chapter
+ * - Source -[:BY_AUTHOR]-> Author
+ * - Book -[:BELONGS_TO]-> Source
+ * - Chapter -[:BELONGS_TO]-> Book
  * - Hadith -[:HAS_CHAIN {isPrimary, label}]-> Chain
  * - Hadith -[:TAGGED]-> Tag
  * - Hadith -[:IDENTIFIED_AS {schemeKey, identifier, isPrimary, notes}]-> Identifier
- * - Hadith -[:GRADED {isPrimary}]-> Grade
+ * - Hadith -[:GRADED {isPrimary, notes}]-> Grade
  * - Grade -[:BY]-> Scholar
  * - Chain -[:NARRATION_LEVEL]-> NarrationLevel
  * - Chain -[:CHAIN_TYPE]-> ChainType
@@ -46,6 +50,7 @@ export type GraphLabel =
   | "Hadith"
   | "Matn"
   | "Source"
+  | "Author"
   | "Book"
   | "Chapter"
   | "Chain"
@@ -66,6 +71,8 @@ export type GraphRelationshipType =
   | "FROM_SOURCE"
   | "IN_BOOK"
   | "IN_CHAPTER"
+  | "BY_AUTHOR"
+  | "BELONGS_TO"
   | "HAS_CHAIN"
   | "TAGGED"
   | "IDENTIFIED_AS"
@@ -121,6 +128,7 @@ export type HadithNodeProps = {
   chapterName?: string | null;
   matnPreview?: string | null;
   location?: string | null;
+  sanad?: string | null;
 };
 
 export type MatnNodeProps = {
@@ -134,6 +142,7 @@ export type ChainNodeProps = {
   pgId: number;
   label?: string | null;
   isPrimary?: boolean | null;
+  notes?: string | null;
   narrationLevel?: string | null;
   chainType?: string | null;
   attributionType?: string | null;
@@ -166,6 +175,12 @@ export type GradeNodeProps = {
 };
 
 export type ScholarNodeProps = {
+  pgId: number;
+  name: string;
+  lifespan?: string | null;
+};
+
+export type AuthorNodeProps = {
   pgId: number;
   name: string;
   lifespan?: string | null;

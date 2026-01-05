@@ -15,6 +15,7 @@ import {
   StepRelationshipProps,
   GradeNodeProps,
   ScholarNodeProps,
+  AuthorNodeProps,
   IdentifierNodeProps,
   TagNodeProps,
   LookupNodeProps,
@@ -40,6 +41,10 @@ export function mapSourceToNode(props: LookupNodeProps): GraphNode<"Source", Loo
   return { label: "Source", key: key("Source", props.pgId), properties: props };
 }
 
+export function mapAuthorToNode(props: AuthorNodeProps): GraphNode<"Author", AuthorNodeProps> {
+  return { label: "Author", key: key("Author", props.pgId), properties: props };
+}
+
 export function mapBookToNode(props: LookupNodeProps): GraphNode<"Book", LookupNodeProps> {
   return { label: "Book", key: key("Book", props.pgId), properties: props };
 }
@@ -61,6 +66,21 @@ export function linkHadithChapter(
   chapter: LookupNodeProps,
 ): GraphRelationship<"IN_CHAPTER"> {
   return { type: "IN_CHAPTER", from: key("Hadith", hadith.pgId), to: key("Chapter", chapter.pgId) };
+}
+
+export function linkSourceAuthor(
+  source: LookupNodeProps,
+  author: AuthorNodeProps,
+): GraphRelationship<"BY_AUTHOR"> {
+  return { type: "BY_AUTHOR", from: key("Source", source.pgId), to: key("Author", author.pgId) };
+}
+
+export function linkBookSource(book: LookupNodeProps, source: LookupNodeProps): GraphRelationship<"BELONGS_TO"> {
+  return { type: "BELONGS_TO", from: key("Book", book.pgId), to: key("Source", source.pgId) };
+}
+
+export function linkChapterBook(chapter: LookupNodeProps, book: LookupNodeProps): GraphRelationship<"BELONGS_TO"> {
+  return { type: "BELONGS_TO", from: key("Chapter", chapter.pgId), to: key("Book", book.pgId) };
 }
 
 // Chains
@@ -207,12 +227,13 @@ export function linkHadithGrade(
   hadith: HadithNodeProps,
   grade: GradeNodeProps,
   isPrimary?: boolean | null,
-): GraphRelationship<"GRADED", { isPrimary?: boolean | null }> {
+  notes?: string | null,
+): GraphRelationship<"GRADED", { isPrimary?: boolean | null; notes?: string | null }> {
   return {
     type: "GRADED",
     from: key("Hadith", hadith.pgId),
     to: key("Grade", grade.pgId),
-    properties: { isPrimary: isPrimary ?? undefined },
+    properties: { isPrimary: isPrimary ?? undefined, notes: notes ?? undefined },
   };
 }
 
