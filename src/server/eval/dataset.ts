@@ -1,4 +1,10 @@
-import "server-only";
+// Mark server-only in Next.js; ignore when running standalone scripts (tsx/node).
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires, import/no-extraneous-dependencies
+  require("server-only");
+} catch {
+  /* noop for script contexts */
+}
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { EvaluationQueryConfig } from "@/types/evaluation";

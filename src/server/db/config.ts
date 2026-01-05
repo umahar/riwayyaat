@@ -10,7 +10,7 @@ if (existsSync(envLocalPath)) {
 }
 
 const requiredEnv = ["PGHOST", "PGPORT", "PGDATABASE", "PGUSER", "PGPASSWORD"] as const;
-const missing = requiredEnv.filter((key) => !process.env[key]);
+const missing = requiredEnv.filter((key) => process.env[key] === undefined);
 
 if (missing.length > 0) {
   console.warn(

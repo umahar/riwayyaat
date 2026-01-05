@@ -1,4 +1,10 @@
-import "server-only";
+// Mark server-only in Next.js; ignore when running standalone scripts (tsx/node).
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires, import/no-extraneous-dependencies
+  require("server-only");
+} catch {
+  /* noop for script contexts */
+}
 import { embedTextsDirect, DEFAULT_EMBEDDING_MODEL } from "@/server/rag/embeddings";
 import { RagFilters, RagRetrievalParams, RagResult } from "@/types/rag";
 import { getClient } from "@/server/db/client";

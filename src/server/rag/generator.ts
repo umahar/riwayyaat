@@ -1,4 +1,10 @@
-import "server-only";
+// Mark server-only in Next.js; ignore when running standalone scripts (tsx/node).
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires, import/no-extraneous-dependencies
+  require("server-only");
+} catch {
+  /* noop for script contexts */
+}
 import OpenAI from "openai";
 import { RagResult, RagAnswer, RagCitation } from "@/types/rag";
 import { DEFAULT_EMBEDDING_MODEL } from "@/server/rag/embeddings";

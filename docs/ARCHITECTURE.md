@@ -27,6 +27,31 @@
 - **APIs**: `/api/graph/chain`, `/api/graph/narrator-network`, `/api/graph/variants` provide graph JSON (nodes/edges/variants).
 - **Workspace UI**: Graph tab in hadith details renders isnād graph, narrator network, variants via react-force-graph.
 
+**Figure 2. Conceptual KG model**
+
+```mermaid
+graph LR
+  Hadith -->|HAS_CHAIN| Chain
+  Chain -->|STEP| Narrator
+  Hadith -->|FROM_SOURCE| Source
+  Hadith -->|HAS_MATN| Matn
+  Hadith -->|GRADED| Grade
+  Grade -->|BY| Scholar
+  Hadith -->|TAGGED| Tag
+  Hadith -->|IDENTIFIED_AS| Identifier
+```
+
+**Figure 3. RAG pipeline**
+
+```mermaid
+graph LR
+  Question --> Api[POST /api/rag/query]
+  Api --> Retrieve[retrieveHadithForQuestion (rag/retriever.ts)]
+  Retrieve --> Generate[generateRagAnswer (rag/generator.ts)]
+  Generate --> Validate[parseAndValidateAnswer (rag/generator.ts)]
+  Validate --> Log[logRagInteraction (rag_logs)]
+```
+
 ## Key Commands
 - `npm run dev` — start Next.js in dev.
 - `npm run graph:sync` — full Neo4j rebuild from Postgres.
