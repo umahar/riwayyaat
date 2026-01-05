@@ -1,3 +1,5 @@
+import type { GraphApiEdge, GraphApiNode } from "@/server/graph/types";
+
 export type RagFilters = {
   sourceId?: number;
   bookId?: number;
@@ -34,6 +36,11 @@ export type RagCitation = {
   hadithId: number;
   displayNumber: string | null;
   source: string;
+};
+
+export type RagGraph = {
+  nodes: GraphApiNode[];
+  edges: GraphApiEdge[];
 };
 
 export type RagContextEntry = {

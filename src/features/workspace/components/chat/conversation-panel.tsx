@@ -27,7 +27,7 @@ export function ConversationPanel({
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const shouldAutoScrollRef = useRef(true);
-  const [graphHadithId, setGraphHadithId] = useState<number | null>(null);
+  const [activeGraph, setActiveGraph] = useState<ChatMessage["graph"] | null>(null);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -87,7 +87,8 @@ export function ConversationPanel({
                       type="button"
                       className="rounded-full border border-[var(--border-soft)] bg-[var(--surface-card)] px-2 py-1 text-xs text-[var(--text-primary)] shadow-sm transition hover:-translate-y-0.5"
                       title="View graph"
-                      onClick={() => setGraphHadithId(message.citations?.[0]?.hadithId ?? null)}
+                      onClick={() => setActiveGraph(message.graph ?? null)}
+                      disabled={!message.graph}
                     >
                       <svg
                         aria-hidden="true"
@@ -135,9 +136,9 @@ export function ConversationPanel({
         <div ref={bottomRef} />
       </div>
       <AnswerGraphModal
-        hadithId={graphHadithId}
-        open={graphHadithId !== null}
-        onClose={() => setGraphHadithId(null)}
+        graph={activeGraph ?? null}
+        open={activeGraph !== null}
+        onClose={() => setActiveGraph(null)}
       />
       <footer className="border-t border-[var(--border-soft)] px-8 py-5">
         <form className="flex gap-3" onSubmit={handleSubmit}>

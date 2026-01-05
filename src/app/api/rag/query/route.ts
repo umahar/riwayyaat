@@ -4,6 +4,7 @@ import { generateRagAnswer } from "@/server/rag/generator";
 import { buildRagContext } from "@/server/rag/context";
 import { inferRagIntent } from "@/server/rag/intent";
 import { loadGraphContext } from "@/server/rag/graph-context";
+import { retrieveHadithForQuestionKg } from "@/server/rag/kg-retriever";
 import { findHadithIdBySourceAndNumber, findSourcesByName } from "@/server/rag/hadith-lookup";
 import {
   findExactNarratorByName,
@@ -12,7 +13,7 @@ import {
   getNarratorDetailsByName,
 } from "@/server/rag/narrator";
 import { extractStructuredFilters, searchHadithIdsByQuery } from "@/server/rag/search";
-import { fetchNarratorNetwork, fetchVariants } from "@/server/graph/queries";
+import { fetchAnswerGraph, fetchNarratorNetwork, fetchVariants } from "@/server/graph/queries";
 import { getHadithById, getHadithByIds } from "@/features/hadith/server/hadith-service";
 import { HadithInsight } from "@/features/hadith/types";
 import { RagCitation, RagFilters } from "@/types/rag";
@@ -90,6 +91,18 @@ function formatNarratorNetworkAnswer(
   const list = narrators.slice(0, 25).join(", ");
   const suffix = narrators.length > 25 ? " (truncated)" : "";
   return `Narrators connected to ${narratorName} within ${depth} hops: ${list}${suffix}.`;
+}
+
+async function buildAnswerGraph(citations?: RagCitation[]) {
+  if (!citations?.length) return null;
+  const ids = citations.map((citation) => citation.hadithId).filter((id) => Number.isFinite(id));
+  if (!ids.length) return null;
+  try {
+    return await fetchAnswerGraph(ids);
+  } catch (error) {
+    console.warn("[rag] Unable to load answer graph", error);
+    return null;
+  }
 }
 
 function formatNarratorDetails(
@@ -442,6 +455,7 @@ export async function POST(request: NextRequest) {
       const graphMap = await loadGraphContext([intent.hadithId], 1);
       const context = buildRagContext(results, hadithMap, graphMap);
       const answer = await generateRagAnswer({ question, results, context });
+      const graph = await buildAnswerGraph(answer.citations);
       await logRagInteraction({
         question,
         filters,
@@ -456,6 +470,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         answer: answer.answer,
         citations: answer.citations,
+        graph,
         retrieved: results,
       });
     }
@@ -518,6 +533,7 @@ export async function POST(request: NextRequest) {
           const graphMap = await loadGraphContext([hadithId], 1);
           const context = buildRagContext(results, hadithMap, graphMap);
           const answer = await generateRagAnswer({ question, results, context });
+          const graph = await buildAnswerGraph(answer.citations);
           await logRagInteraction({
             question,
             filters,
@@ -532,6 +548,7 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({
             answer: answer.answer,
             citations: answer.citations,
+            graph,
             retrieved: results,
           });
         }
@@ -551,6 +568,7 @@ export async function POST(request: NextRequest) {
         const graphMap = await loadGraphContext(structuredIds, MAX_GRAPH_CONTEXT);
         const context = buildRagContext(results, hadithMap, graphMap);
         const answer = await generateRagAnswer({ question, results, context });
+        const graph = await buildAnswerGraph(answer.citations);
         await logRagInteraction({
           question,
           filters,
@@ -565,12 +583,20 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           answer: answer.answer,
           citations: answer.citations,
+          graph,
           retrieved: results,
         });
       }
     }
 
-    const results = await retrieveHadithForQuestion({ question, ...filters, limit });
+    const kgResults = await retrieveHadithForQuestionKg({
+      question,
+      limit,
+      model: process.env.EMBEDDING_MODEL,
+      filters,
+    });
+    const results =
+      kgResults.length > 0 ? kgResults : await retrieveHadithForQuestion({ question, ...filters, limit });
 
     if (!results.length) {
       const structuredIds = await searchHadithIdsByQuery({
@@ -585,6 +611,7 @@ export async function POST(request: NextRequest) {
         const graphMap = await loadGraphContext(structuredIds, MAX_GRAPH_CONTEXT);
         const context = buildRagContext(structuredResults, structuredMap, graphMap);
         const answer = await generateRagAnswer({ question, results: structuredResults, context });
+        const graph = await buildAnswerGraph(answer.citations);
         await logRagInteraction({
           question,
           filters,
@@ -599,6 +626,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           answer: answer.answer,
           citations: answer.citations,
+          graph,
           retrieved: structuredResults,
         });
       }
@@ -624,6 +652,7 @@ export async function POST(request: NextRequest) {
     const graphMap = await loadGraphContext(detailIds, MAX_GRAPH_CONTEXT);
     const context = buildRagContext(results, hadithMap, graphMap);
     const answer = await generateRagAnswer({ question, results, context });
+    const graph = await buildAnswerGraph(answer.citations);
 
     await logRagInteraction({
       question,
@@ -640,6 +669,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       answer: answer.answer,
       citations: answer.citations,
+      graph,
       retrieved: results, // include for now; can be trimmed in production
     });
   } catch (error) {

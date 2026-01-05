@@ -63,6 +63,24 @@ const addRel = (rels: RelMap, rel: GraphRelationship) => {
   if (!rels.has(key)) rels.set(key, rel);
 };
 
+const DEFAULT_EMBEDDING_MODEL = process.env.EMBEDDING_MODEL || "text-embedding-3-small";
+
+const parseEmbedding = (value: unknown): number[] | null => {
+  if (!value) return null;
+  if (Array.isArray(value)) return value.map((v) => Number(v)).filter((n) => Number.isFinite(n));
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        return parsed.map((v) => Number(v)).filter((n) => Number.isFinite(n));
+      }
+    } catch {
+      return null;
+    }
+  }
+  return null;
+};
+
 export async function enqueueHadithSync(
   hadithId: number,
   opts: { graph?: boolean; embedding?: boolean } = {},
@@ -186,6 +204,7 @@ async function fetchGraphDataForHadith(client: PoolClient, hadithId: number) {
     chainNarrators,
     hadithTags,
     hadithGrades,
+    embeddings,
   ] = await Promise.all([
     client.query<{ id: number; name: string; author_id: number | null }>("SELECT id, name, author_id FROM source"),
     client.query<{ id: number; name: string; lifespan_label: string | null }>("SELECT id, name, lifespan_label FROM author"),
@@ -341,6 +360,10 @@ async function fetchGraphDataForHadith(client: PoolClient, hadithId: number) {
       "SELECT hadith_id, grade_id, scholar_id, is_primary, notes FROM hadith_grade WHERE hadith_id = $1",
       [hadithId],
     ),
+    client.query<{ embedding: unknown; model: string }>(
+      "SELECT embedding, model FROM hadith_embedding WHERE hadith_id = $1 AND model = $2",
+      [hadithId, DEFAULT_EMBEDDING_MODEL],
+    ),
   ]);
 
   if (hadithRows.rowCount === 0) {
@@ -456,6 +479,7 @@ async function fetchGraphDataForHadith(client: PoolClient, hadithId: number) {
     matnMap.set(row.id, matn);
   });
 
+  const embeddingVector = parseEmbedding(embeddings.rows[0]?.embedding ?? null);
   const hadithNode = {
     pgId: hadith.id,
     number: hadith.number,
@@ -467,6 +491,12 @@ async function fetchGraphDataForHadith(client: PoolClient, hadithId: number) {
     matnPreview: hadith.matn_text?.slice(0, 200) ?? null,
     location: hadith.location,
     sanad: hadith.sanad,
+    ...(embeddingVector
+      ? {
+          embedding: embeddingVector,
+          embeddingModel: embeddings.rows[0]?.model ?? undefined,
+        }
+      : {}),
   };
   addNode(nodes, mapHadithToNode(hadithNode));
 
@@ -720,11 +750,11 @@ export async function processHadithSyncBatch(limit = 50) {
 
     for (const row of rows) {
       try {
-        if (row.needs_graph) {
-          await syncGraphForHadith(row.hadith_id);
-        }
         if (row.needs_embedding) {
           await embedHadithBatch([row.hadith_id]);
+        }
+        if (row.needs_graph || row.needs_embedding) {
+          await syncGraphForHadith(row.hadith_id);
         }
         await client.query(
           `

@@ -129,6 +129,8 @@ export type HadithNodeProps = {
   matnPreview?: string | null;
   location?: string | null;
   sanad?: string | null;
+  embedding?: number[];
+  embeddingModel?: string | null;
 };
 
 export type MatnNodeProps = {

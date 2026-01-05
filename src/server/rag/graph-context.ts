@@ -12,7 +12,11 @@ function buildChainSummary(graph?: { nodes: GraphApiNode[]; edges: GraphApiEdge[
   const nodeLabels = new Map(graph.nodes.map((node) => [node.id, node.label]));
   const steps = graph.edges
     .filter((edge) => edge.type === "STEP")
-    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+    .sort((a, b) => {
+      const aPos = typeof a.position === "number" ? a.position : Number(a.position ?? 0);
+      const bPos = typeof b.position === "number" ? b.position : Number(b.position ?? 0);
+      return aPos - bPos;
+    })
     .map((edge) => nodeLabels.get(edge.to))
     .filter(Boolean) as string[];
   return steps;

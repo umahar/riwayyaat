@@ -1,11 +1,12 @@
 import { useCallback, useState } from "react";
-import { RagCitation } from "@/types/rag";
+import { RagCitation, RagGraph } from "@/types/rag";
 
 export type ChatMessage = {
   id: string;
   role: "user" | "assistant";
   content: string;
   citations?: RagCitation[];
+  graph?: RagGraph;
   timestamp: string;
 };
 
@@ -46,6 +47,7 @@ export function useRagChat(initialMessages: ChatMessage[] = []) {
         const payload = (await response.json().catch(() => ({}))) as {
           answer?: string;
           citations?: RagCitation[];
+          graph?: RagGraph;
           error?: string;
         };
         if (!response.ok || payload.error) {
@@ -56,6 +58,7 @@ export function useRagChat(initialMessages: ChatMessage[] = []) {
           role: "assistant",
           content: payload.answer ?? "No answer available.",
           citations: payload.citations ?? [],
+          graph: payload.graph,
           timestamp: new Date().toLocaleTimeString(),
         };
         setMessages((prev) => [...prev, assistantMessage]);

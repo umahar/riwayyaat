@@ -198,3 +198,95 @@ export async function fetchNarratorNetwork(narratorId: number, depth: number) {
     await session.close();
   }
 }
+
+export async function fetchAnswerGraph(hadithIds: number[]) {
+  const filtered = hadithIds.filter((id) => Number.isFinite(id) && id > 0);
+  if (!filtered.length) return null;
+  const session = getSession({ defaultAccessMode: "READ" });
+  try {
+    const result = await session.run(
+      `
+        MATCH (h:Hadith)
+        WHERE h.pgId IN $hadithIds
+        OPTIONAL MATCH (h)-[r]->(n)
+        WHERE NOT n:Chain AND NOT n:Narrator
+        OPTIONAL MATCH (n)-[r2]->(m)
+        WHERE (n:Grade AND m:Scholar)
+           OR (n:Source AND m:Author)
+           OR (n:Book AND m:Source)
+           OR (n:Chapter AND m:Book)
+        RETURN h, r, n, r2, m
+      `,
+      { hadithIds: filtered },
+    );
+
+    if (result.records.length === 0) {
+      return null;
+    }
+
+    const nodesMap = new Map<string, GraphApiNode>();
+    const edgesMap = new Map<string, GraphApiEdge>();
+
+    const addNode = (id: string, label: string, type: string) => {
+      if (!nodesMap.has(id)) nodesMap.set(id, { id, label, type });
+    };
+    const addEdge = (id: string, from: string, to: string, type: string, extra?: Record<string, unknown>) => {
+      if (!edgesMap.has(id)) edgesMap.set(id, { id, from, to, type, ...(extra ?? {}) });
+    };
+
+    for (const record of result.records) {
+      const h = record.get("h");
+      const n = record.get("n");
+      const m = record.get("m");
+      const r = record.get("r");
+      const r2 = record.get("r2");
+
+      if (h) {
+        const id = h.properties.key || `Hadith:${h.properties.pgId}`;
+        const label = h.properties.displayLabel ?? `Hadith ${h.properties.pgId}`;
+        addNode(id, label, "Hadith");
+      }
+      if (n) {
+        const label = n.labels?.[0] ?? "Node";
+        const id = n.properties.key || `${label}:${n.properties.pgId ?? n.identity?.toString()}`;
+        const display =
+          n.properties.name ||
+          n.properties.title ||
+          n.properties.identifier ||
+          n.properties.label ||
+          label;
+        addNode(id, display ?? label, label);
+      }
+      if (m) {
+        const label = m.labels?.[0] ?? "Node";
+        const id = m.properties.key || `${label}:${m.properties.pgId ?? m.identity?.toString()}`;
+        const display =
+          m.properties.name ||
+          m.properties.title ||
+          m.properties.identifier ||
+          m.properties.label ||
+          label;
+        addNode(id, display ?? label, label);
+      }
+      if (r && h && n) {
+        const from = h.properties.key || `Hadith:${h.properties.pgId}`;
+        const to = n.properties.key || `${n.labels?.[0] ?? "Node"}:${n.properties.pgId ?? n.identity?.toString()}`;
+        const eid = r.identity ? r.identity.toString() : `${from}->${to}:${r.type}`;
+        addEdge(eid, from, to, r.type);
+      }
+      if (r2 && n && m) {
+        const from = n.properties.key || `${n.labels?.[0] ?? "Node"}:${n.properties.pgId ?? n.identity?.toString()}`;
+        const to = m.properties.key || `${m.labels?.[0] ?? "Node"}:${m.properties.pgId ?? m.identity?.toString()}`;
+        const eid = r2.identity ? r2.identity.toString() : `${from}->${to}:${r2.type}`;
+        addEdge(eid, from, to, r2.type);
+      }
+    }
+
+    return {
+      nodes: Array.from(nodesMap.values()),
+      edges: Array.from(edgesMap.values()),
+    };
+  } finally {
+    await session.close();
+  }
+}
