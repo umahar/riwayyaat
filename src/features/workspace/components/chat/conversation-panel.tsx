@@ -1,8 +1,9 @@
 "use client";
 
-import { FormEvent } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { workspaceCopy } from "@/content/text";
 import { ChatMessage } from "@/features/workspace/hooks/use-rag-chat";
+import { AnswerGraphModal } from "@/features/workspace/components/chat/answer-graph-modal";
 
 type ConversationPanelProps = {
   messages: ChatMessage[];
@@ -23,11 +24,29 @@ export function ConversationPanel({
   onSend,
   onCitationSelect,
 }: ConversationPanelProps) {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const shouldAutoScrollRef = useRef(true);
+  const [graphHadithId, setGraphHadithId] = useState<number | null>(null);
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     onSend();
   };
   const copy = workspaceCopy.conversation;
+
+  const handleScroll = () => {
+    const container = scrollRef.current;
+    if (!container) return;
+    const threshold = 48;
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    shouldAutoScrollRef.current = distanceFromBottom <= threshold;
+  };
+
+  useEffect(() => {
+    if (!shouldAutoScrollRef.current) return;
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages.length, loading, error]);
 
   return (
     <div className="relative flex max-h-svh flex-col border-r border-[var(--border-soft)] bg-[var(--background)]">
@@ -35,7 +54,11 @@ export function ConversationPanel({
         <h2 className="text-lg font-semibold text-[var(--text-primary)]">{copy.title}</h2>
         <p className="text-sm text-[var(--text-muted)]">{copy.description}</p>
       </header>
-      <div className="scrollbar-hide flex-1 space-y-5 overflow-y-auto px-8 py-6">
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="scrollbar-hide flex-1 space-y-5 overflow-y-auto px-8 py-6"
+      >
         {error && (
           <div className="rounded-xl border border-red-400/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
             {error}
@@ -60,6 +83,28 @@ export function ConversationPanel({
                 {message.citations && message.citations.length > 0 ? (
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-semibold text-[var(--text-secondary)]">Sources</span>
+                    <button
+                      type="button"
+                      className="rounded-full border border-[var(--border-soft)] bg-[var(--surface-card)] px-2 py-1 text-xs text-[var(--text-primary)] shadow-sm transition hover:-translate-y-0.5"
+                      title="View graph"
+                      onClick={() => setGraphHadithId(message.citations?.[0]?.hadithId ?? null)}
+                    >
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 24 24"
+                        className="h-3.5 w-3.5"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <circle cx="6" cy="6" r="3" />
+                        <circle cx="18" cy="6" r="3" />
+                        <circle cx="12" cy="18" r="3" />
+                        <path d="M8.7 7.7l3 8.2M15.3 7.7l-3 8.2" />
+                      </svg>
+                    </button>
                     {message.citations.map((citation) => (
                       <button
                         key={`${citation.hadithId}-${citation.displayNumber ?? "?"}`}
@@ -87,7 +132,13 @@ export function ConversationPanel({
             Thinking…
           </div>
         )}
+        <div ref={bottomRef} />
       </div>
+      <AnswerGraphModal
+        hadithId={graphHadithId}
+        open={graphHadithId !== null}
+        onClose={() => setGraphHadithId(null)}
+      />
       <footer className="border-t border-[var(--border-soft)] px-8 py-5">
         <form className="flex gap-3" onSubmit={handleSubmit}>
           <label className="sr-only" htmlFor="workspace-input">

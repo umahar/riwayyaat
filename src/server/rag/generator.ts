@@ -6,12 +6,13 @@ try {
   /* noop for script contexts */
 }
 import OpenAI from "openai";
-import { RagResult, RagAnswer, RagCitation } from "@/types/rag";
+import { RagResult, RagAnswer, RagCitation, RagContextEntry } from "@/types/rag";
 import { DEFAULT_EMBEDDING_MODEL } from "@/server/rag/embeddings";
 
 type GenerateParams = {
   question: string;
   results: RagResult[];
+  context?: RagContextEntry[];
   model?: string; // LLM model, defaults to GPT-4.1-class
   maxTokens?: number;
   temperature?: number;
@@ -27,7 +28,8 @@ function getOpenAI(): OpenAI {
   return new OpenAI({ apiKey });
 }
 
-function formatContext(results: RagResult[]) {
+function formatContext(results: RagResult[], override?: RagContextEntry[]) {
+  if (override && override.length) return override;
   // Provide lean, citation-ready context. Avoid speculation; stick to matn, source, and basic metadata.
   return results.map((r) => ({
     hadithId: r.hadithId,
@@ -54,6 +56,7 @@ You are a hadith reference assistant. Follow these strict rules:
 - Do NOT fabricate narrations, grades, chains, or scholar statements.
 - Be concise, respectful, and neutral.
 - Every statement that references a narration must include a citation with source and display number.
+- If graph context is provided, you may summarize it, but only when it is tied to a cited hadith.
 - If you are unsure, respond with a cautious fallback and no speculation.
 
 Output format (JSON-safe):
@@ -116,7 +119,7 @@ export async function generateRagAnswer(params: GenerateParams): Promise<RagAnsw
   const maxTokens = params.maxTokens ?? 400;
   const temperature = params.temperature ?? 0.2;
 
-  const context = formatContext(results);
+  const context = formatContext(results, params.context);
   const allowedIds = new Set(results.map((r) => r.hadithId));
 
   const openai = getOpenAI();
@@ -134,6 +137,13 @@ export async function generateRagAnswer(params: GenerateParams): Promise<RagAnsw
   if (!content.trim()) return safeFallback();
 
   const parsed = parseAndValidateAnswer(content, allowedIds);
+  if (
+    process.env.RAG_DEBUG_RAW === "true" &&
+    parsed.citations.length === 0 &&
+    parsed.answer === SAFETY_FALLBACK
+  ) {
+    console.warn("[rag] Raw model output failed validation:", content);
+  }
   return {
     ...parsed,
     modelUsed: model,

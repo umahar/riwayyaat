@@ -97,6 +97,12 @@ export async function getHadithById(id: string): Promise<HadithInsight | null> {
   return record ?? null;
 }
 
+export async function getHadithByIds(ids: number[]): Promise<HadithInsight[]> {
+  const unique = Array.from(new Set(ids.filter((id) => Number.isFinite(id) && id > 0)));
+  if (unique.length === 0) return [];
+  return fetchHadiths("WHERE h.id = ANY($1::int[])", [unique]);
+}
+
 async function fetchHadiths(whereClause = "", params: unknown[] = []): Promise<HadithInsight[]> {
   const client = await getClient();
   try {
@@ -434,4 +440,5 @@ function mapNarrationLevelSlug(value?: string | null): NarrationLevel {
 export const hadithService = {
   listHadithInsights,
   getHadithById,
+  getHadithByIds,
 };

@@ -190,6 +190,105 @@ export async function retrieveHadithForQuestion(params: RagRetrievalParams): Pro
   }
 }
 
+export async function retrieveHadithByIds(ids: number[]): Promise<RagResult[]> {
+  const unique = Array.from(new Set(ids.filter((id) => Number.isFinite(id) && id > 0)));
+  if (!unique.length) return [];
+
+  const client = await getClient();
+  try {
+    const sql = `
+      SELECT
+        h.id,
+        h.display_number,
+        h.display_number AS display_label,
+        h.number,
+        h.source_id,
+        s.name AS source_name,
+        h.book_id,
+        b.name AS book_name,
+        b.number AS book_number,
+        h.chapter_id,
+        c.name AS chapter_name,
+        c.number AS chapter_number,
+        m.text_en AS matn,
+        array_remove(array_agg(DISTINCT t.name), NULL) AS tags,
+        json_agg(DISTINCT jsonb_build_object(
+          'grade', jsonb_build_object(
+            'id', g.id,
+            'title', g.name,
+            'description', g.description,
+            'backgroundColor', g.background_color,
+            'textColor', g.text_color
+          ),
+          'scholar', jsonb_build_object(
+            'id', sc.id,
+            'name', sc.name,
+            'lifespan', sc.lifespan_label
+          ),
+          'isPrimary', hg.is_primary
+        )) FILTER (WHERE g.id IS NOT NULL) AS grades
+      FROM hadith h
+      JOIN matn m ON m.id = h.matn_id
+      JOIN source s ON s.id = h.source_id
+      LEFT JOIN book b ON b.id = h.book_id
+      LEFT JOIN chapter c ON c.id = h.chapter_id
+      LEFT JOIN hadith_tag ht ON ht.hadith_id = h.id
+      LEFT JOIN tag t ON t.id = ht.tag_id
+      LEFT JOIN hadith_grade hg ON hg.hadith_id = h.id
+      LEFT JOIN grade g ON g.id = hg.grade_id
+      LEFT JOIN scholar sc ON sc.id = hg.scholar_id
+      WHERE h.id = ANY($1::int[]) AND h.deleted_at IS NULL
+      GROUP BY h.id, h.display_number, h.number, h.source_id, s.name,
+               h.book_id, b.name, b.number, h.chapter_id, c.name, c.number,
+               m.text_en
+      ORDER BY h.id
+    `;
+
+    const { rows } = await client.query<{
+      id: number;
+      display_number: string | null;
+      display_label: string | null;
+      number: number;
+      source_id: number;
+      source_name: string;
+      book_id: number | null;
+      book_name: string | null;
+      book_number: number | null;
+      chapter_id: number | null;
+      chapter_name: string | null;
+      chapter_number: number | null;
+      matn: string;
+      tags: string[] | null;
+      grades: Array<{
+        grade: { id: number; title: string; description: string | null; backgroundColor: string | null; textColor: string | null };
+        scholar: { id: number; name: string; lifespan: string | null };
+        isPrimary: boolean | null;
+      }> | null;
+    }>(sql, [unique]);
+
+    return rows.map((row) => ({
+      hadithId: row.id,
+      displayNumber: row.display_number,
+      displayLabel: row.display_label ?? row.display_number,
+      source: { id: row.source_id, name: row.source_name },
+      book:
+        row.book_id != null
+          ? { id: row.book_id, name: row.book_name, number: row.book_number }
+          : undefined,
+      chapter:
+        row.chapter_id != null
+          ? { id: row.chapter_id, name: row.chapter_name, number: row.chapter_number }
+          : undefined,
+      matn: row.matn,
+      tags: row.tags ?? [],
+      grades: (row.grades ?? []).filter(Boolean),
+      similarity: 1,
+    }));
+  } finally {
+    client.release();
+  }
+}
+
 /**
  * How to use (example for future API route):
  *
