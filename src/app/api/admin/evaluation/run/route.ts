@@ -10,16 +10,22 @@ export async function POST(request: NextRequest) {
     const num = Number(value);
     return Number.isFinite(num) && num > 0 ? Math.trunc(num) : undefined;
   };
-  const datasetPath = typeof (body as { datasetPath?: unknown }).datasetPath === "string" ? (body as { datasetPath?: string }).datasetPath : undefined;
+  const datasetPath =
+    typeof (body as { datasetPath?: unknown }).datasetPath === "string"
+      ? (body as { datasetPath?: string }).datasetPath
+      : undefined;
   const limit = asNumber((body as { limit?: unknown }).limit);
   const topK = asNumber((body as { topK?: unknown }).topK);
   const skipAnswers = Boolean((body as { skipAnswers?: unknown }).skipAnswers);
+  const retrievalModeRaw = (body as { retrievalMode?: unknown }).retrievalMode;
+  const retrievalMode = retrievalModeRaw === "pg" || retrievalModeRaw === "kg" ? retrievalModeRaw : "kg";
   try {
     const result = await runEvaluation({
       limit,
       topK,
       datasetPath,
       generateAnswers: skipAnswers ? false : undefined,
+      retrievalMode,
     });
     return NextResponse.json({ data: result });
   } catch (error) {

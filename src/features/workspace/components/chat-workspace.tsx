@@ -17,7 +17,7 @@ type ChatWorkspaceProps = {
 };
 
 export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) {
-  const { messages, isLoading, error, submitQuestion } = useRagChat();
+  const { messages, isLoading, error, submitQuestion, resultHadithIds } = useRagChat();
   const [input, setInput] = useState("");
   const [selectedHadithId, setSelectedHadithId] = useState<string | null>(null);
   const [selectedGradings, setSelectedGradings] = useState<Set<string>>(
@@ -76,26 +76,32 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
   const { data: hadithData, loading: hadithLoading, error: hadithError, refresh: refreshHadith } =
     useHadithData();
 
+  const scopedHadithData = useMemo(() => {
+    if (!resultHadithIds) return hadithData;
+    const ids = new Set(resultHadithIds);
+    return hadithData.filter((hadith) => ids.has(hadith.id));
+  }, [hadithData, resultHadithIds]);
+
   const hadithMap = useMemo(() => {
-    return hadithData.reduce<Record<string, HadithInsight>>((acc, hadith) => {
+    return scopedHadithData.reduce<Record<string, HadithInsight>>((acc, hadith) => {
       acc[hadith.id] = hadith;
       return acc;
     }, {});
-  }, [hadithData]);
+  }, [scopedHadithData]);
 
   const gradingOptions = useMemo(
-    () => Array.from(new Set(hadithData.map((hadith) => hadith.details.grading))),
-    [hadithData],
+    () => Array.from(new Set(scopedHadithData.map((hadith) => hadith.details.grading))),
+    [scopedHadithData],
   );
 
   const bookOptions = useMemo(
-    () => Array.from(new Set(hadithData.map((hadith) => hadith.details.book))),
-    [hadithData],
+    () => Array.from(new Set(scopedHadithData.map((hadith) => hadith.details.book))),
+    [scopedHadithData],
   );
 
   const sourceOptions = useMemo(
-    () => Array.from(new Set(hadithData.map((hadith) => hadith.details.source))),
-    [hadithData],
+    () => Array.from(new Set(scopedHadithData.map((hadith) => hadith.details.source))),
+    [scopedHadithData],
   );
 
   const toggleSetValue = useCallback(
@@ -154,7 +160,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
 
   const filteredHadiths = useMemo(
     () =>
-      hadithData.filter((hadith) => {
+      scopedHadithData.filter((hadith) => {
         if (
           selectedGradings.size > 0 &&
           !selectedGradings.has(hadith.details.grading)
@@ -172,7 +178,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
         }
         return true;
       }),
-    [hadithData, selectedGradings, selectedBooks, selectedSources],
+    [scopedHadithData, selectedGradings, selectedBooks, selectedSources],
   );
 
   const visibleHadithIds = useMemo(
@@ -318,7 +324,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
         activeHadithId={activeHadithId}
         onSelectHadith={handleSelectHadith}
         filterGroups={filterGroups}
-        loading={hadithLoading}
+        loading={hadithLoading || isLoading}
         error={hadithError}
         onRetry={refreshHadith}
       />

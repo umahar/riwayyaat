@@ -19,6 +19,7 @@ export function useRagChat(initialMessages: ChatMessage[] = []) {
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resultHadithIds, setResultHadithIds] = useState<string[] | null>(null);
 
   const submitQuestion = useCallback(
     async (question: string, options: SubmitOptions = {}) => {
@@ -34,6 +35,7 @@ export function useRagChat(initialMessages: ChatMessage[] = []) {
       setMessages((prev) => [...prev, userMessage]);
       setIsLoading(true);
       setError(null);
+      setResultHadithIds(null);
       try {
         const response = await fetch("/api/rag/query", {
           method: "POST",
@@ -48,11 +50,16 @@ export function useRagChat(initialMessages: ChatMessage[] = []) {
           answer?: string;
           citations?: RagCitation[];
           graph?: RagGraph;
+          retrieved?: Array<{ hadithId: number }>;
           error?: string;
         };
         if (!response.ok || payload.error) {
           throw new Error(payload.error ?? `Request failed (${response.status})`);
         }
+        const retrievedIds = Array.isArray(payload.retrieved)
+          ? payload.retrieved.map((item) => String(item.hadithId))
+          : payload.citations?.map((citation) => String(citation.hadithId)) ?? [];
+        setResultHadithIds(retrievedIds);
         const assistantMessage: ChatMessage = {
           id: `assistant-${Date.now()}`,
           role: "assistant",
@@ -65,6 +72,7 @@ export function useRagChat(initialMessages: ChatMessage[] = []) {
       } catch (err) {
         console.error("[useRagChat] Failed to fetch answer", err);
         setError("Could not load an answer. Please try again.");
+        setResultHadithIds([]);
         const assistantMessage: ChatMessage = {
           id: `assistant-${Date.now()}`,
           role: "assistant",
@@ -84,12 +92,14 @@ export function useRagChat(initialMessages: ChatMessage[] = []) {
     setMessages([]);
     setError(null);
     setIsLoading(false);
+    setResultHadithIds(null);
   }, []);
 
   return {
     messages,
     isLoading,
     error,
+    resultHadithIds,
     submitQuestion,
     reset,
   };

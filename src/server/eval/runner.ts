@@ -14,6 +14,7 @@ import type {
 } from "@/types/evaluation";
 import type { RagResult } from "@/types/rag";
 import { retrieveHadithForQuestion } from "@/server/rag/retriever";
+import { retrieveHadithForQuestionKg } from "@/server/rag/kg-retriever";
 import { generateRagAnswer } from "@/server/rag/generator";
 import { loadEvaluationDataset } from "@/server/eval/dataset";
 import { fetchHadithCoverage, summarizeCoverage, summarizeCoverageForQuery, HadithCoverageRow } from "@/server/eval/kg";
@@ -24,6 +25,7 @@ type RunEvaluationOptions = {
   topK?: number;
   generateAnswers?: boolean;
   answerContextLimit?: number;
+  retrievalMode?: "kg" | "pg";
 };
 
 function emptyMetrics(): EvaluationQueryMetrics {
@@ -115,12 +117,22 @@ export async function runEvaluation(options: RunEvaluationOptions = {}): Promise
         limit: topK,
         ...queryConfig.filters,
       });
-      retrieved.forEach((row) => coverageSet.add(row.hadithId));
+      const retrievedKg =
+        options.retrievalMode === "pg"
+          ? []
+          : await retrieveHadithForQuestionKg({
+              question: queryConfig.question,
+              limit: topK,
+              filters: queryConfig.filters,
+            });
+      const retrievedFinal =
+        options.retrievalMode === "pg" ? retrieved : retrievedKg.length ? retrievedKg : retrieved;
+      retrievedFinal.forEach((row) => coverageSet.add(row.hadithId));
 
       let answerSummary: EvaluationAnswerSummary | undefined;
-      if (answersEnabled && retrieved.length) {
+      if (answersEnabled && retrievedFinal.length) {
         try {
-          const context = retrieved.slice(0, answerContextLimit);
+          const context = retrievedFinal.slice(0, answerContextLimit);
           const answer = await generateRagAnswer({ question: queryConfig.question, results: context });
           answerSummary = { text: answer.answer, citations: answer.citations };
         } catch (error) {
@@ -130,7 +142,7 @@ export async function runEvaluation(options: RunEvaluationOptions = {}): Promise
         }
       }
 
-      const metrics = computeQueryMetrics(retrieved, queryConfig.relevantHadithIds, answerSummary?.citations);
+      const metrics = computeQueryMetrics(retrievedFinal, queryConfig.relevantHadithIds, answerSummary?.citations);
       queryResults.push({
         id: queryConfig.id,
         question: queryConfig.question,
@@ -138,7 +150,7 @@ export async function runEvaluation(options: RunEvaluationOptions = {}): Promise
         relevantHadithIds: queryConfig.relevantHadithIds,
         filters: queryConfig.filters,
         metrics,
-        retrieved: retrieved.map((row, index) => mapResultToHit(row, index + 1, relevantSet)),
+        retrieved: retrievedFinal.map((row, index) => mapResultToHit(row, index + 1, relevantSet)),
         answer: answerSummary,
         warnings: perQueryWarnings.length ? perQueryWarnings : undefined,
       });

@@ -8,12 +8,14 @@ type RunOptions = {
   limit: string;
   topK: string;
   skipAnswers: boolean;
+  retrievalMode: "kg" | "pg";
 };
 
 const DEFAULT_OPTIONS: RunOptions = {
   limit: "",
   topK: "20",
   skipAnswers: false,
+  retrievalMode: "kg",
 };
 
 function formatDecimal(value: number | null, digits = 2) {
@@ -119,6 +121,7 @@ export function EvaluationDashboard() {
           limit: options.limit ? Number(options.limit) : undefined,
           topK: options.topK ? Number(options.topK) : undefined,
           skipAnswers: options.skipAnswers,
+          retrievalMode: options.retrievalMode,
         }),
       });
       const body = (await payload.json().catch(() => ({}))) as { data?: EvaluationRunSummary; error?: string };
@@ -188,6 +191,33 @@ export function EvaluationDashboard() {
             />
             Skip answer generation (compute retrieval metrics only)
           </label>
+          <div className="flex flex-col gap-2 text-sm text-[var(--text-secondary)]">
+            <span className="text-xs uppercase tracking-[0.2em] text-[var(--text-subtle)]">Retrieval mode</span>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setOptions((prev) => ({ ...prev, retrievalMode: "kg" }))}
+                className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                  options.retrievalMode === "kg"
+                    ? "bg-[var(--accent-emerald)] text-[var(--accent-contrast)]"
+                    : "border border-[var(--border-soft)] text-[var(--text-secondary)]"
+                }`}
+              >
+                KG (Neo4j)
+              </button>
+              <button
+                type="button"
+                onClick={() => setOptions((prev) => ({ ...prev, retrievalMode: "pg" }))}
+                className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                  options.retrievalMode === "pg"
+                    ? "bg-[var(--accent-emerald)] text-[var(--accent-contrast)]"
+                    : "border border-[var(--border-soft)] text-[var(--text-secondary)]"
+                }`}
+              >
+                Postgres (pgvector)
+              </button>
+            </div>
+          </div>
         </div>
         <div className="flex flex-col justify-between gap-3 rounded-2xl border border-dashed border-[var(--border-soft)] p-4 text-sm text-[var(--text-secondary)]">
           <p>
