@@ -9,6 +9,7 @@ import { findHadithIdBySourceAndNumber, findSourcesByName } from "@/server/rag/h
 import {
   findExactNarratorByName,
   findNarratorsByName,
+  findNarratorsByAlias,
   getNarratorDetailsById,
   getNarratorDetailsByName,
 } from "@/server/rag/narrator";
@@ -494,6 +495,24 @@ export async function POST(request: NextRequest) {
         }
         if (matches.length === 1) {
           detail = await getNarratorDetailsById(matches[0].id);
+        }
+        if (!detail) {
+          const aliasMatches = await findNarratorsByAlias(narratorDetailName);
+          if (aliasMatches.length > 1) {
+            const options = aliasMatches.map((match) => `${match.name} (ID ${match.id})`).join(", ");
+            const response = `I found multiple narrators matching "${narratorDetailName}": ${options}. Please specify the narrator id.`;
+            await logRagInteraction({
+              question,
+              filters,
+              retrievedIds: aliasMatches.map((match) => match.id),
+              response,
+              citations: [],
+            });
+            return NextResponse.json({ answer: response, citations: [] });
+          }
+          if (aliasMatches.length === 1) {
+            detail = await getNarratorDetailsById(aliasMatches[0].id);
+          }
         }
       }
       if (detail) {

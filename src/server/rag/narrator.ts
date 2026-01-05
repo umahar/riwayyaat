@@ -15,6 +15,35 @@ export type NarratorDetail = {
   methods: string[];
 };
 
+const STOPWORDS = [
+  "ibn",
+  "bin",
+  "bint",
+  "abu",
+  "umm",
+  "al",
+  "el",
+  "ibn.",
+  "bin.",
+  "bint.",
+  "abu.",
+  "umm.",
+];
+
+const normalizeNarrator = (value: string) => {
+  return value
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
+const stripStopwords = (value: string) => {
+  const tokens = normalizeNarrator(value).split(" ");
+  return tokens.filter((token) => token && !STOPWORDS.includes(token)).join(" ");
+};
+
 export async function findNarratorsByName(name: string, limit = 5): Promise<NarratorMatch[]> {
   const client = await getClient();
   try {
@@ -47,6 +76,27 @@ export async function findExactNarratorByName(name: string): Promise<NarratorMat
       [name],
     );
     return rows[0] ?? null;
+  } finally {
+    client.release();
+  }
+}
+
+export async function findNarratorsByAlias(name: string, limit = 5): Promise<NarratorMatch[]> {
+  const client = await getClient();
+  const stripped = stripStopwords(name);
+  if (!stripped) return [];
+  try {
+    const { rows } = await client.query<NarratorMatch>(
+      `
+        SELECT id, name
+        FROM narrator
+        WHERE regexp_replace(lower(name), '[^a-z0-9\\s]', ' ', 'g') ILIKE $1
+        ORDER BY length(name), name
+        LIMIT $2
+      `,
+      [`%${stripped}%`, Math.max(1, Math.min(limit, 10))],
+    );
+    return rows;
   } finally {
     client.release();
   }

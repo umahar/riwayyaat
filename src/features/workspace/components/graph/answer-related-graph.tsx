@@ -74,6 +74,15 @@ export function AnswerRelatedGraph({ data }: AnswerRelatedGraphProps) {
     graphRef.current.centerAt(0, 0, 400);
   };
 
+  const handleDownload = () => {
+    const canvas = graphRef.current?.canvas?.() ?? containerRef.current?.querySelector("canvas");
+    if (!canvas) return;
+    const link = document.createElement("a");
+    link.href = canvas.toDataURL("image/png");
+    link.download = "answer-graph.png";
+    link.click();
+  };
+
   const nodeColor = (type: string) => {
     if (type === "Hadith") return "#2563eb";
     if (type === "Tag") return "#16a34a";
@@ -87,7 +96,7 @@ export function AnswerRelatedGraph({ data }: AnswerRelatedGraphProps) {
   return (
     <div
       ref={containerRef}
-      className="relative h-80 w-full overflow-hidden rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] p-3 shadow-sm"
+      className="relative h-[26rem] w-full overflow-hidden rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-panel)] p-3 shadow-sm"
     >
       <div className="absolute right-3 top-3 z-10 flex items-center gap-2">
         <button
@@ -110,6 +119,14 @@ export function AnswerRelatedGraph({ data }: AnswerRelatedGraphProps) {
           className="rounded-full bg-[var(--surface-card)] px-2 py-1 text-xs font-semibold text-[var(--text-secondary)] shadow-sm ring-1 ring-[var(--border-soft)] transition hover:bg-[var(--surface-card)]/80"
         >
           Reset
+        </button>
+        <button
+          type="button"
+          onClick={handleDownload}
+          className="rounded-full bg-[var(--surface-card)] px-2 py-1 text-xs font-semibold text-[var(--text-secondary)] shadow-sm ring-1 ring-[var(--border-soft)] transition hover:bg-[var(--surface-card)]/80"
+          title="Download graph as PNG"
+        >
+          ⬇
         </button>
       </div>
       <ForceGraph2D
@@ -136,7 +153,7 @@ export function AnswerRelatedGraph({ data }: AnswerRelatedGraphProps) {
         linkWidth={1.6}
       />
       {hoverNode && (
-        <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-lg bg-[var(--surface-card)] px-3 py-2 text-xs text-[var(--text-primary)] shadow">
+        <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-lg bg-[var(--surface-popover)] px-3 py-2 text-xs text-[var(--text-primary)] shadow">
           <p className="font-semibold">{hoverNode.name}</p>
           <p className="text-[var(--text-muted)] capitalize">{hoverNode.type?.toLowerCase()}</p>
         </div>
