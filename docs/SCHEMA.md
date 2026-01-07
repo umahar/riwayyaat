@@ -12,6 +12,7 @@ Run the SQL files in `scripts/migrations` sequentially:
 4. `004_add_hadith_soft_delete_and_tags.sql` — soft delete + tag tables.
 5. `005_add_pgvector_and_rag_tables.sql` — `hadith_embedding`, `rag_logs`, `updated_at` + triggers (enables `vector` extension, adds 1536-dim constraint).
 6. `006_delta_sync_queue.sql` — `hadith_sync_queue` for per-hadith graph/embedding refresh.
+7. `007_add_search_indexes_and_aliases.sql` — FTS + trigram indexes, alias tables for entity linking, extended `rag_logs`.
 
 Example:
 
@@ -19,6 +20,7 @@ Example:
 psql "$DATABASE_URL" -f scripts/migrations/001_add_scholars_and_hadith_grades.sql
 # ...
 psql "$DATABASE_URL" -f scripts/migrations/006_delta_sync_queue.sql
+psql "$DATABASE_URL" -f scripts/migrations/007_add_search_indexes_and_aliases.sql
 ```
 
 ## Core tables (high level)

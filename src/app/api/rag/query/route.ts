@@ -3,6 +3,13 @@ import { retrieveHadithByIds, retrieveHadithForQuestion } from "@/server/rag/ret
 import { generateRagAnswer } from "@/server/rag/generator";
 import { buildRagContext } from "@/server/rag/context";
 import { inferRagIntent } from "@/server/rag/intent";
+import { routeRagIntent } from "@/server/rag/router";
+import {
+  parseSourceNumberFromQuestion,
+  parseSourceNumbersFromQuestion,
+  resolveSourceNumberMatch,
+  resolveSourceNumberQuestion,
+} from "@/server/rag/source-number";
 import { loadGraphContext } from "@/server/rag/graph-context";
 import { retrieveHadithForQuestionHybrid } from "@/server/rag/kg-retriever";
 import { findHadithIdBySourceAndNumber, findSourcesByName } from "@/server/rag/hadith-lookup";
@@ -17,34 +24,39 @@ import { extractStructuredFilters, searchHadithIdsByQuery } from "@/server/rag/s
 import { fetchAnswerGraph, fetchNarratorNetwork, fetchVariants } from "@/server/graph/queries";
 import { getHadithById, getHadithByIds } from "@/features/hadith/server/hadith-service";
 import { HadithInsight } from "@/features/hadith/types";
-import { RagCitation, RagFilters, RagGraph } from "@/types/rag";
+import { RagCitation, RagFilters, RagGraph, RagResult } from "@/types/rag";
 import { getClient } from "@/server/db/client";
+import { fetchHadithCoverage, summarizeCoverageForQuery } from "@/server/eval/kg";
 
 const SAFE_FALLBACK =
   "I couldn’t find enough relevant hadith in the provided context to answer that safely.";
+const SOURCE_NOT_FOUND =
+  "I couldn’t find that collection/source in the database. Please check the name and try again.";
 const REQUIRE_ID_MESSAGE =
   "Please provide a hadith id (e.g., \"Hadith ID 123\") so I can look that up.";
 const REQUIRE_NARRATOR_MESSAGE =
   "Please provide a narrator name or id (e.g., \"Narrator ID 45\" or \"connected to Abu Huraira\").";
+const HADITH_NOT_FOUND_MESSAGE =
+  "I couldn’t find that hadith number for the specified source. Please double-check the number.";
 const MAX_CONTEXT_DETAILS = 3;
 const MAX_STRUCTURED_RESULTS = 12;
 const MAX_GRAPH_CONTEXT = 2;
-const SOURCE_HINTS = [
-  "bukhari",
-  "muslim",
-  "tirmidhi",
-  "nasai",
-  "nasa'i",
-  "abu dawud",
-  "ibn majah",
-  "muwatta",
-  "malik",
-  "ahmad",
-  "bayhaqi",
-  "tabarani",
-  "darimi",
-  "hakim",
-  "mu'jam",
+const TOPIC_KEYWORDS: Array<{ key: string; terms: string[] }> = [
+  {
+    key: "ablution",
+    terms: ["ablution", "wudu", "wudhu", "wuḍū", "wudū", "wudu'", "khuff", "khuffain"],
+  },
+];
+const LIST_VERBS = ["list", "show", "give", "provide", "share", "display"];
+const LIST_NOUNS = ["hadith", "hadiths", "narration", "narrations", "reports"];
+const NARRATOR_NETWORK_KEYWORDS = [
+  "connected",
+  "connection",
+  "network",
+  "hops",
+  "hop",
+  "ego network",
+  "graph",
 ];
 
 function buildCitation(hadith: HadithInsight): RagCitation {
@@ -110,6 +122,38 @@ function formatNarratorChainDetails(hadith: HadithInsight): string {
   return `Narrators for ${label}: ${items.join("; ")}.`;
 }
 
+function formatListAnswer(hadiths: HadithInsight[], sourceLabel?: string | null): string {
+  if (!hadiths.length) return SAFE_FALLBACK;
+  const prefix = sourceLabel ? `from ${sourceLabel}` : "from your collection";
+  const items = hadiths.map((hadith, index) => {
+    const label = `${hadith.details.source} ${hadith.details.displayNumber ?? hadith.id}`;
+    const snippet = hadith.matn.split("\n").map((line) => line.trim()).find(Boolean) ?? hadith.matn;
+    const text = snippet.length > 180 ? `${snippet.slice(0, 180)}…` : snippet;
+    return `${index + 1}. ${text} (${label})`;
+  });
+  return `Here ${hadiths.length === 1 ? "is" : "are"} ${hadiths.length} hadiths ${prefix}: ${items.join(" ")}`;
+}
+
+async function fetchListHadithIds(sourceId: number | null, limit: number): Promise<number[]> {
+  const client = await getClient();
+  try {
+    const { rows } = await client.query<{ id: number }>(
+      `
+        SELECT id
+        FROM hadith
+        WHERE deleted_at IS NULL
+          AND ($1::int IS NULL OR source_id = $1)
+        ORDER BY id
+        LIMIT $2
+      `,
+      [sourceId, Math.min(Math.max(1, limit), 20)],
+    );
+    return rows.map((row) => row.id);
+  } finally {
+    client.release();
+  }
+}
+
 async function buildAnswerGraph(citations?: RagCitation[]) {
   if (!citations?.length) return null;
   const ids = citations.map((citation) => citation.hadithId).filter((id) => Number.isFinite(id));
@@ -155,6 +199,44 @@ function mergeGraphs(primary: RagGraph | null, provenance?: RagGraph | null): Ra
   };
 }
 
+function buildRetrievalScores(results: RagResult[]) {
+  return results.map((result) => ({
+    hadithId: result.hadithId,
+    similarity: result.similarity ?? null,
+    ...(result.retrieval ?? {}),
+  }));
+}
+
+async function mergeContextResults(results: RagResult[], contextIds: number[]): Promise<RagResult[]> {
+  if (!contextIds.length) return results;
+  const existing = new Set(results.map((result) => result.hadithId));
+  const missing = contextIds.filter((id) => Number.isFinite(id) && id > 0 && !existing.has(id));
+  if (!missing.length) return results;
+  const contextResults = await retrieveHadithByIds(missing);
+  return [...contextResults, ...results];
+}
+
+function buildContextDetailIds(results: RagResult[], contextIds: number[], maxDefault: number): number[] {
+  const limit = contextIds.length ? Math.min(10, Math.max(maxDefault, contextIds.length)) : maxDefault;
+  const detailIds: number[] = [];
+  const seen = new Set<number>();
+  for (const id of contextIds) {
+    if (detailIds.length >= limit) break;
+    if (!seen.has(id)) {
+      detailIds.push(id);
+      seen.add(id);
+    }
+  }
+  for (const result of results) {
+    if (detailIds.length >= limit) break;
+    if (!seen.has(result.hadithId)) {
+      detailIds.push(result.hadithId);
+      seen.add(result.hadithId);
+    }
+  }
+  return detailIds;
+}
+
 function formatNarratorDetails(
   detail: Awaited<ReturnType<typeof getNarratorDetailsById>>,
 ): string | null {
@@ -173,11 +255,11 @@ function formatNarratorDetails(
 
 function extractNarratorDetailName(question: string): string | null {
   const patterns = [
-    /tell me more about\s+([^?.!]+)$/i,
-    /tell me about\s+([^?.!]+)$/i,
-    /who is\s+([^?.!]+)$/i,
-    /information on\s+([^?.!]+)$/i,
-    /details on\s+([^?.!]+)$/i,
+    /tell me more about\s+([^?.!]+?)(?:[?.!]|$)/i,
+    /tell me about\s+([^?.!]+?)(?:[?.!]|$)/i,
+    /who is\s+([^?.!]+?)(?:[?.!]|$)/i,
+    /information on\s+([^?.!]+?)(?:[?.!]|$)/i,
+    /details on\s+([^?.!]+?)(?:[?.!]|$)/i,
   ];
   for (const pattern of patterns) {
     const match = question.match(pattern);
@@ -197,19 +279,86 @@ function formatHadithOptions(matches: HadithInsight[], label: string) {
   return `I found multiple hadiths matching ${label}: ${items.join("; ")}. Please specify the hadith id.`;
 }
 
-function parseSourceNumber(question: string): { sourceQuery: string; number: number } | null {
+function extractTopicTerms(question: string): string[] {
   const lower = question.toLowerCase();
-  for (const hint of SOURCE_HINTS) {
-    const index = lower.indexOf(hint);
-    if (index === -1) continue;
-    const tail = lower.slice(index + hint.length);
-    const match = tail.match(/\s*[:#-]?\s*(?:hadith\s*)?(?:no\.?|#)?\s*(\d+)\b/i);
-    if (!match?.[1]) continue;
-    const number = Number(match[1]);
-    if (!Number.isFinite(number) || number <= 0) continue;
-    return { sourceQuery: hint, number };
+  const matches = TOPIC_KEYWORDS.filter((topic) => topic.terms.some((term) => lower.includes(term)));
+  const unique = new Set<string>();
+  matches.forEach((topic) => topic.terms.forEach((term) => unique.add(term)));
+  return Array.from(unique);
+}
+
+function clampCount(value: number | undefined, fallback: number): number {
+  if (!value || !Number.isFinite(value)) return fallback;
+  return Math.min(20, Math.max(1, Math.trunc(value)));
+}
+
+function detectListIntent(question: string): { wantsList: boolean; count?: number } {
+  const lower = question.toLowerCase();
+  const countMatch = lower.match(/\b(\d+)\s+(?:hadith|hadiths|narrations|reports)\b/i);
+  const count = countMatch ? Number(countMatch[1]) : undefined;
+  const hasListVerb = LIST_VERBS.some((verb) => lower.includes(verb));
+  const hasHadithNoun = LIST_NOUNS.some((noun) => lower.includes(noun));
+  const wantsList = Boolean((hasListVerb && hasHadithNoun) || countMatch);
+  return { wantsList, count };
+}
+
+function extractSourceQueryFromQuestion(question: string): string | null {
+  const match = question.match(
+    /\b(?:from|in)\s+([^?.!]+?)(?:\s+(?:about|on|regarding|related to)\b|[?.!]|$)/i,
+  );
+  if (!match?.[1]) return null;
+  const cleaned = match[1].replace(/["“”]/g, "").replace(/[,:;]+$/, "").trim();
+  if (!cleaned || /\b\d+\b/.test(cleaned)) return null;
+  return cleaned;
+}
+
+function extractTopicQuery(question: string): string | null {
+  const match = question.match(
+    /\b(?:about|on|regarding|related to)\s+([^?.!]+?)(?:\s+(?:from|in|within)\b|[?.!]|$)/i,
+  );
+  if (!match?.[1]) return null;
+  const cleaned = match[1].replace(/["“”]/g, "").trim();
+  return cleaned || null;
+}
+
+function isNarratorNetworkQuestion(question: string): boolean {
+  const lower = question.toLowerCase();
+  return NARRATOR_NETWORK_KEYWORDS.some((keyword) => lower.includes(keyword));
+}
+
+async function fetchListHadithIdsWithTopic(
+  sourceId: number | null,
+  limit: number,
+  topicTerms: string[],
+): Promise<number[]> {
+  const client = await getClient();
+  try {
+    const patterns = topicTerms.map((term) => `%${term}%`);
+    const { rows } = await client.query<{ id: number }>(
+      `
+        SELECT h.id
+        FROM hadith h
+        JOIN matn m ON m.id = h.matn_id
+        LEFT JOIN book b ON b.id = h.book_id
+        LEFT JOIN chapter c ON c.id = h.chapter_id
+        WHERE h.deleted_at IS NULL
+          AND ($1::int IS NULL OR h.source_id = $1)
+          AND (
+            m.text_en ILIKE ANY($2)
+            OR b.name ILIKE ANY($2)
+            OR c.name ILIKE ANY($2)
+            OR h.location ILIKE ANY($2)
+            OR h.sanad ILIKE ANY($2)
+          )
+        ORDER BY h.id
+        LIMIT $3
+      `,
+      [sourceId, patterns, Math.min(Math.max(1, limit), 20)],
+    );
+    return rows.map((row) => row.id);
+  } finally {
+    client.release();
   }
-  return null;
 }
 
 function parseBody(body: unknown): {
@@ -232,6 +381,7 @@ function parseBody(body: unknown): {
 
   const filters: RagFilters = {
     contextHadithId: asNumber(filtersRaw.contextHadithId),
+    contextHadithIds: asNumberArray(filtersRaw.contextHadithIds),
     sourceId: asNumber(filtersRaw.sourceId),
     bookId: asNumber(filtersRaw.bookId),
     chapterId: asNumber(filtersRaw.chapterId),
@@ -259,15 +409,19 @@ async function logRagInteraction(params: {
   totalTokens?: number;
   response: string;
   citations: unknown;
+  retrievalMode?: string;
+  retrievalScores?: unknown;
+  seedIds?: number[];
+  kgCoverage?: unknown;
 }) {
   const client = await getClient();
   try {
     await client.query(
       `
         INSERT INTO rag_logs
-          (question, filters, retrieved_ids, model, prompt_tokens, completion_tokens, total_tokens, response, citations)
+          (question, filters, retrieved_ids, model, prompt_tokens, completion_tokens, total_tokens, response, citations, retrieval_mode, retrieval_scores, seed_ids, kg_coverage)
         VALUES
-          ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       `,
       [
         params.question,
@@ -279,6 +433,10 @@ async function logRagInteraction(params: {
         params.totalTokens ?? null,
         params.response,
         JSON.stringify(params.citations ?? []),
+        params.retrievalMode ?? null,
+        params.retrievalScores ? JSON.stringify(params.retrievalScores) : null,
+        params.seedIds ?? null,
+        params.kgCoverage ? JSON.stringify(params.kgCoverage) : null,
       ],
     );
   } finally {
@@ -296,9 +454,45 @@ export async function POST(request: NextRequest) {
 
     const { question, filters, limit } = parsed;
     const { filters: structuredFilters, hasExplicitFilters } = extractStructuredFilters(question);
-    const contextHadithId = filters.contextHadithId;
-    const intent = inferRagIntent(question);
-    const explicitHadithId = "hadithId" in intent ? intent.hadithId : undefined;
+    const contextHadithIds =
+      filters.contextHadithIds && filters.contextHadithIds.length
+        ? filters.contextHadithIds
+        : filters.contextHadithId
+          ? [filters.contextHadithId]
+          : [];
+    const contextHadithId = contextHadithIds[0];
+    const parsedSourceNumbers = parseSourceNumbersFromQuestion(question);
+    const parsedSourceNumber = parsedSourceNumbers[0] ?? null;
+    const resolvedSourceNumber = await resolveSourceNumberQuestion(question);
+    const heuristicIntent = inferRagIntent(question);
+    const heuristicHadithId = "hadithId" in heuristicIntent ? heuristicIntent.hadithId : undefined;
+    const routerDecision = await routeRagIntent({ question, contextHadithId });
+    const useRouter = Boolean(routerDecision && (routerDecision.confidence ?? 1) >= 0.55);
+    const intentType = useRouter ? routerDecision!.intent : heuristicIntent.type;
+    const intentHadithId = useRouter
+      ? routerDecision?.hadithId
+      : heuristicHadithId;
+    const intentNarratorId = useRouter
+      ? routerDecision?.narratorId
+      : "narratorId" in heuristicIntent
+        ? heuristicIntent.narratorId
+        : undefined;
+    const intentNarratorName = useRouter
+      ? routerDecision?.narratorName
+      : "narratorName" in heuristicIntent
+        ? heuristicIntent.narratorName
+        : undefined;
+    const intentDepth =
+      !useRouter && heuristicIntent.type === "narrator-network"
+        ? heuristicIntent.depth
+        : undefined;
+    const hasSourceNumber = Boolean(parsedSourceNumber);
+    const hasExplicitHadithSignal = Boolean(hasSourceNumber || heuristicHadithId);
+    const explicitHadithId = hasSourceNumber
+      ? resolvedSourceNumber?.hadithId
+      : heuristicHadithId ?? resolvedSourceNumber?.hadithId;
+    const narratorDetailName = extractNarratorDetailName(question);
+    const listSignal = detectListIntent(question);
 
     const isContextualQuestion = (value: string) => {
       const lower = value.toLowerCase();
@@ -318,16 +512,138 @@ export async function POST(request: NextRequest) {
       ].some((phrase) => lower.includes(phrase));
     };
     const hasExplicitReference =
-      Boolean(parseSourceNumber(question)) ||
-      Boolean(explicitHadithId) ||
-      ("narratorId" in intent && intent.narratorId) ||
-      Boolean(extractNarratorDetailName(question));
-    const shouldUseContext = Boolean(
-      contextHadithId && !hasExplicitReference && isContextualQuestion(question),
-    );
+      Boolean(hasExplicitHadithSignal) || Boolean(intentNarratorId) || Boolean(narratorDetailName);
+    const contextualFallback = Boolean(contextHadithId && !hasExplicitReference && isContextualQuestion(question));
+    const shouldUseContext =
+      contextualFallback ||
+      (useRouter ? Boolean(routerDecision?.useContext && contextHadithId && !hasExplicitReference) : contextualFallback);
+    const shouldForceHadith = Boolean(shouldUseContext || hasExplicitHadithSignal || explicitHadithId);
+    const shouldAllowHadithIntent = Boolean(shouldUseContext || hasExplicitHadithSignal);
+    const effectiveIntentType =
+      intentType === "hadith" && !shouldAllowHadithIntent ? "semantic" : intentType;
 
-    if (intent.type === "chain") {
-      let hadithId = intent.hadithId ?? (shouldUseContext ? contextHadithId : undefined);
+    const shouldHandleList = (effectiveIntentType === "list" && useRouter) || listSignal.wantsList;
+    if (shouldHandleList && !shouldForceHadith) {
+      const requestedCount = clampCount(routerDecision?.count ?? listSignal.count ?? limit ?? 5, limit ?? 5);
+      const sourceQuery = routerDecision?.source ?? extractSourceQueryFromQuestion(question);
+      let sourceMatch: { id: number; name: string } | null = null;
+      if (sourceQuery) {
+        const sources = await findSourcesByName(sourceQuery, 1);
+        sourceMatch = sources[0] ?? null;
+        if (!sourceMatch) {
+          await logRagInteraction({
+            question,
+            filters,
+            retrievedIds: [],
+            response: SOURCE_NOT_FOUND,
+            citations: [],
+          });
+          return NextResponse.json({ answer: SOURCE_NOT_FOUND, citations: [] });
+        }
+      }
+      const topicQuery = extractTopicQuery(question);
+      const topicTerms = topicQuery ? [] : extractTopicTerms(question);
+      const listFilters = {
+        ...structuredFilters,
+        ...(sourceMatch?.name ? { source: sourceMatch.name } : sourceQuery ? { source: sourceQuery } : {}),
+      };
+      let ids: number[] = [];
+      if (topicQuery) {
+        ids = await searchHadithIdsByQuery({
+          text: topicQuery,
+          filters: listFilters,
+          limit: requestedCount,
+        });
+      } else if (topicTerms.length) {
+        ids = await searchHadithIdsByQuery({
+          text: topicTerms.join(" "),
+          filters: listFilters,
+          limit: requestedCount,
+        });
+        if (!ids.length) {
+          ids = await fetchListHadithIdsWithTopic(sourceMatch?.id ?? null, requestedCount, topicTerms);
+        }
+      } else {
+        ids = await fetchListHadithIds(sourceMatch?.id ?? null, requestedCount);
+      }
+      if (!ids.length) {
+        await logRagInteraction({
+          question,
+          filters,
+          retrievedIds: [],
+          response: SAFE_FALLBACK,
+          citations: [],
+        });
+        return NextResponse.json({ answer: SAFE_FALLBACK, citations: [] });
+      }
+      const hadiths = await getHadithByIds(ids);
+      const citations = hadiths.map((hadith) => buildCitation(hadith));
+      const response = formatListAnswer(hadiths, sourceMatch?.name ?? sourceQuery);
+      await logRagInteraction({
+        question,
+        filters,
+        retrievedIds: ids,
+        response,
+        citations,
+      });
+      return NextResponse.json({
+        answer: response,
+        citations,
+        retrieved: ids.map((id) => ({ hadithId: id })),
+      });
+    }
+
+    if (parsedSourceNumbers.length > 1 && effectiveIntentType !== "chain" && effectiveIntentType !== "variants") {
+      const resolvedPairs = await Promise.all(parsedSourceNumbers.map((match) => resolveSourceNumberMatch(match)));
+      const resolvedIds = Array.from(
+        new Set(
+          resolvedPairs
+            .filter((pair): pair is NonNullable<typeof pair> => Boolean(pair))
+            .map((pair) => pair.hadithId),
+        ),
+      );
+      if (resolvedIds.length) {
+        const baseResults = await retrieveHadithByIds(resolvedIds);
+        if (!baseResults.length) {
+          await logRagInteraction({
+            question,
+            filters,
+            retrievedIds: [],
+            response: SAFE_FALLBACK,
+            citations: [],
+          });
+          return NextResponse.json({ answer: SAFE_FALLBACK, citations: [] });
+        }
+        const results = await mergeContextResults(baseResults, contextHadithIds);
+        const detailIds = buildContextDetailIds(results, contextHadithIds, MAX_CONTEXT_DETAILS);
+        const hadithDetails = await getHadithByIds(detailIds);
+        const hadithMap = new Map(hadithDetails.map((item) => [Number(item.id), item]));
+        const graphMap = await loadGraphContext(detailIds, MAX_GRAPH_CONTEXT);
+        const context = buildRagContext(results, hadithMap, graphMap);
+        const answer = await generateRagAnswer({ question, results, context });
+        const graph = await buildAnswerGraph(answer.citations);
+        await logRagInteraction({
+          question,
+          filters,
+          retrievedIds: results.map((r) => r.hadithId),
+          modelUsed: answer.modelUsed,
+          promptTokens: answer.usage?.promptTokens,
+          completionTokens: answer.usage?.completionTokens,
+          totalTokens: answer.usage?.totalTokens,
+          response: answer.answer,
+          citations: answer.citations,
+        });
+        return NextResponse.json({
+          answer: answer.answer,
+          citations: answer.citations,
+          graph,
+          retrieved: results,
+        });
+      }
+    }
+
+    if (effectiveIntentType === "chain") {
+      let hadithId = intentHadithId ?? (shouldUseContext ? contextHadithId : undefined);
       if (!hadithId) {
         const candidates = await searchHadithIdsByQuery({
           text: question,
@@ -382,8 +698,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ answer: response, citations });
     }
 
-    if (intent.type === "variants") {
-      let hadithId = intent.hadithId ?? (shouldUseContext ? contextHadithId : undefined);
+    if (effectiveIntentType === "variants") {
+      let hadithId = intentHadithId ?? (shouldUseContext ? contextHadithId : undefined);
       if (!hadithId) {
         const candidates = await searchHadithIdsByQuery({
           text: question,
@@ -449,10 +765,61 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ answer: response, citations });
     }
 
-    if (intent.type === "narrator-network") {
-      const depth = intent.depth ?? 2;
-      let narratorId = intent.narratorId;
-      let narratorName = intent.narratorName;
+    if (narratorDetailName && !isNarratorNetworkQuestion(question)) {
+      let detail = await getNarratorDetailsByName(narratorDetailName);
+      if (!detail) {
+        const matches = await findNarratorsByName(narratorDetailName);
+        if (matches.length > 1) {
+          const options = matches.map((match) => `${match.name} (ID ${match.id})`).join(", ");
+          const response = `I found multiple narrators matching "${narratorDetailName}": ${options}. Please specify the narrator id.`;
+          await logRagInteraction({
+            question,
+            filters,
+            retrievedIds: matches.map((match) => match.id),
+            response,
+            citations: [],
+          });
+          return NextResponse.json({ answer: response, citations: [] });
+        }
+        if (matches.length === 1) {
+          detail = await getNarratorDetailsById(matches[0].id);
+        }
+        if (!detail) {
+          const aliasMatches = await findNarratorsByAlias(narratorDetailName);
+          if (aliasMatches.length > 1) {
+            const options = aliasMatches.map((match) => `${match.name} (ID ${match.id})`).join(", ");
+            const response = `I found multiple narrators matching "${narratorDetailName}": ${options}. Please specify the narrator id.`;
+            await logRagInteraction({
+              question,
+              filters,
+              retrievedIds: aliasMatches.map((match) => match.id),
+              response,
+              citations: [],
+            });
+            return NextResponse.json({ answer: response, citations: [] });
+          }
+          if (aliasMatches.length === 1) {
+            detail = await getNarratorDetailsById(aliasMatches[0].id);
+          }
+        }
+      }
+      if (detail) {
+        const response = formatNarratorDetails(detail);
+        await logRagInteraction({
+          question,
+          filters,
+          retrievedIds: [detail.id],
+          response: response ?? SAFE_FALLBACK,
+          citations: [],
+        });
+        return NextResponse.json({ answer: response ?? SAFE_FALLBACK, citations: [] });
+      }
+    }
+
+    if (effectiveIntentType === "narrator-network") {
+      const depth = intentDepth ?? 2;
+      let narratorId = intentNarratorId;
+      let narratorName = intentNarratorName;
 
       if (!narratorId && !narratorName && shouldUseContext && contextHadithId) {
         const hadith = await getHadithById(String(contextHadithId));
@@ -541,10 +908,73 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ answer: response, citations: [] });
     }
 
-    if (intent.type === "hadith" || shouldUseContext) {
-      const resolvedHadithId = intent.type === "hadith" ? intent.hadithId : contextHadithId!;
-      const results = await retrieveHadithByIds([resolvedHadithId]);
-      if (!results.length) {
+    if (effectiveIntentType === "hadith" || shouldUseContext || shouldForceHadith) {
+      let resolvedHadithId: number | undefined;
+      if (hasSourceNumber) {
+        resolvedHadithId = resolvedSourceNumber?.hadithId;
+      }
+      if (!resolvedHadithId) {
+        resolvedHadithId =
+          effectiveIntentType === "hadith"
+            ? hasExplicitHadithSignal
+              ? heuristicHadithId ?? intentHadithId
+              : undefined
+            : shouldUseContext
+              ? contextHadithId!
+              : undefined;
+      }
+      if (!resolvedHadithId && !hasSourceNumber && resolvedSourceNumber?.hadithId) {
+        resolvedHadithId = resolvedSourceNumber.hadithId;
+      }
+      if (!resolvedHadithId && parsedSourceNumber) {
+        const sources = await findSourcesByName(parsedSourceNumber.sourceQuery, 5);
+        if (!sources.length) {
+          await logRagInteraction({
+            question,
+            filters,
+            retrievedIds: [],
+            response: SOURCE_NOT_FOUND,
+            citations: [],
+          });
+          return NextResponse.json({ answer: SOURCE_NOT_FOUND, citations: [] });
+        }
+        if (sources.length > 1) {
+          const options = sources.map((source) => `${source.name} (ID ${source.id})`).join(", ");
+          const response = `I found multiple sources matching "${parsedSourceNumber.sourceQuery}": ${options}. Please specify the source id.`;
+          await logRagInteraction({
+            question,
+            filters,
+            retrievedIds: sources.map((source) => source.id),
+            response,
+            citations: [],
+          });
+          return NextResponse.json({ answer: response, citations: [] });
+        }
+        resolvedHadithId =
+          (await findHadithIdBySourceAndNumber(sources[0].id, parsedSourceNumber.number)) ?? undefined;
+        if (!resolvedHadithId) {
+          await logRagInteraction({
+            question,
+            filters,
+            retrievedIds: [],
+            response: HADITH_NOT_FOUND_MESSAGE,
+            citations: [],
+          });
+          return NextResponse.json({ answer: HADITH_NOT_FOUND_MESSAGE, citations: [] });
+        }
+      }
+      if (!resolvedHadithId) {
+        await logRagInteraction({
+          question,
+          filters,
+          retrievedIds: [],
+          response: REQUIRE_ID_MESSAGE,
+          citations: [],
+        });
+        return NextResponse.json({ answer: REQUIRE_ID_MESSAGE, citations: [] });
+      }
+      const baseResults = await retrieveHadithByIds([resolvedHadithId]);
+      if (!baseResults.length) {
         await logRagInteraction({
           question,
           filters,
@@ -554,9 +984,11 @@ export async function POST(request: NextRequest) {
         });
         return NextResponse.json({ answer: SAFE_FALLBACK, citations: [] });
       }
-      const hadithDetails = await getHadithByIds([resolvedHadithId]);
+      const results = await mergeContextResults(baseResults, contextHadithIds);
+      const detailIds = buildContextDetailIds(results, contextHadithIds, MAX_CONTEXT_DETAILS);
+      const hadithDetails = await getHadithByIds(detailIds);
       const hadithMap = new Map(hadithDetails.map((item) => [Number(item.id), item]));
-      const graphMap = await loadGraphContext([resolvedHadithId], 1);
+      const graphMap = await loadGraphContext(detailIds, 1);
       const context = buildRagContext(results, hadithMap, graphMap);
       const answer = await generateRagAnswer({ question, results, context });
       const graph = await buildAnswerGraph(answer.citations);
@@ -579,104 +1011,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const narratorDetailName = extractNarratorDetailName(question);
-    if (narratorDetailName) {
-      let detail = await getNarratorDetailsByName(narratorDetailName);
-      if (!detail) {
-        const matches = await findNarratorsByName(narratorDetailName);
-        if (matches.length > 1) {
-          const options = matches.map((match) => `${match.name} (ID ${match.id})`).join(", ");
-          const response = `I found multiple narrators matching "${narratorDetailName}": ${options}. Please specify the narrator id.`;
-          await logRagInteraction({
-            question,
-            filters,
-            retrievedIds: matches.map((match) => match.id),
-            response,
-            citations: [],
-          });
-          return NextResponse.json({ answer: response, citations: [] });
-        }
-        if (matches.length === 1) {
-          detail = await getNarratorDetailsById(matches[0].id);
-        }
-        if (!detail) {
-          const aliasMatches = await findNarratorsByAlias(narratorDetailName);
-          if (aliasMatches.length > 1) {
-            const options = aliasMatches.map((match) => `${match.name} (ID ${match.id})`).join(", ");
-            const response = `I found multiple narrators matching "${narratorDetailName}": ${options}. Please specify the narrator id.`;
-            await logRagInteraction({
-              question,
-              filters,
-              retrievedIds: aliasMatches.map((match) => match.id),
-              response,
-              citations: [],
-            });
-            return NextResponse.json({ answer: response, citations: [] });
-          }
-          if (aliasMatches.length === 1) {
-            detail = await getNarratorDetailsById(aliasMatches[0].id);
-          }
-        }
-      }
-      if (detail) {
-        const response = formatNarratorDetails(detail);
-        await logRagInteraction({
-          question,
-          filters,
-          retrievedIds: [detail.id],
-          response: response ?? SAFE_FALLBACK,
-          citations: [],
-        });
-        return NextResponse.json({ answer: response ?? SAFE_FALLBACK, citations: [] });
-      }
-    }
-
-    const sourceNumber = parseSourceNumber(question);
-    if (sourceNumber) {
-      const sources = await findSourcesByName(sourceNumber.sourceQuery);
-      if (sources.length > 1) {
-        const options = sources.map((source) => `${source.name} (ID ${source.id})`).join(", ");
-        const response = `I found multiple sources matching "${sourceNumber.sourceQuery}": ${options}. Please specify the source id.`;
-        await logRagInteraction({
-          question,
-          filters,
-          retrievedIds: sources.map((source) => source.id),
-          response,
-          citations: [],
-        });
-        return NextResponse.json({ answer: response, citations: [] });
-      }
-      if (sources.length === 1) {
-        const hadithId = await findHadithIdBySourceAndNumber(sources[0].id, sourceNumber.number);
-        if (hadithId) {
-          const results = await retrieveHadithByIds([hadithId]);
-          const hadithDetails = await getHadithByIds([hadithId]);
-          const hadithMap = new Map(hadithDetails.map((item) => [Number(item.id), item]));
-          const graphMap = await loadGraphContext([hadithId], 1);
-          const context = buildRagContext(results, hadithMap, graphMap);
-          const answer = await generateRagAnswer({ question, results, context });
-          const graph = await buildAnswerGraph(answer.citations);
-          await logRagInteraction({
-            question,
-            filters,
-            retrievedIds: results.map((r) => r.hadithId),
-            modelUsed: answer.modelUsed,
-            promptTokens: answer.usage?.promptTokens,
-            completionTokens: answer.usage?.completionTokens,
-            totalTokens: answer.usage?.totalTokens,
-            response: answer.answer,
-            citations: answer.citations,
-          });
-          return NextResponse.json({
-            answer: answer.answer,
-            citations: answer.citations,
-            graph,
-            retrieved: results,
-          });
-        }
-      }
-    }
-
     if (hasExplicitFilters) {
       const structuredIds = await searchHadithIdsByQuery({
         text: question,
@@ -684,10 +1018,12 @@ export async function POST(request: NextRequest) {
         limit: MAX_STRUCTURED_RESULTS,
       });
       if (structuredIds.length) {
-        const results = await retrieveHadithByIds(structuredIds);
-        const hadithDetails = await getHadithByIds(structuredIds);
+        const baseResults = await retrieveHadithByIds(structuredIds);
+        const results = await mergeContextResults(baseResults, contextHadithIds);
+        const detailIds = buildContextDetailIds(results, contextHadithIds, MAX_CONTEXT_DETAILS);
+        const hadithDetails = await getHadithByIds(detailIds);
         const hadithMap = new Map(hadithDetails.map((item) => [Number(item.id), item]));
-        const graphMap = await loadGraphContext(structuredIds, MAX_GRAPH_CONTEXT);
+        const graphMap = await loadGraphContext(detailIds, MAX_GRAPH_CONTEXT);
         const context = buildRagContext(results, hadithMap, graphMap);
         const answer = await generateRagAnswer({ question, results, context });
         const graph = await buildAnswerGraph(answer.citations);
@@ -701,6 +1037,8 @@ export async function POST(request: NextRequest) {
           totalTokens: answer.usage?.totalTokens,
           response: answer.answer,
           citations: answer.citations,
+          retrievalMode: "structured",
+          retrievalScores: buildRetrievalScores(results),
         });
         return NextResponse.json({
           answer: answer.answer,
@@ -711,17 +1049,29 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const seedCandidates = await searchHadithIdsByQuery({
+      text: question,
+      filters: structuredFilters,
+      limit: 8,
+    });
+    const seedIds = Array.from(new Set([...(contextHadithIds ?? []), ...seedCandidates]));
+
     const hybridResults = await retrieveHadithForQuestionHybrid({
       question,
       limit,
       model: process.env.EMBEDDING_MODEL,
       filters,
       includeProvenance: true,
+      seedHadithIds: seedIds,
     });
+    let retrievalMode: "hybrid" | "pg" = "hybrid";
     const results =
       hybridResults.results.length > 0
         ? hybridResults.results
         : await retrieveHadithForQuestion({ question, ...filters, limit });
+    if (hybridResults.results.length === 0 && results.length > 0) {
+      retrievalMode = "pg";
+    }
 
     if (!results.length) {
       const structuredIds = await searchHadithIdsByQuery({
@@ -730,10 +1080,12 @@ export async function POST(request: NextRequest) {
         limit: MAX_STRUCTURED_RESULTS,
       });
       if (structuredIds.length) {
-        const structuredResults = await retrieveHadithByIds(structuredIds);
-        const structuredDetails = await getHadithByIds(structuredIds);
+        const baseResults = await retrieveHadithByIds(structuredIds);
+        const structuredResults = await mergeContextResults(baseResults, contextHadithIds);
+        const detailIds = buildContextDetailIds(structuredResults, contextHadithIds, MAX_CONTEXT_DETAILS);
+        const structuredDetails = await getHadithByIds(detailIds);
         const structuredMap = new Map(structuredDetails.map((item) => [Number(item.id), item]));
-        const graphMap = await loadGraphContext(structuredIds, MAX_GRAPH_CONTEXT);
+        const graphMap = await loadGraphContext(detailIds, MAX_GRAPH_CONTEXT);
         const context = buildRagContext(structuredResults, structuredMap, graphMap);
         const answer = await generateRagAnswer({ question, results: structuredResults, context });
         const graph = await buildAnswerGraph(answer.citations);
@@ -747,6 +1099,9 @@ export async function POST(request: NextRequest) {
           totalTokens: answer.usage?.totalTokens,
           response: answer.answer,
           citations: answer.citations,
+          retrievalMode: "structured",
+          retrievalScores: buildRetrievalScores(structuredResults),
+          seedIds,
         });
         return NextResponse.json({
           answer: answer.answer,
@@ -763,6 +1118,8 @@ export async function POST(request: NextRequest) {
         retrievedIds: [],
         response: SAFE_FALLBACK,
         citations: [],
+        retrievalMode,
+        seedIds,
       });
       return NextResponse.json({
         answer: SAFE_FALLBACK,
@@ -771,32 +1128,42 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const detailIds = results.slice(0, MAX_CONTEXT_DETAILS).map((result) => result.hadithId);
+    const mergedResults = await mergeContextResults(results, contextHadithIds);
+    const detailIds = buildContextDetailIds(mergedResults, contextHadithIds, MAX_CONTEXT_DETAILS);
     const hadithDetails = await getHadithByIds(detailIds);
     const hadithMap = new Map(hadithDetails.map((item) => [Number(item.id), item]));
     const graphMap = await loadGraphContext(detailIds, MAX_GRAPH_CONTEXT);
-    const context = buildRagContext(results, hadithMap, graphMap);
-    const answer = await generateRagAnswer({ question, results, context });
+    const context = buildRagContext(mergedResults, hadithMap, graphMap, hybridResults.provenance ?? null);
+    const answer = await generateRagAnswer({ question, results: mergedResults, context });
     const answerGraph = await buildAnswerGraph(answer.citations);
     const graph = mergeGraphs(answerGraph, hybridResults.provenance ?? null);
+
+    const coverageRows = mergedResults.length
+      ? await fetchHadithCoverage(mergedResults.map((r) => r.hadithId))
+      : [];
+    const kgCoverage = summarizeCoverageForQuery(coverageRows);
 
     await logRagInteraction({
       question,
       filters,
-      retrievedIds: results.map((r) => r.hadithId),
+      retrievedIds: mergedResults.map((r) => r.hadithId),
       modelUsed: answer.modelUsed,
       promptTokens: answer.usage?.promptTokens,
       completionTokens: answer.usage?.completionTokens,
       totalTokens: answer.usage?.totalTokens,
       response: answer.answer,
       citations: answer.citations,
+      retrievalMode,
+      retrievalScores: buildRetrievalScores(mergedResults),
+      seedIds,
+      kgCoverage,
     });
 
     return NextResponse.json({
       answer: answer.answer,
       citations: answer.citations,
       graph,
-      retrieved: results, // include for now; can be trimmed in production
+      retrieved: mergedResults, // include for now; can be trimmed in production
     });
   } catch (error) {
     console.error("[api/rag/query] Failed", error);

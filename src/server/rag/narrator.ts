@@ -49,10 +49,12 @@ export async function findNarratorsByName(name: string, limit = 5): Promise<Narr
   try {
     const { rows } = await client.query<NarratorMatch>(
       `
-        SELECT id, name
-        FROM narrator
-        WHERE name ILIKE $1
-        ORDER BY length(name), name
+        SELECT n.id, n.name
+        FROM narrator n
+        LEFT JOIN narrator_alias na ON na.narrator_id = n.id
+        WHERE n.name ILIKE $1 OR na.alias ILIKE $1
+        GROUP BY n.id, n.name
+        ORDER BY length(n.name), n.name
         LIMIT $2
       `,
       [`%${name}%`, Math.max(1, Math.min(limit, 10))],
@@ -68,9 +70,12 @@ export async function findExactNarratorByName(name: string): Promise<NarratorMat
   try {
     const { rows } = await client.query<NarratorMatch>(
       `
-        SELECT id, name
-        FROM narrator
-        WHERE lower(name) = lower($1)
+        SELECT n.id, n.name
+        FROM narrator n
+        LEFT JOIN narrator_alias na ON na.narrator_id = n.id
+        WHERE lower(n.name) = lower($1)
+           OR lower(na.alias) = lower($1)
+        ORDER BY length(n.name), n.name
         LIMIT 1
       `,
       [name],
@@ -88,10 +93,13 @@ export async function findNarratorsByAlias(name: string, limit = 5): Promise<Nar
   try {
     const { rows } = await client.query<NarratorMatch>(
       `
-        SELECT id, name
-        FROM narrator
-        WHERE regexp_replace(lower(name), '[^a-z0-9\\s]', ' ', 'g') ILIKE $1
-        ORDER BY length(name), name
+        SELECT n.id, n.name
+        FROM narrator n
+        LEFT JOIN narrator_alias na ON na.narrator_id = n.id
+        WHERE regexp_replace(lower(n.name), '[^a-z0-9\\s]', ' ', 'g') ILIKE $1
+           OR na.normalized ILIKE $1
+        GROUP BY n.id, n.name
+        ORDER BY length(n.name), n.name
         LIMIT $2
       `,
       [`%${stripped}%`, Math.max(1, Math.min(limit, 10))],

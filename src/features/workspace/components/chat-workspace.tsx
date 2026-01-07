@@ -17,10 +17,10 @@ type ChatWorkspaceProps = {
 };
 
 export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) {
-  const { messages, isLoading, error, submitQuestion, resultHadithIds, lastHadithId, clearContext } =
-    useRagChat();
+  const { messages, isLoading, error, submitQuestion, resultHadithIds } = useRagChat();
   const [input, setInput] = useState("");
   const [selectedHadithId, setSelectedHadithId] = useState<string | null>(null);
+  const [contextHadithIds, setContextHadithIds] = useState<string[]>([]);
   const [selectedGradings, setSelectedGradings] = useState<Set<string>>(
     () => new Set<string>(),
   );
@@ -60,10 +60,12 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
   const handleSend = () => {
     const trimmed = input.trim();
     if (!trimmed) return;
-    const contextId = selectedHadithId ?? lastHadithId;
     submitQuestion(trimmed, {
       limit: 6,
-      filters: contextId ? { contextHadithId: Number(contextId) } : undefined,
+      filters: contextHadithIds.length
+        ? { contextHadithIds: contextHadithIds.map((id) => Number(id)) }
+        : undefined,
+      contextHadithIds: contextHadithIds.length ? contextHadithIds : undefined,
     });
     setInput("");
   };
@@ -310,25 +312,40 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
     }
   };
 
+  const addContext = useCallback((id: string) => {
+    setContextHadithIds((current) => {
+      if (current.includes(id)) return current;
+      return [...current, id];
+    });
+  }, []);
+
   const handleSelectHadith = (id: string) => {
     setSelectedHadithId(id);
+    addContext(id);
   };
   const handleCitationSelect = (id: string) => {
     setSelectedHadithId(id);
+    addContext(id);
   };
   const handleClearContext = () => {
-    setSelectedHadithId(null);
-    clearContext();
+    setContextHadithIds([]);
+  };
+  const handleRemoveContext = (id: string) => {
+    setContextHadithIds((current) => current.filter((item) => item !== id));
   };
 
   const activeHadithId = currentHadith?.id ?? null;
-  const contextHadithId = selectedHadithId ?? lastHadithId ?? null;
-  const contextHadith = contextHadithId ? hadithMap[contextHadithId] : null;
-  const contextLabel = contextHadith
-    ? `${contextHadith.details.source} — ${contextHadith.details.displayNumber ?? contextHadith.id}`
-    : contextHadithId
-      ? `Hadith ID ${contextHadithId}`
-      : null;
+  const contextItems = useMemo(
+    () =>
+      contextHadithIds.map((id) => {
+        const hadith = hadithMap[id];
+        const label = hadith
+          ? `${hadith.details.source} — ${hadith.details.displayNumber ?? hadith.id}`
+          : `Hadith ID ${id}`;
+        return { id, label };
+      }),
+    [contextHadithIds, hadithMap],
+  );
 
   return (
     <section
@@ -366,8 +383,9 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
         onInputChange={setInput}
         onSend={handleSend}
         onCitationSelect={handleCitationSelect}
-        contextLabel={contextLabel}
-        onClearContext={contextLabel ? handleClearContext : undefined}
+        contextItems={contextItems}
+        onClearContext={contextItems.length ? handleClearContext : undefined}
+        onRemoveContext={handleRemoveContext}
       />
 
       <HadithDetailsPanel

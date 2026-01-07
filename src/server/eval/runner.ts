@@ -18,6 +18,7 @@ import { retrieveHadithForQuestionHybrid, retrieveHadithForQuestionKg } from "@/
 import { generateRagAnswer } from "@/server/rag/generator";
 import { loadEvaluationDataset } from "@/server/eval/dataset";
 import { fetchHadithCoverage, summarizeCoverage, summarizeCoverageForQuery, HadithCoverageRow } from "@/server/eval/kg";
+import { parseSourceNumberFromQuestion, resolveSourceNumberQuestion } from "@/server/rag/source-number";
 
 type RunEvaluationOptions = {
   datasetPath?: string;
@@ -88,10 +89,27 @@ function mapResultToHit(result: RagResult, rank: number, relevantIds: Set<number
   };
 }
 
+async function runSourceNumberSelfTest(queries: Array<{ question: string; relevantHadithIds: number[] }>) {
+  const warnings: string[] = [];
+  for (const query of queries) {
+    if (query.relevantHadithIds.length !== 1) continue;
+    const parsed = parseSourceNumberFromQuestion(query.question);
+    if (!parsed) continue;
+    const resolved = await resolveSourceNumberQuestion(query.question);
+    if (!resolved || resolved.hadithId !== query.relevantHadithIds[0]) {
+      warnings.push(
+        `Source+number resolver mismatch for "${query.question}" (expected ${query.relevantHadithIds[0]}, got ${resolved?.hadithId ?? "none"}).`,
+      );
+    }
+  }
+  return warnings;
+}
+
 export async function runEvaluation(options: RunEvaluationOptions = {}): Promise<EvaluationRunSummary> {
   const startedAt = new Date();
   const dataset = await loadEvaluationDataset(options.datasetPath);
   const warnings = [...dataset.warnings];
+  warnings.push(...(await runSourceNumberSelfTest(dataset.queries)));
   const limit = options.limit && options.limit > 0 ? Math.trunc(options.limit) : dataset.queries.length;
   const topK = options.topK && options.topK > 0 ? Math.min(Math.trunc(options.topK), 50) : 20;
   const answerContextLimit =

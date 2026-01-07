@@ -13,8 +13,9 @@ type ConversationPanelProps = {
   onInputChange: (value: string) => void;
   onSend: () => void;
   onCitationSelect?: (hadithId: string) => void;
-  contextLabel?: string | null;
+  contextItems?: Array<{ id: string; label: string }>;
   onClearContext?: () => void;
+  onRemoveContext?: (id: string) => void;
 };
 
 export function ConversationPanel({
@@ -25,8 +26,9 @@ export function ConversationPanel({
   onInputChange,
   onSend,
   onCitationSelect,
-  contextLabel,
+  contextItems,
   onClearContext,
+  onRemoveContext,
 }: ConversationPanelProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -56,6 +58,15 @@ export function ConversationPanel({
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages.length, loading, error]);
 
+  const getRequestedCount = (text: string) => {
+    const lower = text.toLowerCase();
+    const match = lower.match(/\b(\d+)\s+(?:hadith|hadiths|narrations|reports)\b/);
+    if (!match?.[1]) return null;
+    const count = Number(match[1]);
+    if (!Number.isFinite(count) || count <= 0) return null;
+    return Math.min(Math.max(1, Math.trunc(count)), 20);
+  };
+
   return (
     <div className="relative flex max-h-svh flex-col border-r border-[var(--border-soft)] bg-[var(--background)]">
       <header className="border-b border-[var(--border-soft)] px-8 py-6">
@@ -72,7 +83,20 @@ export function ConversationPanel({
             {error}
           </div>
         )}
-        {messages.map((message) => (
+        {messages.map((message, index) => {
+          const prevMessage = messages[index - 1];
+          const requestedCount =
+            message.role === "assistant" && prevMessage?.role === "user"
+              ? getRequestedCount(prevMessage.content)
+              : null;
+          const citationCount = message.citations?.length ?? 0;
+          const shouldShowShortfall =
+            message.role === "assistant" && requestedCount != null && citationCount > 0 && citationCount < requestedCount;
+          const shortfallLabel = shouldShowShortfall
+            ? `Only ${citationCount} of ${requestedCount} matching hadiths were found.`
+            : null;
+          const isContextualUser = message.role === "user" && (message.contextHadithIds?.length ?? 0) > 0;
+          return (
           <article
             key={message.id}
             className={`flex flex-col ${message.role === "user" ? "items-end" : "items-start"}`}
@@ -80,12 +104,19 @@ export function ConversationPanel({
             <div
               className={`max-w-[90%] rounded-3xl border px-4 py-3 text-sm leading-relaxed shadow-sm ${
                 message.role === "user"
-                  ? "bg-[var(--accent-emerald)] text-[var(--accent-contrast)] border-transparent"
+                  ? `bg-[var(--accent-emerald)] text-[var(--accent-contrast)] border-transparent ${
+                      isContextualUser ? "ring-1 ring-[var(--accent-emerald)]/35 ring-offset-2 ring-offset-[var(--background)]" : ""
+                    }`
                   : "bg-[var(--surface-card)] text-[var(--text-primary)] border-[var(--border-soft)]"
               }`}
             >
               {message.content}
             </div>
+            {isContextualUser ? (
+              <span className="mt-1 text-[0.6rem] font-semibold uppercase tracking-[0.2em] text-[var(--text-subtle)]">
+                Context · {message.contextHadithIds?.length}
+              </span>
+            ) : null}
             {message.role === "assistant" && (
               <div className="mt-2 space-y-2 text-xs text-[var(--text-muted)]">
                 {message.citations && message.citations.length > 0 ? (
@@ -125,16 +156,16 @@ export function ConversationPanel({
                       </button>
                     ))}
                   </div>
-                ) : (
-                  <p className="text-[var(--text-muted)]">No direct hadith found for this question.</p>
-                )}
+                ) : null}
+                {shortfallLabel ? <p className="text-[var(--text-muted)]">{shortfallLabel}</p> : null}
               </div>
             )}
             <span className="mt-1 text-xs text-[var(--text-subtle)]">
               {message.role === "user" ? copy.userLabel : copy.assistantLabel} · {message.timestamp}
             </span>
           </article>
-        ))}
+        );
+        })}
         {loading && (
           <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
             <span className="h-2 w-2 animate-ping rounded-full bg-[var(--accent-emerald)]" />
@@ -149,12 +180,29 @@ export function ConversationPanel({
         onClose={() => setActiveGraph(null)}
       />
       <footer className="border-t border-[var(--border-soft)] px-8 py-5">
-        {contextLabel && (
-          <div className="mb-3 flex items-center justify-between rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-3 py-2 text-xs text-[var(--text-primary)] shadow-sm">
+        {contextItems && contextItems.length > 0 ? (
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-3 py-2 text-xs text-[var(--text-primary)] shadow-sm">
             <span className="font-semibold uppercase tracking-[0.15em] text-[0.55rem] text-[var(--text-muted)]">
               Context
             </span>
-            <span className="flex-1 px-3 text-[var(--text-secondary)]">{contextLabel}</span>
+            <div className="flex flex-1 flex-wrap gap-2">
+              {contextItems.map((item) => (
+                <span
+                  key={item.id}
+                  className="flex items-center gap-1 rounded-full border border-[var(--border-soft)] bg-[var(--surface-panel)] px-2 py-1 text-[0.6rem] text-[var(--text-secondary)]"
+                >
+                  {item.label}
+                  <button
+                    type="button"
+                    onClick={() => onRemoveContext?.(item.id)}
+                    className="rounded-full border border-[var(--border-soft)] bg-[var(--surface-card)] px-1 text-[0.55rem] text-[var(--text-primary)] transition hover:-translate-y-0.5"
+                    aria-label={`Remove ${item.label} from context`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
             <button
               type="button"
               onClick={onClearContext}
@@ -163,7 +211,7 @@ export function ConversationPanel({
               Clear
             </button>
           </div>
-        )}
+        ) : null}
         <form className="flex gap-3" onSubmit={handleSubmit}>
           <label className="sr-only" htmlFor="workspace-input">
             {copy.inputLabel}

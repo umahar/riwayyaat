@@ -7,12 +7,14 @@ export type ChatMessage = {
   content: string;
   citations?: RagCitation[];
   graph?: RagGraph;
+  contextHadithIds?: string[];
   timestamp: string;
 };
 
 type SubmitOptions = {
   filters?: Record<string, unknown>;
   limit?: number;
+  contextHadithIds?: string[];
 };
 
 export function useRagChat(initialMessages: ChatMessage[] = []) {
@@ -20,7 +22,6 @@ export function useRagChat(initialMessages: ChatMessage[] = []) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resultHadithIds, setResultHadithIds] = useState<string[] | null>(null);
-  const [lastHadithId, setLastHadithId] = useState<string | null>(null);
 
   const submitQuestion = useCallback(
     async (question: string, options: SubmitOptions = {}) => {
@@ -31,6 +32,7 @@ export function useRagChat(initialMessages: ChatMessage[] = []) {
         id: `user-${Date.now()}`,
         role: "user",
         content: trimmed,
+        contextHadithIds: options.contextHadithIds?.length ? options.contextHadithIds : undefined,
         timestamp,
       };
       setMessages((prev) => [...prev, userMessage]);
@@ -62,9 +64,6 @@ export function useRagChat(initialMessages: ChatMessage[] = []) {
           ? payload.retrieved.map((item) => String(item.hadithId))
           : [];
         setResultHadithIds(citationIds.length > 0 ? citationIds : retrievedIds);
-        const primaryHadithId =
-          payload.citations?.[0]?.hadithId ?? payload.retrieved?.[0]?.hadithId ?? null;
-        setLastHadithId(primaryHadithId ? String(primaryHadithId) : null);
         const assistantMessage: ChatMessage = {
           id: `assistant-${Date.now()}`,
           role: "assistant",
@@ -98,11 +97,6 @@ export function useRagChat(initialMessages: ChatMessage[] = []) {
     setError(null);
     setIsLoading(false);
     setResultHadithIds(null);
-    setLastHadithId(null);
-  }, []);
-
-  const clearContext = useCallback(() => {
-    setLastHadithId(null);
   }, []);
 
   return {
@@ -110,9 +104,7 @@ export function useRagChat(initialMessages: ChatMessage[] = []) {
     isLoading,
     error,
     resultHadithIds,
-    lastHadithId,
     submitQuestion,
     reset,
-    clearContext,
   };
 }

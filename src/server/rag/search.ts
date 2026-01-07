@@ -55,83 +55,7 @@ type SearchParams = {
   limit?: number;
 };
 
-const STOPWORDS = new Set([
-  "the",
-  "a",
-  "an",
-  "of",
-  "and",
-  "to",
-  "for",
-  "in",
-  "on",
-  "with",
-  "by",
-  "about",
-  "every",
-  "all",
-  "show",
-  "find",
-  "trace",
-  "highlight",
-  "hadith",
-  "sanad",
-  "isnad",
-  "variants",
-  "variant",
-  "chain",
-  "narrators",
-  "narrator",
-]);
-
-function extractKeywords(text: string) {
-  const tokens = text
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
-    .split(/\s+/)
-    .filter((token) => token.length >= 4 && !STOPWORDS.has(token));
-  const unique = Array.from(new Set(tokens));
-  return unique.slice(0, 3);
-}
-
-function buildSearchColumns(paramIndex: number) {
-  const columnClauses = [
-    `h.sanad ILIKE $${paramIndex}`,
-    `h.location ILIKE $${paramIndex}`,
-    `m.text_en ILIKE $${paramIndex}`,
-    `m.text_ar ILIKE $${paramIndex}`,
-    `m.summary ILIKE $${paramIndex}`,
-    `s.name ILIKE $${paramIndex}`,
-    `a.name ILIKE $${paramIndex}`,
-    `b.name ILIKE $${paramIndex}`,
-    `c.name ILIKE $${paramIndex}`,
-    `t.name ILIKE $${paramIndex}`,
-    `g.name ILIKE $${paramIndex}`,
-    `g.description ILIKE $${paramIndex}`,
-    `sc.name ILIKE $${paramIndex}`,
-    `hi.scheme_key ILIKE $${paramIndex}`,
-    `hi.identifier ILIKE $${paramIndex}`,
-    `hi.notes ILIKE $${paramIndex}`,
-    `at.name_en ILIKE $${paramIndex}`,
-    `at.name_ar ILIKE $${paramIndex}`,
-    `at.description ILIKE $${paramIndex}`,
-    `ct.name_en ILIKE $${paramIndex}`,
-    `ct.name_ar ILIKE $${paramIndex}`,
-    `ct.description ILIKE $${paramIndex}`,
-    `nl.name_en ILIKE $${paramIndex}`,
-    `nl.name_ar ILIKE $${paramIndex}`,
-    `nl.description ILIKE $${paramIndex}`,
-    `n.name ILIKE $${paramIndex}`,
-    `n.descriptor ILIKE $${paramIndex}`,
-    `nt.name ILIKE $${paramIndex}`,
-    `nt.secondary_label ILIKE $${paramIndex}`,
-    `rt.name ILIKE $${paramIndex}`,
-    `rt.secondary_label ILIKE $${paramIndex}`,
-    `tm.name ILIKE $${paramIndex}`,
-    `tm.description ILIKE $${paramIndex}`,
-  ];
-  return `(${columnClauses.join(" OR ")})`;
-}
+const MIN_QUERY_LENGTH = 3;
 
 function pushFilterClause(
   clauses: string[],
@@ -188,17 +112,32 @@ export async function searchHadithIdsByQuery(params: SearchParams): Promise<numb
   pushFilterClause(clauses, values, filters.sanad, "h.sanad ILIKE $$");
   pushFilterClause(clauses, values, filters.matn, "(m.text_en ILIKE $$ OR m.text_ar ILIKE $$ OR m.summary ILIKE $$)");
 
-  if (params.text) {
-    const keywords = extractKeywords(params.text);
-    if (keywords.length === 0) {
-      values.push(`%${params.text}%`);
-      clauses.push(buildSearchColumns(values.length));
-    } else {
-      for (const keyword of keywords) {
-        values.push(`%${keyword}%`);
-        clauses.push(buildSearchColumns(values.length));
-      }
-    }
+  if (params.text && params.text.trim().length >= MIN_QUERY_LENGTH) {
+    const text = params.text.trim();
+    values.push(text);
+    const tsIdx = values.length;
+    values.push(`%${text}%`);
+    const likeIdx = values.length;
+    clauses.push(
+      `(
+        m.matn_search @@ websearch_to_tsquery('english', $${tsIdx})
+        OR s.source_search @@ websearch_to_tsquery('english', $${tsIdx})
+        OR b.book_search @@ websearch_to_tsquery('english', $${tsIdx})
+        OR c.chapter_search @@ websearch_to_tsquery('english', $${tsIdx})
+        OR n.narrator_search @@ websearch_to_tsquery('english', $${tsIdx})
+        OR t.tag_search @@ websearch_to_tsquery('english', $${tsIdx})
+        OR g.grade_search @@ websearch_to_tsquery('english', $${tsIdx})
+        OR sc.scholar_search @@ websearch_to_tsquery('english', $${tsIdx})
+        OR m.text_en ILIKE $${likeIdx}
+        OR m.text_ar ILIKE $${likeIdx}
+        OR m.summary ILIKE $${likeIdx}
+        OR h.sanad ILIKE $${likeIdx}
+        OR h.location ILIKE $${likeIdx}
+        OR hi.scheme_key ILIKE $${likeIdx}
+        OR hi.identifier ILIKE $${likeIdx}
+        OR hi.notes ILIKE $${likeIdx}
+      )`,
+    );
   }
 
   const whereClause = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";

@@ -1,5 +1,5 @@
 import { HadithInsight } from "@/features/hadith/types";
-import { RagContextEntry, RagResult } from "@/types/rag";
+import { RagContextEntry, RagResult, RagGraph } from "@/types/rag";
 import { RagGraphContext } from "@/server/rag/graph-context";
 
 type HadithMap = Map<number, HadithInsight>;
@@ -33,8 +33,10 @@ export function buildRagContext(
   results: RagResult[],
   hadithsById: HadithMap,
   graphsById?: Map<number, RagGraphContext>,
+  provenance?: RagGraph | null,
 ): RagContextEntry[] {
-  return results.map((result) => {
+  const provenanceSummary = summarizeProvenance(provenance ?? undefined);
+  return results.map((result, index) => {
     const hadith = hadithsById.get(result.hadithId);
     const graph = graphsById?.get(result.hadithId);
     return {
@@ -52,6 +54,26 @@ export function buildRagContext(
       })),
       extra: mapHadithExtra(hadith),
       graph,
+      provenance: index === 0 ? provenanceSummary : undefined,
     };
   });
+}
+
+function summarizeProvenance(graph?: RagGraph) {
+  if (!graph?.nodes?.length) return undefined;
+  const nodeTypes: Record<string, number> = {};
+  const edgeTypes: Record<string, number> = {};
+  graph.nodes.forEach((node) => {
+    const key = node.type ?? "Node";
+    nodeTypes[key] = (nodeTypes[key] ?? 0) + 1;
+  });
+  graph.edges?.forEach((edge) => {
+    const key = edge.type ?? "REL";
+    edgeTypes[key] = (edgeTypes[key] ?? 0) + 1;
+  });
+  const sampleNodes = graph.nodes
+    .map((node) => node.label)
+    .filter((label): label is string => Boolean(label))
+    .slice(0, 12);
+  return { nodeTypes, edgeTypes, sampleNodes };
 }

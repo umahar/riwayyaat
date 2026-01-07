@@ -3,7 +3,9 @@ import { getSession } from "@/server/graph/client";
 import { ensureVectorIndex, getVectorIndexName } from "@/server/graph/indexes";
 import { RagFilters, RagGraph, RagResult } from "@/types/rag";
 import { retrieveHadithByIds, retrieveHadithForQuestion } from "@/server/rag/retriever";
+import { retrieveHadithForQuestionLexical } from "@/server/rag/lexical";
 import { getClient } from "@/server/db/client";
+import { resolveSourceNumberQuestion } from "@/server/rag/source-number";
 
 type KgRetrievalParams = {
   question: string;
@@ -11,6 +13,7 @@ type KgRetrievalParams = {
   model?: string;
   filters?: RagFilters;
   includeProvenance?: boolean;
+  seedHadithIds?: number[];
 };
 
 type KgRetrievalOutput = {
@@ -23,6 +26,13 @@ type GraphSignals = {
   sharedBooks: number;
   sharedSources: number;
   sharedChapters: number;
+  sharedTags: number;
+  sharedGrades: number;
+  sharedScholars: number;
+  sharedChainTypes: number;
+  sharedNarrationLevels: number;
+  sharedAttributionTypes: number;
+  sharedTransmissionMethods: number;
 };
 
 type VectorHit = {
@@ -35,6 +45,13 @@ const GRAPH_SIGNAL_DEFAULTS: GraphSignals = {
   sharedBooks: 0,
   sharedSources: 0,
   sharedChapters: 0,
+  sharedTags: 0,
+  sharedGrades: 0,
+  sharedScholars: 0,
+  sharedChainTypes: 0,
+  sharedNarrationLevels: 0,
+  sharedAttributionTypes: 0,
+  sharedTransmissionMethods: 0,
 };
 
 const DEFAULT_GRAPH_WEIGHTS = {
@@ -42,6 +59,13 @@ const DEFAULT_GRAPH_WEIGHTS = {
   book: 0.2,
   source: 0.15,
   chapter: 0.05,
+  tag: 0.12,
+  grade: 0.1,
+  scholar: 0.08,
+  chainType: 0.08,
+  narrationLevel: 0.06,
+  attributionType: 0.06,
+  transmissionMethod: 0.05,
 };
 
 const DEFAULT_KG_WEIGHTS = {
@@ -50,9 +74,10 @@ const DEFAULT_KG_WEIGHTS = {
 };
 
 const DEFAULT_HYBRID_WEIGHTS = {
-  vector: 0.45,
-  graph: 0.35,
+  vector: 0.5,
+  graph: 0.25,
   dense: 0.2,
+  lexical: 0.05,
 };
 
 const VECTOR_CANDIDATE_MULTIPLIER = 4;
@@ -85,6 +110,22 @@ function getGraphWeights() {
     book: parseWeight(process.env.RAG_GRAPH_WEIGHT_BOOK, DEFAULT_GRAPH_WEIGHTS.book),
     source: parseWeight(process.env.RAG_GRAPH_WEIGHT_SOURCE, DEFAULT_GRAPH_WEIGHTS.source),
     chapter: parseWeight(process.env.RAG_GRAPH_WEIGHT_CHAPTER, DEFAULT_GRAPH_WEIGHTS.chapter),
+    tag: parseWeight(process.env.RAG_GRAPH_WEIGHT_TAG, DEFAULT_GRAPH_WEIGHTS.tag),
+    grade: parseWeight(process.env.RAG_GRAPH_WEIGHT_GRADE, DEFAULT_GRAPH_WEIGHTS.grade),
+    scholar: parseWeight(process.env.RAG_GRAPH_WEIGHT_SCHOLAR, DEFAULT_GRAPH_WEIGHTS.scholar),
+    chainType: parseWeight(process.env.RAG_GRAPH_WEIGHT_CHAIN_TYPE, DEFAULT_GRAPH_WEIGHTS.chainType),
+    narrationLevel: parseWeight(
+      process.env.RAG_GRAPH_WEIGHT_NARRATION_LEVEL,
+      DEFAULT_GRAPH_WEIGHTS.narrationLevel,
+    ),
+    attributionType: parseWeight(
+      process.env.RAG_GRAPH_WEIGHT_ATTRIBUTION_TYPE,
+      DEFAULT_GRAPH_WEIGHTS.attributionType,
+    ),
+    transmissionMethod: parseWeight(
+      process.env.RAG_GRAPH_WEIGHT_TRANSMISSION_METHOD,
+      DEFAULT_GRAPH_WEIGHTS.transmissionMethod,
+    ),
   });
 }
 
@@ -100,6 +141,7 @@ function getHybridWeights() {
     vector: parseWeight(process.env.RAG_HYBRID_VECTOR_WEIGHT, DEFAULT_HYBRID_WEIGHTS.vector),
     graph: parseWeight(process.env.RAG_HYBRID_GRAPH_WEIGHT, DEFAULT_HYBRID_WEIGHTS.graph),
     dense: parseWeight(process.env.RAG_HYBRID_DENSE_WEIGHT, DEFAULT_HYBRID_WEIGHTS.dense),
+    lexical: parseWeight(process.env.RAG_HYBRID_LEXICAL_WEIGHT, DEFAULT_HYBRID_WEIGHTS.lexical),
   });
 }
 
@@ -237,6 +279,76 @@ async function fetchGraphSignals(seedIds: number[]): Promise<Map<number, GraphSi
       `,
       "sharedChapters",
     );
+    await runCount(
+      `
+        MATCH (seed:Hadith)
+        WHERE seed.pgId IN $seedIds
+        MATCH (seed)-[:TAGGED]->(t:Tag)<-[:TAGGED]-(candidate:Hadith)
+        WHERE candidate.pgId <> seed.pgId
+        RETURN candidate.pgId AS hadithId, count(DISTINCT t) AS count
+      `,
+      "sharedTags",
+    );
+    await runCount(
+      `
+        MATCH (seed:Hadith)
+        WHERE seed.pgId IN $seedIds
+        MATCH (seed)-[:GRADED]->(g:Grade)<-[:GRADED]-(candidate:Hadith)
+        WHERE candidate.pgId <> seed.pgId
+        RETURN candidate.pgId AS hadithId, count(DISTINCT g) AS count
+      `,
+      "sharedGrades",
+    );
+    await runCount(
+      `
+        MATCH (seed:Hadith)
+        WHERE seed.pgId IN $seedIds
+        MATCH (seed)-[:GRADED]->(:Grade)-[:BY]->(s:Scholar)<-[:BY]-(:Grade)<-[:GRADED]-(candidate:Hadith)
+        WHERE candidate.pgId <> seed.pgId
+        RETURN candidate.pgId AS hadithId, count(DISTINCT s) AS count
+      `,
+      "sharedScholars",
+    );
+    await runCount(
+      `
+        MATCH (seed:Hadith)
+        WHERE seed.pgId IN $seedIds
+        MATCH (seed)-[:HAS_CHAIN]->(:Chain)-[:CHAIN_TYPE]->(ct:ChainType)<-[:CHAIN_TYPE]-(:Chain)<-[:HAS_CHAIN]-(candidate:Hadith)
+        WHERE candidate.pgId <> seed.pgId
+        RETURN candidate.pgId AS hadithId, count(DISTINCT ct) AS count
+      `,
+      "sharedChainTypes",
+    );
+    await runCount(
+      `
+        MATCH (seed:Hadith)
+        WHERE seed.pgId IN $seedIds
+        MATCH (seed)-[:HAS_CHAIN]->(:Chain)-[:NARRATION_LEVEL]->(nl:NarrationLevel)<-[:NARRATION_LEVEL]-(:Chain)<-[:HAS_CHAIN]-(candidate:Hadith)
+        WHERE candidate.pgId <> seed.pgId
+        RETURN candidate.pgId AS hadithId, count(DISTINCT nl) AS count
+      `,
+      "sharedNarrationLevels",
+    );
+    await runCount(
+      `
+        MATCH (seed:Hadith)
+        WHERE seed.pgId IN $seedIds
+        MATCH (seed)-[:HAS_CHAIN]->(:Chain)-[:ATTRIBUTION_TYPE]->(at:AttributionType)<-[:ATTRIBUTION_TYPE]-(:Chain)<-[:HAS_CHAIN]-(candidate:Hadith)
+        WHERE candidate.pgId <> seed.pgId
+        RETURN candidate.pgId AS hadithId, count(DISTINCT at) AS count
+      `,
+      "sharedAttributionTypes",
+    );
+    await runCount(
+      `
+        MATCH (seed:Hadith)
+        WHERE seed.pgId IN $seedIds
+        MATCH (seed)-[:HAS_CHAIN]->(:Chain)-[:STEP]->(n:Narrator)-[:HAS_METHOD]->(tm:TransmissionMethod)<-[:HAS_METHOD]-(:Narrator)<-[:STEP]-(:Chain)<-[:HAS_CHAIN]-(candidate:Hadith)
+        WHERE candidate.pgId <> seed.pgId
+        RETURN candidate.pgId AS hadithId, count(DISTINCT tm) AS count
+      `,
+      "sharedTransmissionMethods",
+    );
   } finally {
     await session.close();
   }
@@ -251,12 +363,26 @@ function computeGraphScores(signals: Map<number, GraphSignals>): Map<number, num
   let maxBooks = 0;
   let maxSources = 0;
   let maxChapters = 0;
+  let maxTags = 0;
+  let maxGrades = 0;
+  let maxScholars = 0;
+  let maxChainTypes = 0;
+  let maxNarrationLevels = 0;
+  let maxAttributionTypes = 0;
+  let maxTransmissionMethods = 0;
 
   signals.forEach((signal) => {
     maxNarrators = Math.max(maxNarrators, signal.sharedNarrators);
     maxBooks = Math.max(maxBooks, signal.sharedBooks);
     maxSources = Math.max(maxSources, signal.sharedSources);
     maxChapters = Math.max(maxChapters, signal.sharedChapters);
+    maxTags = Math.max(maxTags, signal.sharedTags);
+    maxGrades = Math.max(maxGrades, signal.sharedGrades);
+    maxScholars = Math.max(maxScholars, signal.sharedScholars);
+    maxChainTypes = Math.max(maxChainTypes, signal.sharedChainTypes);
+    maxNarrationLevels = Math.max(maxNarrationLevels, signal.sharedNarrationLevels);
+    maxAttributionTypes = Math.max(maxAttributionTypes, signal.sharedAttributionTypes);
+    maxTransmissionMethods = Math.max(maxTransmissionMethods, signal.sharedTransmissionMethods);
   });
 
   const scores = new Map<number, number>();
@@ -265,11 +391,25 @@ function computeGraphScores(signals: Map<number, GraphSignals>): Map<number, num
     const bookScore = maxBooks ? signal.sharedBooks / maxBooks : 0;
     const sourceScore = maxSources ? signal.sharedSources / maxSources : 0;
     const chapterScore = maxChapters ? signal.sharedChapters / maxChapters : 0;
+    const tagScore = maxTags ? signal.sharedTags / maxTags : 0;
+    const gradeScore = maxGrades ? signal.sharedGrades / maxGrades : 0;
+    const scholarScore = maxScholars ? signal.sharedScholars / maxScholars : 0;
+    const chainTypeScore = maxChainTypes ? signal.sharedChainTypes / maxChainTypes : 0;
+    const narrationLevelScore = maxNarrationLevels ? signal.sharedNarrationLevels / maxNarrationLevels : 0;
+    const attributionTypeScore = maxAttributionTypes ? signal.sharedAttributionTypes / maxAttributionTypes : 0;
+    const transmissionMethodScore = maxTransmissionMethods ? signal.sharedTransmissionMethods / maxTransmissionMethods : 0;
     const total =
       narratorScore * weights.narrator +
       bookScore * weights.book +
       sourceScore * weights.source +
-      chapterScore * weights.chapter;
+      chapterScore * weights.chapter +
+      tagScore * weights.tag +
+      gradeScore * weights.grade +
+      scholarScore * weights.scholar +
+      chainTypeScore * weights.chainType +
+      narrationLevelScore * weights.narrationLevel +
+      attributionTypeScore * weights.attributionType +
+      transmissionMethodScore * weights.transmissionMethod;
     scores.set(hadithId, clampScore(total));
   });
   return scores;
@@ -280,21 +420,27 @@ function mergeScores(params: {
   vectorScores: Map<number, number>;
   graphScores: Map<number, number>;
   denseScores?: Map<number, number>;
-  weights: { vector: number; graph: number; dense?: number };
+  lexicalScores?: Map<number, number>;
+  weights: { vector: number; graph: number; dense?: number; lexical?: number };
 }) {
-  const { vectorScores, graphScores, denseScores, weights } = params;
+  const { vectorScores, graphScores, denseScores, lexicalScores, weights } = params;
   params.results.forEach((result) => {
     const vectorScore = vectorScores.get(result.hadithId) ?? 0;
     const graphScore = graphScores.get(result.hadithId) ?? 0;
     const denseScore = denseScores?.get(result.hadithId) ?? 0;
+    const lexicalScore = lexicalScores?.get(result.hadithId) ?? 0;
     const combined = clampScore(
-      vectorScore * weights.vector + graphScore * weights.graph + denseScore * (weights.dense ?? 0),
+      vectorScore * weights.vector +
+        graphScore * weights.graph +
+        denseScore * (weights.dense ?? 0) +
+        lexicalScore * (weights.lexical ?? 0),
     );
     result.similarity = combined;
     result.retrieval = {
       vectorScore,
       graphScore,
       denseScore: weights.dense != null ? denseScore : undefined,
+      lexicalScore: weights.lexical != null ? lexicalScore : undefined,
       combinedScore: combined,
     };
   });
@@ -393,11 +539,22 @@ export async function retrieveHadithForQuestionKg(params: KgRetrievalParams): Pr
   const vectorLimit = Math.min(50, limit * VECTOR_CANDIDATE_MULTIPLIER);
 
   try {
+    const directMatch = await resolveSourceNumberQuestion(question);
     const vectorHits = await fetchVectorHits(question, model, vectorLimit);
-    if (!vectorHits.length) return { results: [] };
-
+    const seedFromParams = (params.seedHadithIds ?? []).filter((id) => Number.isFinite(id) && id > 0);
     const vectorScores = new Map(vectorHits.map((hit) => [hit.hadithId, hit.score]));
-    const seedIds = vectorHits.slice(0, Math.min(SEED_LIMIT, vectorHits.length)).map((hit) => hit.hadithId);
+    if (directMatch) {
+      vectorScores.set(directMatch.hadithId, 1);
+    }
+    const seedIds = Array.from(
+      new Set([
+        ...vectorHits.slice(0, Math.min(SEED_LIMIT, vectorHits.length)).map((hit) => hit.hadithId),
+        ...(directMatch ? [directMatch.hadithId] : []),
+        ...seedFromParams,
+      ]),
+    );
+
+    if (!seedIds.length) return { results: [] };
 
     const graphSignals = await fetchGraphSignals(seedIds);
     const graphScores = computeGraphScores(graphSignals);
@@ -407,7 +564,7 @@ export async function retrieveHadithForQuestionKg(params: KgRetrievalParams): Pr
       .slice(0, GRAPH_CANDIDATE_LIMIT)
       .map(([id]) => id);
 
-    const candidateIds = Array.from(new Set([...vectorScores.keys(), ...graphCandidateIds]));
+    const candidateIds = Array.from(new Set([...vectorScores.keys(), ...graphCandidateIds, ...seedIds]));
     if (!candidateIds.length) return { results: [] };
 
     const results = await retrieveHadithByIds(candidateIds);
@@ -442,6 +599,7 @@ export async function retrieveHadithForQuestionHybrid(params: KgRetrievalParams)
 
   const kgLimit = Math.min(40, Math.max(limit * 3, 12));
   const denseLimit = Math.min(40, Math.max(limit * 3, 12));
+  const lexicalLimit = Math.min(40, Math.max(limit * 3, 12));
 
   const kg = await retrieveHadithForQuestionKg({
     ...params,
@@ -454,6 +612,12 @@ export async function retrieveHadithForQuestionHybrid(params: KgRetrievalParams)
     limit: denseLimit,
     ...params.filters,
     model: params.model,
+  });
+
+  const lexical = await retrieveHadithForQuestionLexical({
+    question,
+    limit: lexicalLimit,
+    filters: params.filters,
   });
 
   const denseScores = new Map(dense.map((row) => [row.hadithId, clampScore(row.similarity)]));
@@ -469,6 +633,15 @@ export async function retrieveHadithForQuestionHybrid(params: KgRetrievalParams)
     }
   });
 
+  const lexicalIds = lexical.map((row) => row.hadithId);
+  const missingLexicalIds = lexicalIds.filter((id) => !merged.has(id));
+  if (missingLexicalIds.length) {
+    const lexicalRows = await retrieveHadithByIds(missingLexicalIds);
+    lexicalRows.forEach((row) => {
+      merged.set(row.hadithId, { ...row, similarity: 0 });
+    });
+  }
+
   const results = Array.from(merged.values());
   const vectorScores = new Map(
     results.map((row) => [row.hadithId, row.retrieval?.vectorScore ?? 0]),
@@ -476,9 +649,10 @@ export async function retrieveHadithForQuestionHybrid(params: KgRetrievalParams)
   const graphScores = new Map(
     results.map((row) => [row.hadithId, row.retrieval?.graphScore ?? 0]),
   );
+  const lexicalScores = new Map(lexical.map((row) => [row.hadithId, clampScore(row.score)]));
 
   const weights = getHybridWeights();
-  mergeScores({ results, vectorScores, graphScores, denseScores, weights });
+  mergeScores({ results, vectorScores, graphScores, denseScores, lexicalScores, weights });
 
   const sorted = sortByScore(results);
   const filtered = await applyFilters(sorted, params.filters);

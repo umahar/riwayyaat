@@ -10,10 +10,12 @@ export async function findSourcesByName(name: string, limit = 5): Promise<Source
   try {
     const { rows } = await client.query<SourceMatch>(
       `
-        SELECT id, name
-        FROM source
-        WHERE name ILIKE $1
-        ORDER BY length(name), name
+        SELECT s.id, s.name
+        FROM source s
+        LEFT JOIN source_alias sa ON sa.source_id = s.id
+        WHERE s.name ILIKE $1 OR sa.alias ILIKE $1
+        GROUP BY s.id, s.name
+        ORDER BY length(s.name), s.name
         LIMIT $2
       `,
       [`%${name}%`, Math.max(1, Math.min(limit, 10))],

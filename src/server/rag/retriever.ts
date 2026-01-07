@@ -8,6 +8,7 @@ try {
 import { embedTextsDirect, DEFAULT_EMBEDDING_MODEL } from "@/server/rag/embeddings";
 import { RagFilters, RagRetrievalParams, RagResult } from "@/types/rag";
 import { getClient } from "@/server/db/client";
+import { resolveSourceNumberQuestion } from "@/server/rag/source-number";
 
 /**
  * Retrieval strategy:
@@ -80,6 +81,33 @@ export async function retrieveHadithForQuestion(params: RagRetrievalParams): Pro
   const model = params.model || process.env.EMBEDDING_MODEL || DEFAULT_EMBEDDING_MODEL;
   const limit = params.limit && params.limit > 0 ? params.limit : 8;
   if (!params.question.trim()) return [];
+
+  const directMatch = await resolveSourceNumberQuestion(params.question);
+  let directResults: RagResult[] = [];
+  if (directMatch) {
+    const matches = await retrieveHadithByIds([directMatch.hadithId]);
+    if (matches.length) {
+      const candidate = matches[0];
+      if (params.sourceId && candidate.source.id !== params.sourceId) {
+        directResults = [];
+      } else if (params.bookId && candidate.book?.id !== params.bookId) {
+        directResults = [];
+      } else if (params.chapterId && candidate.chapter?.id !== params.chapterId) {
+        directResults = [];
+      } else {
+        directResults = [
+          {
+            ...candidate,
+            similarity: 1,
+            retrieval: { combinedScore: 1 },
+          },
+        ];
+      }
+    }
+  }
+
+  const remainingLimit = Math.max(0, limit - directResults.length);
+  if (remainingLimit === 0) return directResults;
 
   const embedding = await embedQuestion(params.question, model);
   // pgvector prefers literal vector syntax; ensure bracketed string, not a PG array literal.
@@ -165,26 +193,32 @@ export async function retrieveHadithForQuestion(params: RagRetrievalParams): Pro
         scholar: { id: number; name: string; lifespan: string | null };
         isPrimary: boolean | null;
       }> | null;
-    }>(sql, [...filterParams, embeddingVector, model, limit]);
+    }>(sql, [...filterParams, embeddingVector, model, remainingLimit + directResults.length]);
 
-    return rows.map((row) => ({
-      hadithId: row.id,
-      displayNumber: row.display_number,
-      displayLabel: row.display_label,
-      source: { id: row.source_id, name: row.source_name },
-      book:
-        row.book_id != null
-          ? { id: row.book_id, name: row.book_name, number: row.book_number }
-          : undefined,
-      chapter:
-        row.chapter_id != null
-          ? { id: row.chapter_id, name: row.chapter_name, number: row.chapter_number }
-          : undefined,
-      matn: row.matn,
-      tags: row.tags ?? [],
-      grades: (row.grades ?? []).filter(Boolean),
-      similarity: 1 - row.distance, // convert cosine distance to similarity
-    }));
+    const exclude = new Set(directResults.map((result) => result.hadithId));
+    const dense = rows
+      .map((row) => ({
+        hadithId: row.id,
+        displayNumber: row.display_number,
+        displayLabel: row.display_label,
+        source: { id: row.source_id, name: row.source_name },
+        book:
+          row.book_id != null
+            ? { id: row.book_id, name: row.book_name, number: row.book_number }
+            : undefined,
+        chapter:
+          row.chapter_id != null
+            ? { id: row.chapter_id, name: row.chapter_name, number: row.chapter_number }
+            : undefined,
+        matn: row.matn,
+        tags: row.tags ?? [],
+        grades: (row.grades ?? []).filter(Boolean),
+        similarity: 1 - row.distance, // convert cosine distance to similarity
+      }))
+      .filter((row) => !exclude.has(row.hadithId))
+      .slice(0, remainingLimit);
+
+    return [...directResults, ...dense];
   } finally {
     client.release();
   }

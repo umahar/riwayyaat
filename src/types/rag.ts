@@ -2,6 +2,7 @@ import type { GraphApiEdge, GraphApiNode } from "@/server/graph/types";
 
 export type RagFilters = {
   contextHadithId?: number;
+  contextHadithIds?: number[];
   sourceId?: number;
   bookId?: number;
   chapterId?: number;
@@ -35,6 +36,7 @@ export type RagResult = {
     vectorScore?: number;
     graphScore?: number;
     denseScore?: number;
+    lexicalScore?: number;
     combinedScore?: number;
   };
 };
@@ -79,6 +81,11 @@ export type RagContextEntry = {
   graph?: {
     chain?: string[];
     variants?: Array<{ hadithId: number; source: string; displayNumber: string; reason: string }>;
+  };
+  provenance?: {
+    nodeTypes: Record<string, number>;
+    edgeTypes: Record<string, number>;
+    sampleNodes: string[];
   };
 };
 
