@@ -17,7 +17,7 @@ type ChatWorkspaceProps = {
 };
 
 export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) {
-  const { messages, isLoading, error, submitQuestion, resultHadithIds } = useRagChat();
+  const { messages, isLoading, error, submitQuestion, retryLast, resultHadithIds } = useRagChat();
   const [input, setInput] = useState("");
   const [selectedHadithId, setSelectedHadithId] = useState<string | null>(null);
   const [contextHadithIds, setContextHadithIds] = useState<string[]>([]);
@@ -334,6 +334,10 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
     setContextHadithIds((current) => current.filter((item) => item !== id));
   };
 
+  const handleContextSelect = (id: string) => {
+    setSelectedHadithId(id);
+  };
+
   const activeHadithId = currentHadith?.id ?? null;
   const contextItems = useMemo(
     () =>
@@ -382,7 +386,9 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
         input={input}
         onInputChange={setInput}
         onSend={handleSend}
+        onRetry={retryLast}
         onCitationSelect={handleCitationSelect}
+        onContextSelect={handleContextSelect}
         contextItems={contextItems}
         onClearContext={contextItems.length ? handleClearContext : undefined}
         onRemoveContext={handleRemoveContext}

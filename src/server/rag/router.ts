@@ -8,7 +8,7 @@ try {
 import OpenAI from "openai";
 
 export type RagRouteDecision = {
-  intent: "list" | "hadith" | "chain" | "variants" | "narrator-network" | "semantic";
+  intent: "list" | "hadith" | "chain" | "variants" | "narrator-network" | "narrator-aggregate" | "semantic";
   count?: number;
   source?: string;
   hadithId?: number;
@@ -30,7 +30,7 @@ function buildSystemPrompt() {
   return `
 You are a routing classifier for a hadith assistant. Return ONLY JSON with:
 {
-  "intent": "list" | "hadith" | "chain" | "variants" | "narrator-network" | "semantic",
+  "intent": "list" | "hadith" | "chain" | "variants" | "narrator-network" | "narrator-aggregate" | "semantic",
   "count": number | null,
   "source": string | null,
   "hadithId": number | null,
@@ -44,6 +44,7 @@ Rules:
 - intent "list": user asks for N hadiths, or a list of hadiths from a source/book.
 - intent "hadith": user asks about a specific hadith and provides a number/id/source+number.
 - intent "chain"/"variants"/"narrator-network": user asks for isnad/variants/narrator network.
+- intent "narrator-aggregate": user asks for most frequent/top/common narrators within a collection/book/chapter.
 - intent "semantic": general explanation or topical question.
 - count should be 1-20 when applicable.
 - source should be the collection name if mentioned (e.g., "Sahih al-Bukhari").
@@ -54,7 +55,15 @@ Rules:
 
 function normalizeDecision(raw: RagRouteDecision): RagRouteDecision | null {
   if (!raw || typeof raw.intent !== "string") return null;
-  const allowed = new Set(["list", "hadith", "chain", "variants", "narrator-network", "semantic"]);
+  const allowed = new Set([
+    "list",
+    "hadith",
+    "chain",
+    "variants",
+    "narrator-network",
+    "narrator-aggregate",
+    "semantic",
+  ]);
   if (!allowed.has(raw.intent)) return null;
   const count =
     typeof raw.count === "number" && Number.isFinite(raw.count)

@@ -12,6 +12,8 @@ import {
 import { loadGraphContext } from "@/server/rag/graph-context";
 import { retrieveHadithForQuestionHybrid } from "@/server/rag/kg-retriever";
 import {
+  findBooksByName,
+  findChaptersByName,
   findHadithIdBySourceAndNumber,
   findSourcesByName,
   findSourcesMentionedInQuestion,
@@ -20,6 +22,7 @@ import {
   findExactNarratorByName,
   findNarratorsByName,
   findNarratorsByAlias,
+  fetchTopNarrators,
   getNarratorDetailsById,
   getNarratorDetailsByName,
 } from "@/server/rag/narrator";
@@ -39,6 +42,10 @@ const REQUIRE_ID_MESSAGE =
   "If you can, share a hadith id (e.g., \"Hadith ID 123\") so I can look it up.";
 const REQUIRE_NARRATOR_MESSAGE =
   "Please share a narrator name or id (e.g., \"Narrator ID 45\" or \"connected to Abu Huraira\").";
+const BOOK_NOT_FOUND =
+  "I couldn't find that book in the database. Please check the spelling or try the source name instead.";
+const CHAPTER_NOT_FOUND =
+  "I couldn't find that chapter in the database. Please check the spelling or try the book name instead.";
 const REQUIRE_CONTEXT_MESSAGE =
   "Select a hadith from the results, or share a hadith id, and I can answer from that context.";
 const HADITH_NOT_FOUND_MESSAGE =
@@ -62,6 +69,17 @@ const NARRATOR_NETWORK_KEYWORDS = [
   "hop",
   "ego network",
   "graph",
+];
+const NARRATOR_AGGREGATE_KEYWORDS = [
+  "most frequent",
+  "most common",
+  "most mentioned",
+  "appear most",
+  "appears most",
+  "top narrators",
+  "top narrator",
+  "frequent narrators",
+  "common narrators",
 ];
 const GRADE_KEYWORDS = ["grade", "graded", "sahih", "hasan", "daif", "dhaif", "weak", "authentic"];
 const ATTRIBUTION_KEYWORDS = ["marfu", "marfū", "mawquf", "maqtu", "maqṭu", "mursal"];
@@ -374,9 +392,40 @@ function extractTopicQuery(question: string): string | null {
   return cleaned || null;
 }
 
+function extractBookQueryFromQuestion(question: string): string | null {
+  const match =
+    question.match(/\bbook\s+of\s+([^?.!]+?)(?:\s+(?:in|from|within)\b|[?.!]|$)/i) ??
+    question.match(/\bin\s+book\s+([^?.!]+?)(?:\s+(?:in|from|within)\b|[?.!]|$)/i);
+  if (!match?.[1]) return null;
+  const cleaned = match[1].replace(/["“”]/g, "").replace(/[,:;]+$/, "").trim();
+  return cleaned || null;
+}
+
+function extractChapterQueryFromQuestion(question: string): string | null {
+  const match =
+    question.match(/\bchapter\s+of\s+([^?.!]+?)(?:\s+(?:in|from|within)\b|[?.!]|$)/i) ??
+    question.match(/\bin\s+chapter\s+([^?.!]+?)(?:\s+(?:in|from|within)\b|[?.!]|$)/i);
+  if (!match?.[1]) return null;
+  const cleaned = match[1].replace(/["“”]/g, "").replace(/[,:;]+$/, "").trim();
+  return cleaned || null;
+}
+
+function extractTopCount(question: string): number | undefined {
+  const match = question.match(/\btop\s+(\d+)\b/i) ?? question.match(/\b(\d+)\s+top\b/i);
+  if (!match?.[1]) return undefined;
+  const count = Number(match[1]);
+  return Number.isFinite(count) && count > 0 ? count : undefined;
+}
+
 function isNarratorNetworkQuestion(question: string): boolean {
   const lower = question.toLowerCase();
   return NARRATOR_NETWORK_KEYWORDS.some((keyword) => lower.includes(keyword));
+}
+
+function isNarratorAggregateQuestion(question: string): boolean {
+  const lower = question.toLowerCase();
+  if (!lower.includes("narrator")) return false;
+  return NARRATOR_AGGREGATE_KEYWORDS.some((keyword) => lower.includes(keyword));
 }
 
 async function fetchListHadithIdsWithTopic(
@@ -578,8 +627,10 @@ export async function POST(request: NextRequest) {
       (useRouter ? Boolean(routerDecision?.useContext && contextHadithId && !hasExplicitReference) : contextualFallback);
     const shouldForceHadith = Boolean(shouldUseContext || hasExplicitHadithSignal || explicitHadithId);
     const shouldAllowHadithIntent = Boolean(shouldUseContext || hasExplicitHadithSignal);
+    const narratorAggregateSignal = isNarratorAggregateQuestion(question);
+    const intentOverride = narratorAggregateSignal ? "narrator-aggregate" : intentType;
     const effectiveIntentType =
-      intentType === "hadith" && !shouldAllowHadithIntent ? "semantic" : intentType;
+      intentOverride === "hadith" && !shouldAllowHadithIntent ? "semantic" : intentOverride;
 
     const shouldHandleList = (effectiveIntentType === "list" && useRouter) || listSignal.wantsList;
     if (shouldHandleList && !shouldForceHadith) {
@@ -650,6 +701,134 @@ export async function POST(request: NextRequest) {
         citations,
         retrieved: ids.map((id) => ({ hadithId: id })),
       });
+    }
+
+    if (effectiveIntentType === "narrator-aggregate") {
+      const requestedCount = clampCount(
+        routerDecision?.count ?? extractTopCount(question) ?? limit ?? 5,
+        5,
+      );
+      let sourceId = filters.sourceId ?? null;
+      let sourceLabel: string | null = null;
+      const sourceQuery = routerDecision?.source ?? extractSourceQueryFromQuestion(question);
+
+      let bookIds = filters.bookId ? [filters.bookId] : null;
+      let chapterIds = filters.chapterId ? [filters.chapterId] : null;
+      let bookLabel: string | null = null;
+      let chapterLabel: string | null = null;
+
+      const bookQuery = structuredFilters.book ?? extractBookQueryFromQuestion(question);
+      if (!bookIds) {
+        if (bookQuery) {
+          const matches = await findBooksByName(bookQuery, 10);
+          const scoped = sourceId ? matches.filter((match) => match.sourceId === sourceId) : matches;
+          if (!scoped.length) {
+            await logRagInteraction({
+              question,
+              filters,
+              retrievedIds: [],
+              response: BOOK_NOT_FOUND,
+              citations: [],
+            });
+            return NextResponse.json({ answer: BOOK_NOT_FOUND, citations: [] });
+          }
+          bookIds = scoped.map((match) => match.id);
+          bookLabel = scoped.length === 1 ? scoped[0].name : `book "${bookQuery}"`;
+          if (!sourceLabel && scoped.length === 1 && scoped[0].sourceName) {
+            sourceLabel = scoped[0].sourceName;
+          }
+        }
+      }
+
+      if (!sourceId && sourceQuery) {
+        const sources = await findSourcesByName(sourceQuery, 1);
+        const match = sources[0] ?? null;
+        if (!match) {
+          if (!bookQuery) {
+            const bookMatches = await findBooksByName(sourceQuery, 10);
+            if (bookMatches.length) {
+              bookIds = bookIds ?? bookMatches.map((row) => row.id);
+              bookLabel = bookLabel ?? (bookMatches.length === 1 ? bookMatches[0].name : `book "${sourceQuery}"`);
+              sourceLabel = sourceLabel ?? bookMatches[0].sourceName ?? null;
+            } else {
+              await logRagInteraction({
+                question,
+                filters,
+                retrievedIds: [],
+                response: SOURCE_NOT_FOUND,
+                citations: [],
+              });
+              return NextResponse.json({ answer: SOURCE_NOT_FOUND, citations: [] });
+            }
+          }
+        } else {
+          sourceId = match.id;
+          sourceLabel = match.name;
+        }
+      }
+
+      if (!chapterIds) {
+        const chapterQuery = structuredFilters.chapter ?? extractChapterQueryFromQuestion(question);
+        if (chapterQuery) {
+          const matches = await findChaptersByName(chapterQuery, 10);
+          const scoped = sourceId ? matches.filter((match) => match.sourceId === sourceId) : matches;
+          if (!scoped.length) {
+            await logRagInteraction({
+              question,
+              filters,
+              retrievedIds: [],
+              response: CHAPTER_NOT_FOUND,
+              citations: [],
+            });
+            return NextResponse.json({ answer: CHAPTER_NOT_FOUND, citations: [] });
+          }
+          chapterIds = scoped.map((match) => match.id);
+          chapterLabel = scoped.length === 1 ? scoped[0].name : `chapter "${chapterQuery}"`;
+          if (!sourceLabel && scoped.length === 1 && scoped[0].sourceName) {
+            sourceLabel = scoped[0].sourceName;
+          }
+        }
+      }
+
+      const results = await fetchTopNarrators({
+        sourceId,
+        bookIds,
+        chapterIds,
+        limit: requestedCount,
+      });
+      if (!results.length) {
+        await logRagInteraction({
+          question,
+          filters,
+          retrievedIds: [],
+          response: SAFE_FALLBACK,
+          citations: [],
+        });
+        return NextResponse.json({ answer: SAFE_FALLBACK, citations: [] });
+      }
+
+      const scopeParts: string[] = [];
+      if (chapterLabel) {
+        scopeParts.push(`chapter ${chapterLabel}`);
+      } else if (bookLabel) {
+        scopeParts.push(`book ${bookLabel}`);
+      } else {
+        scopeParts.push("the collection");
+      }
+      if (sourceLabel) {
+        scopeParts.push(`in ${sourceLabel}`);
+      }
+      const scopeLabel = scopeParts.join(" ");
+      const list = results.map((row, index) => `${index + 1}. ${row.name} (${row.count})`).join("; ");
+      const response = `Top narrators in ${scopeLabel}: ${list}.`;
+      await logRagInteraction({
+        question,
+        filters,
+        retrievedIds: results.map((row) => row.id),
+        response,
+        citations: [],
+      });
+      return NextResponse.json({ answer: response, citations: [] });
     }
 
     if (parsedSourceNumbers.length > 1) {

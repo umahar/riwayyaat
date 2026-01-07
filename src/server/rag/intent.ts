@@ -6,11 +6,23 @@ const HOPS_REGEX = /(\d+)\s*(?:hop|hops|depth)\b/i;
 const CHAIN_KEYWORDS = ["chain", "isnad", "sanad"];
 const VARIANT_KEYWORDS = ["variant", "variants", "across sources", "other sources", "different sources"];
 const NARRATOR_KEYWORDS = ["narrator", "narrators", "network", "hops", "ego network"];
+const NARRATOR_AGGREGATE_KEYWORDS = [
+  "most frequent",
+  "most common",
+  "most mentioned",
+  "appear most",
+  "appears most",
+  "top narrators",
+  "top narrator",
+  "frequent narrators",
+  "common narrators",
+];
 
 export type RagIntent =
   | { type: "chain"; hadithId?: number }
   | { type: "variants"; hadithId?: number }
   | { type: "narrator-network"; narratorId?: number; narratorName?: string; depth?: number }
+  | { type: "narrator-aggregate" }
   | { type: "hadith"; hadithId: number }
   | { type: "semantic" };
 
@@ -64,6 +76,9 @@ export function inferRagIntent(question: string): RagIntent {
     return { type: "variants", hadithId };
   }
   if (hasAnyKeyword(question, NARRATOR_KEYWORDS)) {
+    if (hasAnyKeyword(question, NARRATOR_AGGREGATE_KEYWORDS)) {
+      return { type: "narrator-aggregate" };
+    }
     return { type: "narrator-network", narratorId, narratorName, depth };
   }
   if (hadithId) {

@@ -2,17 +2,19 @@
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { workspaceCopy } from "@/content/text";
-import { ChatMessage } from "@/features/workspace/hooks/use-rag-chat";
+import { ChatError, ChatMessage } from "@/features/workspace/hooks/use-rag-chat";
 import { AnswerGraphModal } from "@/features/workspace/components/chat/answer-graph-modal";
 
 type ConversationPanelProps = {
   messages: ChatMessage[];
   loading: boolean;
-  error: string | null;
+  error: ChatError | null;
   input: string;
   onInputChange: (value: string) => void;
   onSend: () => void;
+  onRetry?: () => void;
   onCitationSelect?: (hadithId: string) => void;
+  onContextSelect?: (hadithId: string) => void;
   contextItems?: Array<{ id: string; label: string }>;
   onClearContext?: () => void;
   onRemoveContext?: (id: string) => void;
@@ -25,7 +27,9 @@ export function ConversationPanel({
   input,
   onInputChange,
   onSend,
+  onRetry,
   onCitationSelect,
+  onContextSelect,
   contextItems,
   onClearContext,
   onRemoveContext,
@@ -34,6 +38,7 @@ export function ConversationPanel({
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const shouldAutoScrollRef = useRef(true);
   const [activeGraph, setActiveGraph] = useState<ChatMessage["graph"] | null>(null);
+  const [isComposing, setIsComposing] = useState(false);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -79,8 +84,20 @@ export function ConversationPanel({
         className="scrollbar-hide flex-1 space-y-5 overflow-y-auto px-8 py-6"
       >
         {error && (
-          <div className="rounded-xl border border-red-400/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-            {error}
+          <div
+            className="flex items-center justify-between gap-3 rounded-full border border-red-400/40 bg-red-500/10 px-4 py-2 text-sm text-red-200"
+            role="status"
+          >
+            <span>{error.message}</span>
+            {error.retryable && onRetry ? (
+              <button
+                type="button"
+                onClick={onRetry}
+                className="rounded-full border border-red-400/50 bg-red-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-red-100 transition hover:-translate-y-0.5"
+              >
+                Retry
+              </button>
+            ) : null}
           </div>
         )}
         {messages.map((message, index) => {
@@ -186,16 +203,22 @@ export function ConversationPanel({
               Context
             </span>
             <div className="flex flex-1 flex-wrap gap-2">
-              {contextItems.map((item) => (
-                <span
-                  key={item.id}
-                  className="flex items-center gap-1 rounded-full border border-[var(--border-soft)] bg-[var(--surface-panel)] px-2 py-1 text-[0.6rem] text-[var(--text-secondary)]"
-                >
-                  {item.label}
-                  <button
-                    type="button"
-                    onClick={() => onRemoveContext?.(item.id)}
-                    className="rounded-full border border-[var(--border-soft)] bg-[var(--surface-card)] px-1 text-[0.55rem] text-[var(--text-primary)] transition hover:-translate-y-0.5"
+                {contextItems.map((item) => (
+                  <span
+                    key={item.id}
+                    className="flex items-center gap-1 rounded-full border border-[var(--border-soft)] bg-[var(--surface-panel)] px-2 py-1 text-[0.6rem] text-[var(--text-secondary)]"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => onContextSelect?.(item.id)}
+                      className="text-left transition hover:opacity-80"
+                    >
+                      {item.label}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onRemoveContext?.(item.id)}
+                      className="rounded-full border border-[var(--border-soft)] bg-[var(--surface-card)] px-1 text-[0.55rem] text-[var(--text-primary)] transition hover:-translate-y-0.5"
                     aria-label={`Remove ${item.label} from context`}
                   >
                     ×
@@ -216,14 +239,21 @@ export function ConversationPanel({
           <label className="sr-only" htmlFor="workspace-input">
             {copy.inputLabel}
           </label>
-          <input
+          <textarea
             id="workspace-input"
-            type="text"
             value={input}
             onChange={(event) => onInputChange(event.target.value)}
             placeholder={copy.placeholder}
             disabled={loading}
-            className="flex-1 rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-4 py-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-emerald)] focus:outline-none disabled:opacity-60"
+            rows={2}
+            onCompositionStart={() => setIsComposing(true)}
+            onCompositionEnd={() => setIsComposing(false)}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter" || event.shiftKey || isComposing) return;
+              event.preventDefault();
+              onSend();
+            }}
+            className="flex-1 resize-none rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-4 py-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-emerald)] focus:outline-none disabled:opacity-60"
           />
           <button
             type="submit"

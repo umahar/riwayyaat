@@ -15,6 +15,12 @@ export type NarratorDetail = {
   methods: string[];
 };
 
+export type NarratorAggregate = {
+  id: number;
+  name: string;
+  count: number;
+};
+
 const STOPWORDS = [
   "ibn",
   "bin",
@@ -177,6 +183,40 @@ export async function getNarratorDetailsByName(name: string): Promise<NarratorDe
       reliabilities: rows[0].reliabilities ?? [],
       methods: rows[0].methods ?? [],
     };
+  } finally {
+    client.release();
+  }
+}
+
+export async function fetchTopNarrators(params: {
+  sourceId?: number | null;
+  bookIds?: number[] | null;
+  chapterIds?: number[] | null;
+  limit?: number;
+}): Promise<NarratorAggregate[]> {
+  const client = await getClient();
+  const limit = params.limit && params.limit > 0 ? Math.min(Math.trunc(params.limit), 20) : 5;
+  const bookIds = params.bookIds?.length ? params.bookIds : null;
+  const chapterIds = params.chapterIds?.length ? params.chapterIds : null;
+  try {
+    const { rows } = await client.query<NarratorAggregate>(
+      `
+        SELECT n.id, n.name, COUNT(*)::int AS count
+        FROM chain_narrator cn
+        JOIN hadith_chain hc ON hc.id = cn.chain_id
+        JOIN hadith h ON h.id = hc.hadith_id
+        JOIN narrator n ON n.id = cn.narrator_id
+        WHERE h.deleted_at IS NULL
+          AND ($1::int IS NULL OR h.source_id = $1)
+          AND ($2::int[] IS NULL OR h.book_id = ANY($2))
+          AND ($3::int[] IS NULL OR h.chapter_id = ANY($3))
+        GROUP BY n.id, n.name
+        ORDER BY count DESC, n.name
+        LIMIT $4
+      `,
+      [params.sourceId ?? null, bookIds, chapterIds, limit],
+    );
+    return rows;
   } finally {
     client.release();
   }
