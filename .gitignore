@@ -24,6 +24,7 @@
 .DS_Store
 *.pem
 /backups
+/scrapped-data
 
 # debug
 npm-debug.log*
