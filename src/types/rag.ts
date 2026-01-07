@@ -29,7 +29,13 @@ export type RagResult = {
     scholar: { id: number; name: string; lifespan: string | null };
     isPrimary: boolean | null;
   }>;
-  similarity: number; // cosine similarity (higher is more similar)
+  similarity: number; // combined retrieval score (higher is more similar)
+  retrieval?: {
+    vectorScore?: number;
+    graphScore?: number;
+    denseScore?: number;
+    combinedScore?: number;
+  };
 };
 
 export type RagCitation = {

@@ -14,7 +14,7 @@ import type {
 } from "@/types/evaluation";
 import type { RagResult } from "@/types/rag";
 import { retrieveHadithForQuestion } from "@/server/rag/retriever";
-import { retrieveHadithForQuestionKg } from "@/server/rag/kg-retriever";
+import { retrieveHadithForQuestionHybrid, retrieveHadithForQuestionKg } from "@/server/rag/kg-retriever";
 import { generateRagAnswer } from "@/server/rag/generator";
 import { loadEvaluationDataset } from "@/server/eval/dataset";
 import { fetchHadithCoverage, summarizeCoverage, summarizeCoverageForQuery, HadithCoverageRow } from "@/server/eval/kg";
@@ -25,7 +25,7 @@ type RunEvaluationOptions = {
   topK?: number;
   generateAnswers?: boolean;
   answerContextLimit?: number;
-  retrievalMode?: "kg" | "pg";
+  retrievalMode?: "kg" | "pg" | "hybrid";
 };
 
 function emptyMetrics(): EvaluationQueryMetrics {
@@ -112,21 +112,29 @@ export async function runEvaluation(options: RunEvaluationOptions = {}): Promise
     const coverageSet = new Set<number>(queryConfig.relevantHadithIds);
     perQueryHadithIds.set(queryConfig.id, coverageSet);
     try {
-      const retrieved = await retrieveHadithForQuestion({
+      const retrievedDense = await retrieveHadithForQuestion({
         question: queryConfig.question,
         limit: topK,
         ...queryConfig.filters,
       });
-      const retrievedKg =
-        options.retrievalMode === "pg"
-          ? []
-          : await retrieveHadithForQuestionKg({
-              question: queryConfig.question,
-              limit: topK,
-              filters: queryConfig.filters,
-            });
-      const retrievedFinal =
-        options.retrievalMode === "pg" ? retrieved : retrievedKg.length ? retrievedKg : retrieved;
+      let retrievedFinal: RagResult[] = [];
+      if (options.retrievalMode === "pg") {
+        retrievedFinal = retrievedDense;
+      } else if (options.retrievalMode === "hybrid") {
+        const hybrid = await retrieveHadithForQuestionHybrid({
+          question: queryConfig.question,
+          limit: topK,
+          filters: queryConfig.filters,
+        });
+        retrievedFinal = hybrid.results;
+      } else {
+        const kg = await retrieveHadithForQuestionKg({
+          question: queryConfig.question,
+          limit: topK,
+          filters: queryConfig.filters,
+        });
+        retrievedFinal = kg.results.length ? kg.results : retrievedDense;
+      }
       retrievedFinal.forEach((row) => coverageSet.add(row.hadithId));
 
       let answerSummary: EvaluationAnswerSummary | undefined;

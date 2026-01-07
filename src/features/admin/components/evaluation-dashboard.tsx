@@ -8,7 +8,7 @@ type RunOptions = {
   limit: string;
   topK: string;
   skipAnswers: boolean;
-  retrievalMode: "kg" | "pg";
+  retrievalMode: "kg" | "pg" | "hybrid";
 };
 
 const DEFAULT_OPTIONS: RunOptions = {
@@ -204,6 +204,17 @@ export function EvaluationDashboard() {
                 }`}
               >
                 KG (Neo4j)
+              </button>
+              <button
+                type="button"
+                onClick={() => setOptions((prev) => ({ ...prev, retrievalMode: "hybrid" }))}
+                className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                  options.retrievalMode === "hybrid"
+                    ? "bg-[var(--accent-emerald)] text-[var(--accent-contrast)]"
+                    : "border border-[var(--border-soft)] text-[var(--text-secondary)]"
+                }`}
+              >
+                Hybrid (KG + dense)
               </button>
               <button
                 type="button"

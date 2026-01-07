@@ -1,8 +1,8 @@
 import { embedTextsDirect, DEFAULT_EMBEDDING_MODEL } from "@/server/rag/embeddings";
 import { getSession } from "@/server/graph/client";
 import { ensureVectorIndex, getVectorIndexName } from "@/server/graph/indexes";
-import { RagFilters, RagResult } from "@/types/rag";
-import { retrieveHadithByIds } from "@/server/rag/retriever";
+import { RagFilters, RagGraph, RagResult } from "@/types/rag";
+import { retrieveHadithByIds, retrieveHadithForQuestion } from "@/server/rag/retriever";
 import { getClient } from "@/server/db/client";
 
 type KgRetrievalParams = {
@@ -10,7 +10,98 @@ type KgRetrievalParams = {
   limit?: number;
   model?: string;
   filters?: RagFilters;
+  includeProvenance?: boolean;
 };
+
+type KgRetrievalOutput = {
+  results: RagResult[];
+  provenance?: RagGraph | null;
+};
+
+type GraphSignals = {
+  sharedNarrators: number;
+  sharedBooks: number;
+  sharedSources: number;
+  sharedChapters: number;
+};
+
+type VectorHit = {
+  hadithId: number;
+  score: number;
+};
+
+const GRAPH_SIGNAL_DEFAULTS: GraphSignals = {
+  sharedNarrators: 0,
+  sharedBooks: 0,
+  sharedSources: 0,
+  sharedChapters: 0,
+};
+
+const DEFAULT_GRAPH_WEIGHTS = {
+  narrator: 0.6,
+  book: 0.2,
+  source: 0.15,
+  chapter: 0.05,
+};
+
+const DEFAULT_KG_WEIGHTS = {
+  vector: 0.55,
+  graph: 0.45,
+};
+
+const DEFAULT_HYBRID_WEIGHTS = {
+  vector: 0.45,
+  graph: 0.35,
+  dense: 0.2,
+};
+
+const VECTOR_CANDIDATE_MULTIPLIER = 4;
+const GRAPH_CANDIDATE_LIMIT = 40;
+const SEED_LIMIT = 8;
+const PROVENANCE_LIMIT = 6;
+const PROVENANCE_PATH_LIMIT = 80;
+
+const clampScore = (value: number) => Math.max(0, Math.min(1, value));
+
+const parseWeight = (value: string | undefined, fallback: number) => {
+  if (!value) return fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const normalizeWeights = <T extends Record<string, number>>(weights: T): T => {
+  const total = Object.values(weights).reduce((sum, value) => sum + value, 0);
+  if (total <= 0) return weights;
+  const normalized = Object.entries(weights).reduce<Record<string, number>>((acc, [key, value]) => {
+    acc[key] = value / total;
+    return acc;
+  }, {});
+  return normalized as T;
+};
+
+function getGraphWeights() {
+  return normalizeWeights({
+    narrator: parseWeight(process.env.RAG_GRAPH_WEIGHT_NARRATOR, DEFAULT_GRAPH_WEIGHTS.narrator),
+    book: parseWeight(process.env.RAG_GRAPH_WEIGHT_BOOK, DEFAULT_GRAPH_WEIGHTS.book),
+    source: parseWeight(process.env.RAG_GRAPH_WEIGHT_SOURCE, DEFAULT_GRAPH_WEIGHTS.source),
+    chapter: parseWeight(process.env.RAG_GRAPH_WEIGHT_CHAPTER, DEFAULT_GRAPH_WEIGHTS.chapter),
+  });
+}
+
+function getKgWeights() {
+  return normalizeWeights({
+    vector: parseWeight(process.env.RAG_KG_VECTOR_WEIGHT, DEFAULT_KG_WEIGHTS.vector),
+    graph: parseWeight(process.env.RAG_KG_GRAPH_WEIGHT, DEFAULT_KG_WEIGHTS.graph),
+  });
+}
+
+function getHybridWeights() {
+  return normalizeWeights({
+    vector: parseWeight(process.env.RAG_HYBRID_VECTOR_WEIGHT, DEFAULT_HYBRID_WEIGHTS.vector),
+    graph: parseWeight(process.env.RAG_HYBRID_GRAPH_WEIGHT, DEFAULT_HYBRID_WEIGHTS.graph),
+    dense: parseWeight(process.env.RAG_HYBRID_DENSE_WEIGHT, DEFAULT_HYBRID_WEIGHTS.dense),
+  });
+}
 
 async function resolveTagNames(tagIds: number[]) {
   const ids = tagIds.filter((id) => Number.isFinite(id) && id > 0);
@@ -51,20 +142,10 @@ async function applyFilters(results: RagResult[], filters?: RagFilters) {
   });
 }
 
-function reorderByIds(results: RagResult[], orderedIds: number[]) {
-  const map = new Map(results.map((result) => [result.hadithId, result]));
-  return orderedIds.map((id) => map.get(id)).filter(Boolean) as RagResult[];
-}
-
-export async function retrieveHadithForQuestionKg(params: KgRetrievalParams): Promise<RagResult[]> {
-  const question = params.question.trim();
-  if (!question) return [];
-  const model = params.model || process.env.EMBEDDING_MODEL || DEFAULT_EMBEDDING_MODEL;
-  const limit = params.limit && params.limit > 0 ? Math.min(Math.trunc(params.limit), 20) : 8;
-
+async function fetchVectorHits(question: string, model: string, limit: number): Promise<VectorHit[]> {
+  if (!question.trim()) return [];
   await ensureVectorIndex();
   const vector = await embedTextsDirect([question], model);
-
   const session = getSession({ defaultAccessMode: "READ" });
   try {
     const result = await session.run(
@@ -82,18 +163,325 @@ export async function retrieveHadithForQuestionKg(params: KgRetrievalParams): Pr
         model,
       },
     );
-    const orderedIds = result.records
-      .map((record) => Number(record.get("hadithId")))
-      .filter((id) => Number.isFinite(id) && id > 0);
-    if (!orderedIds.length) return [];
-
-    const results = await retrieveHadithByIds(orderedIds);
-    const ordered = reorderByIds(results, orderedIds);
-    return await applyFilters(ordered, params.filters);
-  } catch (error) {
-    console.warn("[rag] KG retrieval failed, falling back", error);
-    return [];
+    return result.records
+      .map((record) => ({
+        hadithId: Number(record.get("hadithId")),
+        score: Number(record.get("score")),
+      }))
+      .filter((row) => Number.isFinite(row.hadithId) && row.hadithId > 0)
+      .map((row) => ({ ...row, score: clampScore(row.score) }));
   } finally {
     await session.close();
   }
+}
+
+async function fetchGraphSignals(seedIds: number[]): Promise<Map<number, GraphSignals>> {
+  const signals = new Map<number, GraphSignals>();
+  if (!seedIds.length) return signals;
+  const session = getSession({ defaultAccessMode: "READ" });
+
+  const updateSignal = (hadithId: number, key: keyof GraphSignals, value: number) => {
+    if (!Number.isFinite(hadithId) || hadithId <= 0) return;
+    const current = signals.get(hadithId) ?? { ...GRAPH_SIGNAL_DEFAULTS };
+    current[key] += value;
+    signals.set(hadithId, current);
+  };
+
+  const runCount = async (cypher: string, key: keyof GraphSignals) => {
+    const result = await session.run(cypher, { seedIds });
+    result.records.forEach((record) => {
+      const hadithId = Number(record.get("hadithId"));
+      const count = Number(record.get("count"));
+      if (Number.isFinite(count) && count > 0) updateSignal(hadithId, key, count);
+    });
+  };
+
+  try {
+    await runCount(
+      `
+        MATCH (seed:Hadith)
+        WHERE seed.pgId IN $seedIds
+        MATCH (seed)-[:HAS_CHAIN]->(:Chain)-[:STEP]->(n:Narrator)<-[:STEP]-(:Chain)<-[:HAS_CHAIN]-(candidate:Hadith)
+        WHERE candidate.pgId <> seed.pgId
+        RETURN candidate.pgId AS hadithId, count(DISTINCT n) AS count
+      `,
+      "sharedNarrators",
+    );
+    await runCount(
+      `
+        MATCH (seed:Hadith)
+        WHERE seed.pgId IN $seedIds
+        MATCH (seed)-[:IN_BOOK]->(b:Book)<-[:IN_BOOK]-(candidate:Hadith)
+        WHERE candidate.pgId <> seed.pgId
+        RETURN candidate.pgId AS hadithId, count(DISTINCT b) AS count
+      `,
+      "sharedBooks",
+    );
+    await runCount(
+      `
+        MATCH (seed:Hadith)
+        WHERE seed.pgId IN $seedIds
+        MATCH (seed)-[:FROM_SOURCE]->(s:Source)<-[:FROM_SOURCE]-(candidate:Hadith)
+        WHERE candidate.pgId <> seed.pgId
+        RETURN candidate.pgId AS hadithId, count(DISTINCT s) AS count
+      `,
+      "sharedSources",
+    );
+    await runCount(
+      `
+        MATCH (seed:Hadith)
+        WHERE seed.pgId IN $seedIds
+        MATCH (seed)-[:IN_CHAPTER]->(c:Chapter)<-[:IN_CHAPTER]-(candidate:Hadith)
+        WHERE candidate.pgId <> seed.pgId
+        RETURN candidate.pgId AS hadithId, count(DISTINCT c) AS count
+      `,
+      "sharedChapters",
+    );
+  } finally {
+    await session.close();
+  }
+
+  return signals;
+}
+
+function computeGraphScores(signals: Map<number, GraphSignals>): Map<number, number> {
+  if (!signals.size) return new Map();
+  const weights = getGraphWeights();
+  let maxNarrators = 0;
+  let maxBooks = 0;
+  let maxSources = 0;
+  let maxChapters = 0;
+
+  signals.forEach((signal) => {
+    maxNarrators = Math.max(maxNarrators, signal.sharedNarrators);
+    maxBooks = Math.max(maxBooks, signal.sharedBooks);
+    maxSources = Math.max(maxSources, signal.sharedSources);
+    maxChapters = Math.max(maxChapters, signal.sharedChapters);
+  });
+
+  const scores = new Map<number, number>();
+  signals.forEach((signal, hadithId) => {
+    const narratorScore = maxNarrators ? signal.sharedNarrators / maxNarrators : 0;
+    const bookScore = maxBooks ? signal.sharedBooks / maxBooks : 0;
+    const sourceScore = maxSources ? signal.sharedSources / maxSources : 0;
+    const chapterScore = maxChapters ? signal.sharedChapters / maxChapters : 0;
+    const total =
+      narratorScore * weights.narrator +
+      bookScore * weights.book +
+      sourceScore * weights.source +
+      chapterScore * weights.chapter;
+    scores.set(hadithId, clampScore(total));
+  });
+  return scores;
+}
+
+function mergeScores(params: {
+  results: RagResult[];
+  vectorScores: Map<number, number>;
+  graphScores: Map<number, number>;
+  denseScores?: Map<number, number>;
+  weights: { vector: number; graph: number; dense?: number };
+}) {
+  const { vectorScores, graphScores, denseScores, weights } = params;
+  params.results.forEach((result) => {
+    const vectorScore = vectorScores.get(result.hadithId) ?? 0;
+    const graphScore = graphScores.get(result.hadithId) ?? 0;
+    const denseScore = denseScores?.get(result.hadithId) ?? 0;
+    const combined = clampScore(
+      vectorScore * weights.vector + graphScore * weights.graph + denseScore * (weights.dense ?? 0),
+    );
+    result.similarity = combined;
+    result.retrieval = {
+      vectorScore,
+      graphScore,
+      denseScore: weights.dense != null ? denseScore : undefined,
+      combinedScore: combined,
+    };
+  });
+}
+
+function sortByScore(results: RagResult[]) {
+  return [...results].sort((a, b) => {
+    const diff = (b.similarity ?? 0) - (a.similarity ?? 0);
+    if (diff !== 0) return diff;
+    return a.hadithId - b.hadithId;
+  });
+}
+
+async function fetchProvenanceGraph(
+  seedIds: number[],
+  candidateIds: number[],
+): Promise<RagGraph | null> {
+  if (!seedIds.length || !candidateIds.length) return null;
+  const session = getSession({ defaultAccessMode: "READ" });
+  try {
+    const result = await session.run(
+      `
+        MATCH (seed:Hadith)
+        WHERE seed.pgId IN $seedIds
+        MATCH (candidate:Hadith)
+        WHERE candidate.pgId IN $candidateIds
+        OPTIONAL MATCH p1=(seed)-[:HAS_CHAIN]->(:Chain)-[:STEP]->(:Narrator)<-[:STEP]-(:Chain)<-[:HAS_CHAIN]-(candidate)
+        OPTIONAL MATCH p2=(seed)-[:IN_BOOK]->(:Book)<-[:IN_BOOK]-(candidate)
+        OPTIONAL MATCH p3=(seed)-[:FROM_SOURCE]->(:Source)<-[:FROM_SOURCE]-(candidate)
+        OPTIONAL MATCH p4=(seed)-[:IN_CHAPTER]->(:Chapter)<-[:IN_CHAPTER]-(candidate)
+        WITH collect(p1) + collect(p2) + collect(p3) + collect(p4) AS paths
+        UNWIND paths AS p
+        WITH p WHERE p IS NOT NULL
+        WITH collect(DISTINCT p) AS uniquePaths
+        UNWIND uniquePaths AS p
+        WITH p LIMIT $maxPaths
+        UNWIND nodes(p) AS node
+        UNWIND relationships(p) AS rel
+        RETURN collect(DISTINCT node) AS nodes, collect(DISTINCT rel) AS rels
+      `,
+      { seedIds, candidateIds, maxPaths: PROVENANCE_PATH_LIMIT },
+    );
+
+    if (!result.records.length) return null;
+    const record = result.records[0];
+    const nodes = (record.get("nodes") as any[]) ?? [];
+    const rels = (record.get("rels") as any[]) ?? [];
+    if (!nodes.length || !rels.length) return null;
+
+    const nodesMap = new Map<string, { id: string; label: string; type: string; provenance: boolean }>();
+    const edgesMap = new Map<string, { id: string; from: string; to: string; type: string; provenance: boolean }>();
+
+    const addNode = (node: any) => {
+      const label = node.labels?.[0] ?? "Node";
+      const id = node.properties?.key || `${label}:${node.properties?.pgId ?? node.identity?.toString()}`;
+      const display =
+        node.properties?.name ||
+        node.properties?.title ||
+        node.properties?.identifier ||
+        node.properties?.displayLabel ||
+        node.properties?.label ||
+        `${label} ${node.properties?.pgId ?? ""}`.trim();
+      if (!nodesMap.has(id)) {
+        nodesMap.set(id, { id, label: display, type: label, provenance: true });
+      }
+    };
+
+    const addEdge = (rel: any) => {
+      const type = rel.type ?? "REL";
+      const from = rel.start?.properties?.key || rel.start?.identity?.toString();
+      const to = rel.end?.properties?.key || rel.end?.identity?.toString();
+      if (!from || !to) return;
+      const id = rel.identity ? rel.identity.toString() : `${from}->${to}:${type}`;
+      if (!edgesMap.has(id)) {
+        edgesMap.set(id, { id, from, to, type, provenance: true });
+      }
+    };
+
+    nodes.forEach(addNode);
+    rels.forEach(addEdge);
+
+    return {
+      nodes: Array.from(nodesMap.values()),
+      edges: Array.from(edgesMap.values()),
+    };
+  } finally {
+    await session.close();
+  }
+}
+
+export async function retrieveHadithForQuestionKg(params: KgRetrievalParams): Promise<KgRetrievalOutput> {
+  const question = params.question.trim();
+  if (!question) return { results: [] };
+  const model = params.model || process.env.EMBEDDING_MODEL || DEFAULT_EMBEDDING_MODEL;
+  const limit = params.limit && params.limit > 0 ? Math.min(Math.trunc(params.limit), 20) : 8;
+  const vectorLimit = Math.min(50, limit * VECTOR_CANDIDATE_MULTIPLIER);
+
+  try {
+    const vectorHits = await fetchVectorHits(question, model, vectorLimit);
+    if (!vectorHits.length) return { results: [] };
+
+    const vectorScores = new Map(vectorHits.map((hit) => [hit.hadithId, hit.score]));
+    const seedIds = vectorHits.slice(0, Math.min(SEED_LIMIT, vectorHits.length)).map((hit) => hit.hadithId);
+
+    const graphSignals = await fetchGraphSignals(seedIds);
+    const graphScores = computeGraphScores(graphSignals);
+
+    const graphCandidateIds = Array.from(graphScores.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, GRAPH_CANDIDATE_LIMIT)
+      .map(([id]) => id);
+
+    const candidateIds = Array.from(new Set([...vectorScores.keys(), ...graphCandidateIds]));
+    if (!candidateIds.length) return { results: [] };
+
+    const results = await retrieveHadithByIds(candidateIds);
+    if (!results.length) return { results: [] };
+
+    const weights = getKgWeights();
+    mergeScores({ results, vectorScores, graphScores, weights });
+
+    const scored = sortByScore(results);
+    const filtered = await applyFilters(scored, params.filters);
+    const finalResults = filtered.slice(0, limit);
+
+    let provenance: RagGraph | null = null;
+    if (params.includeProvenance) {
+      const provenanceIds = finalResults
+        .slice(0, Math.min(PROVENANCE_LIMIT, finalResults.length))
+        .map((r) => r.hadithId);
+      provenance = await fetchProvenanceGraph(seedIds, provenanceIds);
+    }
+
+    return { results: finalResults, provenance };
+  } catch (error) {
+    console.warn("[rag] KG retrieval failed, falling back", error);
+    return { results: [] };
+  }
+}
+
+export async function retrieveHadithForQuestionHybrid(params: KgRetrievalParams): Promise<KgRetrievalOutput> {
+  const question = params.question.trim();
+  if (!question) return { results: [] };
+  const limit = params.limit && params.limit > 0 ? Math.min(Math.trunc(params.limit), 20) : 8;
+
+  const kgLimit = Math.min(40, Math.max(limit * 3, 12));
+  const denseLimit = Math.min(40, Math.max(limit * 3, 12));
+
+  const kg = await retrieveHadithForQuestionKg({
+    ...params,
+    limit: kgLimit,
+    includeProvenance: params.includeProvenance,
+  });
+
+  const dense = await retrieveHadithForQuestion({
+    question,
+    limit: denseLimit,
+    ...params.filters,
+    model: params.model,
+  });
+
+  const denseScores = new Map(dense.map((row) => [row.hadithId, clampScore(row.similarity)]));
+  const merged = new Map<number, RagResult>();
+
+  kg.results.forEach((row) => {
+    merged.set(row.hadithId, { ...row });
+  });
+
+  dense.forEach((row) => {
+    if (!merged.has(row.hadithId)) {
+      merged.set(row.hadithId, { ...row, similarity: 0 });
+    }
+  });
+
+  const results = Array.from(merged.values());
+  const vectorScores = new Map(
+    results.map((row) => [row.hadithId, row.retrieval?.vectorScore ?? 0]),
+  );
+  const graphScores = new Map(
+    results.map((row) => [row.hadithId, row.retrieval?.graphScore ?? 0]),
+  );
+
+  const weights = getHybridWeights();
+  mergeScores({ results, vectorScores, graphScores, denseScores, weights });
+
+  const sorted = sortByScore(results);
+  const filtered = await applyFilters(sorted, params.filters);
+
+  return { results: filtered.slice(0, limit), provenance: kg.provenance ?? null };
 }

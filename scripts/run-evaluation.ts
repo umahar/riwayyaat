@@ -8,6 +8,7 @@ type CliOptions = {
   topK?: number;
   datasetPath?: string;
   skipAnswers?: boolean;
+  retrievalMode?: "kg" | "pg" | "hybrid";
 };
 
 function parseArgs(): CliOptions {
@@ -26,6 +27,10 @@ function parseArgs(): CliOptions {
       options.topK = Math.trunc(numeric);
     } else if (flag === "--dataset") {
       options.datasetPath = value;
+    } else if (flag === "--mode") {
+      if (value === "kg" || value === "pg" || value === "hybrid") {
+        options.retrievalMode = value;
+      }
     }
   }
   return options;
@@ -86,6 +91,7 @@ async function main() {
     topK: args.topK,
     datasetPath: args.datasetPath,
     generateAnswers: args.skipAnswers ? false : undefined,
+    retrievalMode: args.retrievalMode,
   });
 
   console.log("=== Evaluation Summary ===");

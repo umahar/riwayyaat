@@ -4,7 +4,7 @@ import { generateRagAnswer } from "@/server/rag/generator";
 import { buildRagContext } from "@/server/rag/context";
 import { inferRagIntent } from "@/server/rag/intent";
 import { loadGraphContext } from "@/server/rag/graph-context";
-import { retrieveHadithForQuestionKg } from "@/server/rag/kg-retriever";
+import { retrieveHadithForQuestionHybrid } from "@/server/rag/kg-retriever";
 import { findHadithIdBySourceAndNumber, findSourcesByName } from "@/server/rag/hadith-lookup";
 import {
   findExactNarratorByName,
@@ -17,7 +17,7 @@ import { extractStructuredFilters, searchHadithIdsByQuery } from "@/server/rag/s
 import { fetchAnswerGraph, fetchNarratorNetwork, fetchVariants } from "@/server/graph/queries";
 import { getHadithById, getHadithByIds } from "@/features/hadith/server/hadith-service";
 import { HadithInsight } from "@/features/hadith/types";
-import { RagCitation, RagFilters } from "@/types/rag";
+import { RagCitation, RagFilters, RagGraph } from "@/types/rag";
 import { getClient } from "@/server/db/client";
 
 const SAFE_FALLBACK =
@@ -104,6 +104,39 @@ async function buildAnswerGraph(citations?: RagCitation[]) {
     console.warn("[rag] Unable to load answer graph", error);
     return null;
   }
+}
+
+function mergeGraphs(primary: RagGraph | null, provenance?: RagGraph | null): RagGraph | null {
+  if (!primary && !provenance) return null;
+  const nodes = new Map<string, RagGraph["nodes"][number]>();
+  const edges = new Map<string, RagGraph["edges"][number]>();
+
+  const addNode = (node: RagGraph["nodes"][number]) => {
+    const existing = nodes.get(node.id);
+    nodes.set(node.id, {
+      ...existing,
+      ...node,
+      provenance: existing?.provenance || node.provenance || false,
+    });
+  };
+  const addEdge = (edge: RagGraph["edges"][number]) => {
+    const existing = edges.get(edge.id);
+    edges.set(edge.id, {
+      ...existing,
+      ...edge,
+      provenance: existing?.provenance || edge.provenance || false,
+    });
+  };
+
+  primary?.nodes.forEach(addNode);
+  primary?.edges.forEach(addEdge);
+  provenance?.nodes.forEach((node) => addNode({ ...node, provenance: true }));
+  provenance?.edges.forEach((edge) => addEdge({ ...edge, provenance: true }));
+
+  return {
+    nodes: Array.from(nodes.values()),
+    edges: Array.from(edges.values()),
+  };
 }
 
 function formatNarratorDetails(
@@ -608,14 +641,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const kgResults = await retrieveHadithForQuestionKg({
+    const hybridResults = await retrieveHadithForQuestionHybrid({
       question,
       limit,
       model: process.env.EMBEDDING_MODEL,
       filters,
+      includeProvenance: true,
     });
     const results =
-      kgResults.length > 0 ? kgResults : await retrieveHadithForQuestion({ question, ...filters, limit });
+      hybridResults.results.length > 0
+        ? hybridResults.results
+        : await retrieveHadithForQuestion({ question, ...filters, limit });
 
     if (!results.length) {
       const structuredIds = await searchHadithIdsByQuery({
@@ -671,7 +707,8 @@ export async function POST(request: NextRequest) {
     const graphMap = await loadGraphContext(detailIds, MAX_GRAPH_CONTEXT);
     const context = buildRagContext(results, hadithMap, graphMap);
     const answer = await generateRagAnswer({ question, results, context });
-    const graph = await buildAnswerGraph(answer.citations);
+    const answerGraph = await buildAnswerGraph(answer.citations);
+    const graph = mergeGraphs(answerGraph, hybridResults.provenance ?? null);
 
     await logRagInteraction({
       question,

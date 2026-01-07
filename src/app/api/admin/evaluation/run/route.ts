@@ -18,7 +18,10 @@ export async function POST(request: NextRequest) {
   const topK = asNumber((body as { topK?: unknown }).topK);
   const skipAnswers = Boolean((body as { skipAnswers?: unknown }).skipAnswers);
   const retrievalModeRaw = (body as { retrievalMode?: unknown }).retrievalMode;
-  const retrievalMode = retrievalModeRaw === "pg" || retrievalModeRaw === "kg" ? retrievalModeRaw : "kg";
+  const retrievalMode =
+    retrievalModeRaw === "pg" || retrievalModeRaw === "kg" || retrievalModeRaw === "hybrid"
+      ? retrievalModeRaw
+      : "kg";
   try {
     const result = await runEvaluation({
       limit,

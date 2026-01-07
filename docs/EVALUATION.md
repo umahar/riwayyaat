@@ -35,6 +35,9 @@ npm run eval:run
 
 # optional flags
 npm run eval:run -- --limit=5 --topK=15 --skip-answers
+
+# retrieval mode: kg (Neo4j), pg (pgvector), hybrid (KG + dense)
+npm run eval:run -- --mode=hybrid
 ```
 
 The CLI prints:
@@ -47,6 +50,7 @@ The CLI prints:
 
 - Visit `/admin/eval` (link available in the Hadith Manager header).
 - Choose query limit / top-K / whether to skip answer generation.
+- Pick retrieval mode (KG, PG, or Hybrid) to compare pipelines.
 - Click **Run evaluation**. Results display inline with cards for each metric, KG slot breakdown, per-query accordions, and any warnings.
 - Use this view during the live demo so your professor can watch each metric update after a run.
 

@@ -107,6 +107,7 @@ export type GraphApiNode = {
   id: string;
   label: string;
   type: string;
+  provenance?: boolean;
 };
 
 export type GraphApiEdge = {
@@ -114,6 +115,7 @@ export type GraphApiEdge = {
   from: string;
   to: string;
   type: string;
+  provenance?: boolean;
   [key: string]: unknown;
 };
 

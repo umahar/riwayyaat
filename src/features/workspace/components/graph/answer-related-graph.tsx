@@ -46,11 +46,13 @@ export function AnswerRelatedGraph({ data }: AnswerRelatedGraphProps) {
         id: n.id,
         name: n.label,
         type: n.type,
+        provenance: n.provenance ?? false,
       })),
       links: data.edges.map((e) => ({
         source: e.from,
         target: e.to,
         type: e.type,
+        provenance: e.provenance ?? false,
       })),
     };
   }, [data]);
@@ -83,14 +85,14 @@ export function AnswerRelatedGraph({ data }: AnswerRelatedGraphProps) {
     link.click();
   };
 
-  const nodeColor = (type: string) => {
+  const nodeColor = (type: string, isProvenance: boolean) => {
     if (type === "Hadith") return "#2563eb";
     if (type === "Tag") return "#16a34a";
     if (type === "Grade") return "#f97316";
     if (type === "Scholar") return "#a855f7";
     if (type === "Identifier") return "#0ea5e9";
     if (type === "Source" || type === "Book" || type === "Chapter") return "#64748b";
-    return "#0f766e";
+    return isProvenance ? "#0f766e" : "#0d9488";
   };
 
   return (
@@ -139,18 +141,25 @@ export function AnswerRelatedGraph({ data }: AnswerRelatedGraphProps) {
         nodeCanvasObject={(node: any, ctx: CanvasRenderingContext2D) => {
           const label = truncateLabel(node.name || node.id);
           const faded = hoverNode && hoverNode.id !== node.id;
+          const isProvenance = Boolean(node.provenance);
           ctx.globalAlpha = faded ? 0.35 : 1;
-          ctx.fillStyle = nodeColor(node.type);
+          ctx.fillStyle = nodeColor(node.type, isProvenance);
           ctx.beginPath();
-          ctx.arc(node.x!, node.y!, 6, 0, 2 * Math.PI, false);
+          const radius = isProvenance ? 7 : 6;
+          ctx.arc(node.x!, node.y!, radius, 0, 2 * Math.PI, false);
           ctx.fill();
+          if (isProvenance) {
+            ctx.strokeStyle = "#fbbf24";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+          }
           ctx.font = "12px Inter, sans-serif";
           ctx.fillStyle = isDark ? "#e2e8f0" : "#0f172a";
           ctx.fillText(label, node.x! + 10, node.y! + 4);
           ctx.globalAlpha = 1;
         }}
-        linkColor={() => "#94a3b8"}
-        linkWidth={1.6}
+        linkColor={(link: any) => (link.provenance ? "#f59e0b" : "#94a3b8")}
+        linkWidth={(link: any) => (link.provenance ? 2.6 : 1.6)}
       />
       {hoverNode && (
         <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-lg bg-[var(--surface-popover)] px-3 py-2 text-xs text-[var(--text-primary)] shadow">

@@ -32,7 +32,9 @@ export function AnswerGraphModal({ graph, open, onClose }: GraphModalProps) {
         <header className="flex items-center justify-between border-b border-[var(--border-soft)] px-6 py-4">
           <div>
             <h3 className="text-base font-semibold text-[var(--text-primary)]">Related knowledge graph</h3>
-            <p className="text-xs text-[var(--text-muted)]">Relationships used to answer this question.</p>
+            <p className="text-xs text-[var(--text-muted)]">
+              Relationships used to answer this question (highlighted links show the retrieval path).
+            </p>
           </div>
         </header>
         <div className="px-6 py-5">
