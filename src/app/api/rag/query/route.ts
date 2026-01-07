@@ -593,7 +593,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    if (parsedSourceNumbers.length > 1 && effectiveIntentType !== "chain" && effectiveIntentType !== "variants") {
+    if (parsedSourceNumbers.length > 1) {
       const resolvedPairs = await Promise.all(parsedSourceNumbers.map((match) => resolveSourceNumberMatch(match)));
       const resolvedIds = Array.from(
         new Set(

@@ -26,7 +26,7 @@ export const siteConfig = {
   ],
   examplePrompts: [
     "Trace every sanad variant for the Hadith of Intentions and highlight key narrators.",
-    "Compare matn wording differences in Jibril’s hadith across Sahih Muslim and Muwatta.",
+    "Compare Sahih al-Bukhari 136 and Sahih al-Bukhari 203.",
     "Show reliability notes for narrators linking Imam Malik to Anas ibn Malik.",
     "Summarize commentaries on the hadith about mercy between spouses.",
   ],
