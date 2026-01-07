@@ -30,7 +30,8 @@ const DASH_VARIANTS = /[\u2010-\u2015\u2212]/g;
 function normalizeSourceQuery(value: string) {
   return value
     .replace(/["“”]/g, "")
-    .replace(/\s*-\s*.*$/, "")
+    .replace(DASH_VARIANTS, "-")
+    .replace(/\s+-\s*(?:hadith|no\.?|#|id|\d+).*/i, "")
     .replace(/\s+/g, " ")
     .replace(/[,:;]+$/, "")
     .replace(TRIM_TRAILING, "")
@@ -67,7 +68,8 @@ function findPrefixedSource(question: string, hint: string): string | null {
   const escapedHint = escapeRegExp(hint);
   const escapedPrefixes = SOURCE_PREFIXES.map((prefix) => escapeRegExp(prefix)).join("|");
   const pattern = new RegExp(`\\b(?:${escapedPrefixes})\\s+${AL_PREFIX}${escapedHint}\\b`, "i");
-  const match = question.match(pattern);
+  const normalizedQuestion = normalizeHintInput(question);
+  const match = normalizedQuestion.match(pattern);
   if (!match?.[0]) return null;
   const normalized = normalizeSourceQuery(match[0]);
   return normalized || null;
@@ -156,6 +158,77 @@ export function parseSourceNumbersFromQuestion(question: string): SourceNumberMa
       if (seen.has(key)) continue;
       seen.add(key);
       matches.push({ sourceQuery, number, hint: hintFromQuestion });
+    }
+  }
+
+  return matches;
+}
+
+export function buildSourceNumberMatchesFromSources(
+  question: string,
+  sources: Array<{ name: string; aliases?: string[] | null }>,
+): SourceNumberMatch[] {
+  if (!sources.length) return [];
+  const normalized = normalizeHintInput(question);
+  const matches: SourceNumberMatch[] = [];
+  const seen = new Set<string>();
+  const mentions: Array<{ source: { name: string }; index: number; length: number }> = [];
+
+  for (const source of sources) {
+    const tokens = [source.name, ...(source.aliases ?? [])].filter(Boolean);
+    for (const token of tokens) {
+      const needle = normalizeHintInput(token);
+      if (!needle) continue;
+      const pattern = new RegExp(`\\b${escapeRegExp(needle)}\\b`, "g");
+      for (const match of normalized.matchAll(pattern)) {
+        if (match.index == null) continue;
+        mentions.push({ source: { name: source.name }, index: match.index, length: match[0].length });
+      }
+    }
+  }
+
+  mentions.sort((a, b) => a.index - b.index);
+  for (let i = 0; i < mentions.length; i += 1) {
+    const current = mentions[i];
+    const next = mentions[i + 1];
+    const start = current.index + current.length;
+    const end = next ? next.index : normalized.length;
+    const segment = normalized.slice(start, end);
+    const numberMatches = Array.from(segment.matchAll(/\b(\d+)\b/g));
+    for (const match of numberMatches) {
+      const raw = match?.[1];
+      if (!raw) continue;
+      const number = Number(raw);
+      if (!Number.isFinite(number) || number <= 0) continue;
+      if (match.index != null && isCountToken(segment, match.index)) continue;
+      const key = `${current.source.name.toLowerCase()}::${number}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      matches.push({
+        sourceQuery: current.source.name,
+        number,
+        hint: detectSourceHint(current.source.name) ?? undefined,
+      });
+    }
+  }
+
+  if (!matches.length && sources.length === 1) {
+    const source = sources[0];
+    const numberMatches = Array.from(normalized.matchAll(/\b(\d+)\b/g));
+    for (const match of numberMatches) {
+      const raw = match?.[1];
+      if (!raw) continue;
+      const number = Number(raw);
+      if (!Number.isFinite(number) || number <= 0) continue;
+      if (match.index != null && isCountToken(normalized, match.index)) continue;
+      const key = `${source.name.toLowerCase()}::${number}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      matches.push({
+        sourceQuery: source.name,
+        number,
+        hint: detectSourceHint(source.name) ?? undefined,
+      });
     }
   }
 

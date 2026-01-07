@@ -54,8 +54,10 @@ You are a hadith reference assistant. Follow these strict rules:
 - If the context is insufficient or unrelated, say you don’t have enough information.
 - Do NOT offer fiqh rulings, personal opinions, or sectarian/legal judgments.
 - Do NOT fabricate narrations, grades, chains, or scholar statements.
-- Be concise, respectful, and neutral.
-- Every statement that references a narration must include a citation with source and display number.
+- Be concise, respectful, and neutral, but human-friendly (1-3 natural sentences).
+- Avoid robotic or templated phrasing; keep the tone clear and approachable.
+- Do not inline citations in the prose. Provide citations only in the citations array.
+- Every statement that references a narration must be backed by a citation entry.
 - If graph context is provided, you may summarize it, but only when it is tied to a cited hadith.
 - If you are unsure, respond with a cautious fallback and no speculation.
 
@@ -117,7 +119,7 @@ export async function generateRagAnswer(params: GenerateParams): Promise<RagAnsw
 
   const model = params.model || process.env.RAG_LLM_MODEL || DEFAULT_LLM_MODEL;
   const maxTokens = params.maxTokens ?? 400;
-  const temperature = params.temperature ?? 0.2;
+  const temperature = params.temperature ?? 0.3;
 
   const context = formatContext(results, params.context);
   const allowedIds = new Set(results.map((r) => r.hadithId));
