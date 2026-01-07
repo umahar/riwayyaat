@@ -17,7 +17,8 @@ type ChatWorkspaceProps = {
 };
 
 export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) {
-  const { messages, isLoading, error, submitQuestion, resultHadithIds } = useRagChat();
+  const { messages, isLoading, error, submitQuestion, resultHadithIds, lastHadithId, clearContext } =
+    useRagChat();
   const [input, setInput] = useState("");
   const [selectedHadithId, setSelectedHadithId] = useState<string | null>(null);
   const [selectedGradings, setSelectedGradings] = useState<Set<string>>(
@@ -29,6 +30,7 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
   const [selectedSources, setSelectedSources] = useState<Set<string>>(
     () => new Set<string>(),
   );
+  const [showAllHadiths, setShowAllHadiths] = useState(false);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [leftWidth, setLeftWidth] = useState(320);
   const [rightWidth, setRightWidth] = useState(420);
@@ -58,7 +60,11 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
   const handleSend = () => {
     const trimmed = input.trim();
     if (!trimmed) return;
-    submitQuestion(trimmed, { limit: 6 });
+    const contextId = selectedHadithId ?? lastHadithId;
+    submitQuestion(trimmed, {
+      limit: 6,
+      filters: contextId ? { contextHadithId: Number(contextId) } : undefined,
+    });
     setInput("");
   };
 
@@ -76,11 +82,21 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
   const { data: hadithData, loading: hadithLoading, error: hadithError, refresh: refreshHadith } =
     useHadithData();
 
+  const handleToggleShowAll = useCallback(() => {
+    setShowAllHadiths((current) => {
+      const next = !current;
+      if (!current) {
+        refreshHadith();
+      }
+      return next;
+    });
+  }, [refreshHadith]);
+
   const scopedHadithData = useMemo(() => {
-    if (!resultHadithIds) return hadithData;
+    if (showAllHadiths || !resultHadithIds) return hadithData;
     const ids = new Set(resultHadithIds);
     return hadithData.filter((hadith) => ids.has(hadith.id));
-  }, [hadithData, resultHadithIds]);
+  }, [hadithData, resultHadithIds, showAllHadiths]);
 
   const hadithMap = useMemo(() => {
     return scopedHadithData.reduce<Record<string, HadithInsight>>((acc, hadith) => {
@@ -300,8 +316,19 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
   const handleCitationSelect = (id: string) => {
     setSelectedHadithId(id);
   };
+  const handleClearContext = () => {
+    setSelectedHadithId(null);
+    clearContext();
+  };
 
   const activeHadithId = currentHadith?.id ?? null;
+  const contextHadithId = selectedHadithId ?? lastHadithId ?? null;
+  const contextHadith = contextHadithId ? hadithMap[contextHadithId] : null;
+  const contextLabel = contextHadith
+    ? `${contextHadith.details.source} — ${contextHadith.details.displayNumber ?? contextHadith.id}`
+    : contextHadithId
+      ? `Hadith ID ${contextHadithId}`
+      : null;
 
   return (
     <section
@@ -320,6 +347,8 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
         onToggleCollapse={handleToggleLeft}
         onResizeStart={isDesktop ? startResize("left") : undefined}
         onNewChat={onNewChat}
+        showAllHadiths={showAllHadiths}
+        onToggleShowAllHadiths={handleToggleShowAll}
         hadiths={filteredHadiths}
         activeHadithId={activeHadithId}
         onSelectHadith={handleSelectHadith}
@@ -337,6 +366,8 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
         onInputChange={setInput}
         onSend={handleSend}
         onCitationSelect={handleCitationSelect}
+        contextLabel={contextLabel}
+        onClearContext={contextLabel ? handleClearContext : undefined}
       />
 
       <HadithDetailsPanel

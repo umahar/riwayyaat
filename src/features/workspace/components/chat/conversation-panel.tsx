@@ -13,6 +13,8 @@ type ConversationPanelProps = {
   onInputChange: (value: string) => void;
   onSend: () => void;
   onCitationSelect?: (hadithId: string) => void;
+  contextLabel?: string | null;
+  onClearContext?: () => void;
 };
 
 export function ConversationPanel({
@@ -23,6 +25,8 @@ export function ConversationPanel({
   onInputChange,
   onSend,
   onCitationSelect,
+  contextLabel,
+  onClearContext,
 }: ConversationPanelProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -31,6 +35,10 @@ export function ConversationPanel({
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    shouldAutoScrollRef.current = true;
+    requestAnimationFrame(() => {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    });
     onSend();
   };
   const copy = workspaceCopy.conversation;
@@ -141,6 +149,21 @@ export function ConversationPanel({
         onClose={() => setActiveGraph(null)}
       />
       <footer className="border-t border-[var(--border-soft)] px-8 py-5">
+        {contextLabel && (
+          <div className="mb-3 flex items-center justify-between rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-card)] px-3 py-2 text-xs text-[var(--text-primary)] shadow-sm">
+            <span className="font-semibold uppercase tracking-[0.15em] text-[0.55rem] text-[var(--text-muted)]">
+              Context
+            </span>
+            <span className="flex-1 px-3 text-[var(--text-secondary)]">{contextLabel}</span>
+            <button
+              type="button"
+              onClick={onClearContext}
+              className="rounded-full border border-[var(--border-soft)] bg-[var(--surface-panel)] px-2 py-1 text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-[var(--text-primary)] transition hover:-translate-y-0.5"
+            >
+              Clear
+            </button>
+          </div>
+        )}
         <form className="flex gap-3" onSubmit={handleSubmit}>
           <label className="sr-only" htmlFor="workspace-input">
             {copy.inputLabel}

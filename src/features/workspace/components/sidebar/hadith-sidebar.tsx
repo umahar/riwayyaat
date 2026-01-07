@@ -29,6 +29,8 @@ type HadithSidebarProps = {
   onToggleCollapse: () => void;
   onResizeStart?: (event: React.MouseEvent) => void;
   onNewChat: () => void;
+  showAllHadiths: boolean;
+  onToggleShowAllHadiths: () => void;
   hadiths: HadithInsight[];
   activeHadithId: string | null;
   onSelectHadith: (id: string) => void;
@@ -44,6 +46,8 @@ export function HadithSidebar({
   onToggleCollapse,
   onResizeStart,
   onNewChat,
+  showAllHadiths,
+  onToggleShowAllHadiths,
   hadiths,
   activeHadithId,
   onSelectHadith,
@@ -96,32 +100,54 @@ export function HadithSidebar({
       {!collapsed && (
         <>
           <header className="space-y-1">
-            <div className="flex flex-nowrap items-center gap-2 whitespace-nowrap sm:gap-3">
-                <div className="flex flex-col whitespace-nowrap">
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
-                    {copy.heading}
-                  </p>
-                  <p className="text-base font-semibold text-[var(--text-primary)]">
-                    {loading ? "—" : hadiths.length} {copy.resultsSuffix}
-                  </p>
-                </div>
-                <div className="flex flex-nowrap items-center gap-2 sm:gap-3">
-                  {filterGroups.map((group) => (
-                    <FilterMenu
-                      key={group.key}
+            <div className="flex flex-wrap items-center gap-2 whitespace-nowrap sm:gap-3">
+              <div className="flex flex-col whitespace-nowrap">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+                  {copy.heading}
+                </p>
+                <p className="text-base font-semibold text-[var(--text-primary)]">
+                  {loading ? "—" : hadiths.length} {copy.resultsSuffix}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 rounded-full border border-[var(--border-soft)] bg-[var(--surface-card)] px-2 py-1 text-[0.55rem] font-semibold uppercase tracking-[0.25em] text-[var(--text-muted)]">
+                <span>All</span>
+                <button
+                  type="button"
+                  aria-pressed={showAllHadiths}
+                  aria-label={showAllHadiths ? "Showing all hadiths" : "Show all hadiths"}
+                  title={showAllHadiths ? "Showing all hadiths" : "Show all hadiths"}
+                  onClick={onToggleShowAllHadiths}
+                  disabled={loading}
+                  className={`relative h-4 w-7 rounded-full border border-[var(--border-soft)] bg-[var(--surface-card)] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-emerald)] ${
+                    showAllHadiths ? "border-[var(--accent-emerald)]/60" : ""
+                  } ${loading ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
+                >
+                  <span
+                    className={`absolute top-0.5 h-3 w-3 rounded-full transition ${
+                      showAllHadiths
+                        ? "left-[calc(100%-14px)] bg-[var(--accent-emerald)]"
+                        : "left-0.5 bg-[var(--text-muted)]"
+                    }`}
+                  />
+                </button>
+              </div>
+              <div className="flex flex-nowrap items-center gap-2 sm:gap-3">
+                {filterGroups.map((group) => (
+                  <FilterMenu
+                    key={group.key}
                     label={group.label}
                     menuTitle={group.menuTitle}
                     options={group.options.map<FilterOption>((value) => ({
                       label: value,
                       value,
                     }))}
-                      selectedValues={group.selected}
-                      onToggle={group.onToggle}
-                      onClear={group.onClear}
-                      clearLabel={group.clearLabel}
-                    />
-                  ))}
-                </div>
+                    selectedValues={group.selected}
+                    onToggle={group.onToggle}
+                    onClear={group.onClear}
+                    clearLabel={group.clearLabel}
+                  />
+                ))}
+              </div>
             </div>
           </header>
           <div className="space-y-6">

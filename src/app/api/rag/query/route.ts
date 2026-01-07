@@ -94,6 +94,22 @@ function formatNarratorNetworkAnswer(
   return `Narrators connected to ${narratorName} within ${depth} hops: ${list}${suffix}.`;
 }
 
+function formatNarratorChainDetails(hadith: HadithInsight): string {
+  if (!hadith.chain.length) {
+    return `I don’t have chain data stored for ${hadith.details.source} ${hadith.details.displayNumber ?? hadith.id}.`;
+  }
+  const label = hadith.details.displayLabel ?? `Hadith ${hadith.details.displayNumber ?? hadith.id}`;
+  const items = hadith.chain.map((node) => {
+    const bits = [node.name];
+    if (node.type === "prophet") bits.push("Prophet");
+    if (node.classificationDetail?.title) bits.push(node.classificationDetail.title);
+    if (node.reliabilityDetail?.title) bits.push(node.reliabilityDetail.title);
+    if (node.lifespan) bits.push(node.lifespan);
+    return bits.join(" — ");
+  });
+  return `Narrators for ${label}: ${items.join("; ")}.`;
+}
+
 async function buildAnswerGraph(citations?: RagCitation[]) {
   if (!citations?.length) return null;
   const ids = citations.map((citation) => citation.hadithId).filter((id) => Number.isFinite(id));
@@ -215,6 +231,7 @@ function parseBody(body: unknown): {
     Array.isArray(value) ? value.map((v) => Number(v)).filter((n) => Number.isFinite(n)) : [];
 
   const filters: RagFilters = {
+    contextHadithId: asNumber(filtersRaw.contextHadithId),
     sourceId: asNumber(filtersRaw.sourceId),
     bookId: asNumber(filtersRaw.bookId),
     chapterId: asNumber(filtersRaw.chapterId),
@@ -279,10 +296,38 @@ export async function POST(request: NextRequest) {
 
     const { question, filters, limit } = parsed;
     const { filters: structuredFilters, hasExplicitFilters } = extractStructuredFilters(question);
+    const contextHadithId = filters.contextHadithId;
     const intent = inferRagIntent(question);
+    const explicitHadithId = "hadithId" in intent ? intent.hadithId : undefined;
+
+    const isContextualQuestion = (value: string) => {
+      const lower = value.toLowerCase();
+      return [
+        "this hadith",
+        "that hadith",
+        "tell me more",
+        "more info",
+        "all info",
+        "all information",
+        "details",
+        "explain it",
+        "explain this",
+        "about it",
+        "its narrators",
+        "its chain",
+      ].some((phrase) => lower.includes(phrase));
+    };
+    const hasExplicitReference =
+      Boolean(parseSourceNumber(question)) ||
+      Boolean(explicitHadithId) ||
+      ("narratorId" in intent && intent.narratorId) ||
+      Boolean(extractNarratorDetailName(question));
+    const shouldUseContext = Boolean(
+      contextHadithId && !hasExplicitReference && isContextualQuestion(question),
+    );
 
     if (intent.type === "chain") {
-      let hadithId = intent.hadithId;
+      let hadithId = intent.hadithId ?? (shouldUseContext ? contextHadithId : undefined);
       if (!hadithId) {
         const candidates = await searchHadithIdsByQuery({
           text: question,
@@ -338,7 +383,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (intent.type === "variants") {
-      let hadithId = intent.hadithId;
+      let hadithId = intent.hadithId ?? (shouldUseContext ? contextHadithId : undefined);
       if (!hadithId) {
         const candidates = await searchHadithIdsByQuery({
           text: question,
@@ -409,6 +454,30 @@ export async function POST(request: NextRequest) {
       let narratorId = intent.narratorId;
       let narratorName = intent.narratorName;
 
+      if (!narratorId && !narratorName && shouldUseContext && contextHadithId) {
+        const hadith = await getHadithById(String(contextHadithId));
+        if (!hadith) {
+          await logRagInteraction({
+            question,
+            filters,
+            retrievedIds: [contextHadithId],
+            response: SAFE_FALLBACK,
+            citations: [],
+          });
+          return NextResponse.json({ answer: SAFE_FALLBACK, citations: [] });
+        }
+        const response = formatNarratorChainDetails(hadith);
+        const citations = [buildCitation(hadith)];
+        await logRagInteraction({
+          question,
+          filters,
+          retrievedIds: [contextHadithId],
+          response,
+          citations,
+        });
+        return NextResponse.json({ answer: response, citations });
+      }
+
       if (!narratorId && narratorName) {
         const exact = await findExactNarratorByName(narratorName);
         if (exact) {
@@ -472,8 +541,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ answer: response, citations: [] });
     }
 
-    if (intent.type === "hadith") {
-      const results = await retrieveHadithByIds([intent.hadithId]);
+    if (intent.type === "hadith" || shouldUseContext) {
+      const resolvedHadithId = intent.type === "hadith" ? intent.hadithId : contextHadithId!;
+      const results = await retrieveHadithByIds([resolvedHadithId]);
       if (!results.length) {
         await logRagInteraction({
           question,
@@ -484,9 +554,9 @@ export async function POST(request: NextRequest) {
         });
         return NextResponse.json({ answer: SAFE_FALLBACK, citations: [] });
       }
-      const hadithDetails = await getHadithByIds([intent.hadithId]);
+      const hadithDetails = await getHadithByIds([resolvedHadithId]);
       const hadithMap = new Map(hadithDetails.map((item) => [Number(item.id), item]));
-      const graphMap = await loadGraphContext([intent.hadithId], 1);
+      const graphMap = await loadGraphContext([resolvedHadithId], 1);
       const context = buildRagContext(results, hadithMap, graphMap);
       const answer = await generateRagAnswer({ question, results, context });
       const graph = await buildAnswerGraph(answer.citations);

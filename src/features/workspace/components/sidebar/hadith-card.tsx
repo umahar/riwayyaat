@@ -29,7 +29,9 @@ export function HadithCard({ hadith, active, expanded, onSelect }: HadithCardPro
     <article
       onClick={() => onSelect(hadith.id)}
       className={`cursor-pointer rounded-3xl border bg-[var(--workspace-card-bg)] px-5 py-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
-        active ? "border-[var(--accent-emerald)] shadow-lg" : "border-[var(--workspace-card-border)]"
+        active
+          ? "border-[var(--accent-emerald)] bg-[var(--surface-card)]/70 shadow-lg ring-2 ring-[var(--accent-emerald)]/30"
+          : "border-[var(--workspace-card-border)]"
       }`}
     >
       <div className="flex items-start justify-between gap-4">

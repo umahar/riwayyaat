@@ -1,6 +1,7 @@
 import type { GraphApiEdge, GraphApiNode } from "@/server/graph/types";
 
 export type RagFilters = {
+  contextHadithId?: number;
   sourceId?: number;
   bookId?: number;
   chapterId?: number;
