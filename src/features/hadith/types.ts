@@ -90,7 +90,7 @@ export type HadithInsight = {
   sourceTypeDetails?: LookupDetail[];
   chainTypes: string[];
   chainTypeDetails?: LookupDetail[];
-  narrationLevel: NarrationLevel;
+  narrationLevel?: NarrationLevel;
   narrationLevelDetail?: LookupDetail;
 };
 

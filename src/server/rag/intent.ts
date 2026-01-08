@@ -1,5 +1,4 @@
-const HADITH_ID_REGEX =
-  /\bhadith\s*(?:id|#|no\.?|number)?\s*[:#]?\s*(\d+)\b|\bid\s*(\d+)\b/i;
+const HADITH_ID_REGEX = /\bhadith\s*(?:id|#|no\.?|number)?\s*[:#]?\s*(\d+)\b/i;
 const NARRATOR_ID_REGEX = /\bnarrator\s*(?:id|#)?\s*[:#]?\s*(\d+)\b/i;
 const HOPS_REGEX = /(\d+)\s*(?:hop|hops|depth)\b/i;
 

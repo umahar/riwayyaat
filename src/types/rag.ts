@@ -15,6 +15,7 @@ export type RagRetrievalParams = {
   question: string;
   limit?: number;
   model?: string;
+  storageModel?: string;
 } & RagFilters;
 
 export type RagResult = {
@@ -73,6 +74,7 @@ export type RagContextEntry = {
       lifespan?: string;
       type?: "prophet";
       reliability?: string;
+      transmissionMethod?: string;
     }>;
     narrationLevel?: string;
     chainTypes?: string[];

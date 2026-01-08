@@ -22,6 +22,7 @@ function mapHadithExtra(hadith?: HadithInsight) {
       lifespan: node.lifespan,
       type: node.type,
       reliability: node.reliabilityDetail?.title,
+      transmissionMethod: node.transmissionMethodDetail?.title,
     })),
     narrationLevel: hadith.narrationLevel,
     chainTypes: hadith.chainTypes,

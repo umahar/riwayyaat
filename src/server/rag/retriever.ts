@@ -79,6 +79,7 @@ function buildFilters(filters: RagFilters) {
 
 export async function retrieveHadithForQuestion(params: RagRetrievalParams): Promise<RagResult[]> {
   const model = params.model || process.env.EMBEDDING_MODEL || DEFAULT_EMBEDDING_MODEL;
+  const storageModel = params.storageModel || model;
   const limit = params.limit && params.limit > 0 ? params.limit : 8;
   if (!params.question.trim()) return [];
 
@@ -193,14 +194,14 @@ export async function retrieveHadithForQuestion(params: RagRetrievalParams): Pro
         scholar: { id: number; name: string; lifespan: string | null };
         isPrimary: boolean | null;
       }> | null;
-    }>(sql, [...filterParams, embeddingVector, model, remainingLimit + directResults.length]);
+    }>(sql, [...filterParams, embeddingVector, storageModel, remainingLimit + directResults.length]);
 
     const exclude = new Set(directResults.map((result) => result.hadithId));
     const dense = rows
       .map((row) => ({
         hadithId: row.id,
-        displayNumber: row.display_number,
-        displayLabel: row.display_label,
+        displayNumber: String(row.number),
+        displayLabel: String(row.number),
         source: { id: row.source_id, name: row.source_name },
         book:
           row.book_id != null
@@ -302,8 +303,8 @@ export async function retrieveHadithByIds(ids: number[]): Promise<RagResult[]> {
 
     return rows.map((row) => ({
       hadithId: row.id,
-      displayNumber: row.display_number,
-      displayLabel: row.display_label ?? row.display_number,
+      displayNumber: String(row.number),
+      displayLabel: String(row.number),
       source: { id: row.source_id, name: row.source_name },
       book:
         row.book_id != null

@@ -151,6 +151,20 @@ export function HadithDetailsPanel({
     setGradeDetailState({ hadithId: hadith?.id ?? null, open: false });
   };
 
+  // Auto-load chain graph when entering Graph tab or when hadith changes.
+  useEffect(() => {
+    if (activeTab === "graph" && hadith?.id) {
+      loadChainGraph(Number(hadith.id));
+      resetNetwork();
+      resetVariants();
+    }
+  }, [activeTab, hadith?.id, loadChainGraph, resetNetwork, resetVariants]);
+
+  useEffect(() => {
+    setVariantFilter("all");
+    setVariantSourceFilter("all");
+  }, [hadith?.id]);
+
   if (loading) {
     return (
       <PanelWrapper isDesktop={isDesktop} onResizeStart={onResizeStart}>
@@ -198,20 +212,6 @@ export function HadithDetailsPanel({
   const displayNumber = hadith.details.displayNumber ?? String(hadith.details.hadithNumber);
   const narrationDetails = hadith.narrationLevelDetail;
   const sourceAuthor = hadith.details.author ?? null;
-
-  // Auto-load chain graph when entering Graph tab or when hadith changes.
-  useEffect(() => {
-    if (activeTab === "graph" && hadith?.id) {
-      loadChainGraph(Number(hadith.id));
-      resetNetwork();
-      resetVariants();
-    }
-  }, [activeTab, hadith?.id, loadChainGraph, resetNetwork, resetVariants]);
-
-  useEffect(() => {
-    setVariantFilter("all");
-    setVariantSourceFilter("all");
-  }, [hadith?.id]);
 
   return (
     <PanelWrapper isDesktop={isDesktop} onResizeStart={onResizeStart}>

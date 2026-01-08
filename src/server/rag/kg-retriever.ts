@@ -11,6 +11,9 @@ type KgRetrievalParams = {
   question: string;
   limit?: number;
   model?: string;
+  storageModel?: string;
+  kgModel?: string;
+  kgStorageModel?: string;
   filters?: RagFilters;
   includeProvenance?: boolean;
   seedHadithIds?: number[];
@@ -184,10 +187,15 @@ async function applyFilters(results: RagResult[], filters?: RagFilters) {
   });
 }
 
-async function fetchVectorHits(question: string, model: string, limit: number): Promise<VectorHit[]> {
+async function fetchVectorHits(
+  question: string,
+  providerModel: string,
+  storageModel: string,
+  limit: number,
+): Promise<VectorHit[]> {
   if (!question.trim()) return [];
   await ensureVectorIndex();
-  const vector = await embedTextsDirect([question], model);
+  const vector = await embedTextsDirect([question], providerModel);
   const session = getSession({ defaultAccessMode: "READ" });
   try {
     const result = await session.run(
@@ -202,7 +210,7 @@ async function fetchVectorHits(question: string, model: string, limit: number): 
         index: getVectorIndexName(),
         k: limit,
         vector: vector[0],
-        model,
+        model: storageModel,
       },
     );
     return result.records
@@ -534,13 +542,14 @@ async function fetchProvenanceGraph(
 export async function retrieveHadithForQuestionKg(params: KgRetrievalParams): Promise<KgRetrievalOutput> {
   const question = params.question.trim();
   if (!question) return { results: [] };
-  const model = params.model || process.env.EMBEDDING_MODEL || DEFAULT_EMBEDDING_MODEL;
+  const model = params.kgModel || params.model || process.env.EMBEDDING_MODEL || DEFAULT_EMBEDDING_MODEL;
+  const storageModel = params.kgStorageModel || params.storageModel || model;
   const limit = params.limit && params.limit > 0 ? Math.min(Math.trunc(params.limit), 20) : 8;
   const vectorLimit = Math.min(50, limit * VECTOR_CANDIDATE_MULTIPLIER);
 
   try {
     const directMatch = await resolveSourceNumberQuestion(question);
-    const vectorHits = await fetchVectorHits(question, model, vectorLimit);
+    const vectorHits = await fetchVectorHits(question, model, storageModel, vectorLimit);
     const seedFromParams = (params.seedHadithIds ?? []).filter((id) => Number.isFinite(id) && id > 0);
     const vectorScores = new Map(vectorHits.map((hit) => [hit.hadithId, hit.score]));
     if (directMatch) {
@@ -612,6 +621,7 @@ export async function retrieveHadithForQuestionHybrid(params: KgRetrievalParams)
     limit: denseLimit,
     ...params.filters,
     model: params.model,
+    storageModel: params.storageModel,
   });
 
   const lexical = await retrieveHadithForQuestionLexical({

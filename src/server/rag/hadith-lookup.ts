@@ -141,3 +141,35 @@ export async function findHadithIdBySourceAndNumber(sourceId: number, number: nu
     client.release();
   }
 }
+
+export async function findUniqueHadithIdByNumber(
+  number: number,
+): Promise<{ hadithId: number; sourceName: string } | null> {
+  const client = await getClient();
+  try {
+    const { rows } = await client.query<{
+      id: number;
+      source_name: string;
+      total: string | number;
+    }>(
+      `
+        SELECT h.id, s.name AS source_name, COUNT(*) OVER() AS total
+        FROM hadith h
+        JOIN source s ON s.id = h.source_id
+        WHERE h.deleted_at IS NULL
+          AND (h.number = $1 OR h.display_number = $2)
+        ORDER BY h.id
+        LIMIT 2
+      `,
+      [number, String(number)],
+    );
+    if (!rows.length) return null;
+    const total = Number(rows[0].total ?? rows.length);
+    if (Number.isFinite(total) && total === 1) {
+      return { hadithId: rows[0].id, sourceName: rows[0].source_name };
+    }
+    return null;
+  } finally {
+    client.release();
+  }
+}

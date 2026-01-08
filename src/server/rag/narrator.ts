@@ -71,6 +71,33 @@ export async function findNarratorsByName(name: string, limit = 5): Promise<Narr
   }
 }
 
+export async function findNarratorsByNameInHadith(
+  name: string,
+  hadithId: number,
+  limit = 5,
+): Promise<NarratorMatch[]> {
+  const client = await getClient();
+  try {
+    const { rows } = await client.query<NarratorMatch>(
+      `
+        SELECT DISTINCT n.id, n.name
+        FROM narrator n
+        JOIN chain_narrator cn ON cn.narrator_id = n.id
+        JOIN hadith_chain hc ON hc.id = cn.chain_id
+        LEFT JOIN narrator_alias na ON na.narrator_id = n.id
+        WHERE hc.hadith_id = $1
+          AND (n.name ILIKE $2 OR na.alias ILIKE $2)
+        ORDER BY length(n.name), n.name
+        LIMIT $3
+      `,
+      [hadithId, `%${name}%`, Math.max(1, Math.min(limit, 10))],
+    );
+    return rows;
+  } finally {
+    client.release();
+  }
+}
+
 export async function findExactNarratorByName(name: string): Promise<NarratorMatch | null> {
   const client = await getClient();
   try {

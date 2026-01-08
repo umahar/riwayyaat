@@ -11,6 +11,7 @@ export type StructuredSearchFilters = {
   attribution?: string;
   chainType?: string;
   narrationLevel?: string;
+  transmissionMethod?: string;
   narrator?: string;
   sanad?: string;
   matn?: string;
@@ -27,6 +28,7 @@ const FILTER_PATTERNS: Array<[keyof StructuredSearchFilters, RegExp]> = [
   ["attribution", /\battribution\s*[:=]\s*([^,;.]+)/i],
   ["chainType", /\bchain\s*type\s*[:=]\s*([^,;.]+)/i],
   ["narrationLevel", /\bnarration\s*level\s*[:=]\s*([^,;.]+)/i],
+  ["transmissionMethod", /\btransmission\s*method\s*[:=]\s*([^,;.]+)/i],
   ["narrator", /\bnarrator\s*[:=]\s*([^,;.]+)/i],
   ["sanad", /\bsanad\s*[:=]\s*([^,;.]+)/i],
   ["matn", /\bmatn\s*[:=]\s*([^,;.]+)/i],
@@ -108,6 +110,7 @@ export async function searchHadithIdsByQuery(params: SearchParams): Promise<numb
     filters.narrationLevel,
     "(nl.name_en ILIKE $$ OR nl.name_ar ILIKE $$ OR nl.description ILIKE $$)",
   );
+  pushFilterClause(clauses, values, filters.transmissionMethod, "(tm.name ILIKE $$ OR tm.description ILIKE $$)");
   pushFilterClause(clauses, values, filters.narrator, "(n.name ILIKE $$ OR n.descriptor ILIKE $$)");
   pushFilterClause(clauses, values, filters.sanad, "h.sanad ILIKE $$");
   pushFilterClause(clauses, values, filters.matn, "(m.text_en ILIKE $$ OR m.text_ar ILIKE $$ OR m.summary ILIKE $$)");

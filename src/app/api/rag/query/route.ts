@@ -11,15 +11,18 @@ import {
 } from "@/server/rag/source-number";
 import { loadGraphContext } from "@/server/rag/graph-context";
 import { retrieveHadithForQuestionHybrid } from "@/server/rag/kg-retriever";
+import { DEFAULT_EMBEDDING_PROFILE, getAugmentedEmbeddingProfile } from "@/server/rag/embeddings";
 import {
   findBooksByName,
   findChaptersByName,
   findHadithIdBySourceAndNumber,
+  findUniqueHadithIdByNumber,
   findSourcesByName,
   findSourcesMentionedInQuestion,
 } from "@/server/rag/hadith-lookup";
 import {
   findExactNarratorByName,
+  findNarratorsByNameInHadith,
   findNarratorsByName,
   findNarratorsByAlias,
   fetchTopNarrators,
@@ -27,6 +30,12 @@ import {
   getNarratorDetailsByName,
 } from "@/server/rag/narrator";
 import { extractStructuredFilters, searchHadithIdsByQuery } from "@/server/rag/search";
+import {
+  compareChains,
+  findHadithIdsByMatnSimilarity,
+  findMatnPairsByPrefix,
+  loadHadithInsights,
+} from "@/server/rag/compare";
 import { fetchAnswerGraph, fetchNarratorNetwork, fetchVariants } from "@/server/graph/queries";
 import { getHadithById, getHadithByIds } from "@/features/hadith/server/hadith-service";
 import { HadithInsight } from "@/features/hadith/types";
@@ -39,7 +48,11 @@ const SAFE_FALLBACK =
 const SOURCE_NOT_FOUND =
   "I don't recognize that source name in the database. Please check the spelling and try again.";
 const REQUIRE_ID_MESSAGE =
-  "If you can, share a hadith id (e.g., \"Hadith ID 123\") so I can look it up.";
+  "Please include the source name with the hadith number (e.g., \"Sahih al-Bukhari 4014\").";
+const REQUIRE_SOURCE_MESSAGE =
+  "I need the source name with that hadith number (e.g., \"Sahih al-Bukhari 4014\").";
+const REQUIRE_COMPARE_SOURCE_MESSAGE =
+  "Please include the source name with each hadith number (e.g., \"Compare Bukhari 2398 and 2399\").";
 const REQUIRE_NARRATOR_MESSAGE =
   "Please share a narrator name or id (e.g., \"Narrator ID 45\" or \"connected to Abu Huraira\").";
 const BOOK_NOT_FOUND =
@@ -47,9 +60,11 @@ const BOOK_NOT_FOUND =
 const CHAPTER_NOT_FOUND =
   "I couldn't find that chapter in the database. Please check the spelling or try the book name instead.";
 const REQUIRE_CONTEXT_MESSAGE =
-  "Select a hadith from the results, or share a hadith id, and I can answer from that context.";
+  "Select a hadith from the results, or share a source name with hadith number, and I can answer from that context.";
 const HADITH_NOT_FOUND_MESSAGE =
   "I couldn't find that number under the specified source. Please double-check the source and number.";
+const CONTEXT_ONLY_MESSAGE =
+  "This chat is scoped to the selected hadith. Clear the context to search globally.";
 const MAX_CONTEXT_DETAILS = 3;
 const MAX_STRUCTURED_RESULTS = 12;
 const MAX_GRAPH_CONTEXT = 2;
@@ -61,6 +76,26 @@ const TOPIC_KEYWORDS: Array<{ key: string; terms: string[] }> = [
 ];
 const LIST_VERBS = ["list", "show", "give", "provide", "share", "display"];
 const LIST_NOUNS = ["hadith", "hadiths", "narration", "narrations", "reports"];
+const CHAIN_KEYWORDS = ["chain", "isnad", "sanad"];
+const CHAIN_TYPE_KEYWORDS = ["chain type", "isnad type", "sanad type", "chain classification"];
+const COMPARE_KEYWORDS = [
+  "compare",
+  "difference",
+  "different",
+  "versus",
+  "vs",
+  "same",
+  "similar",
+  "nearly identical",
+  "parallel",
+  "variants",
+  "variant",
+  "same wording",
+  "similar wording",
+  "same matn",
+  "similar matn",
+];
+const MATN_SIMILARITY_THRESHOLD = 0.75;
 const NARRATOR_NETWORK_KEYWORDS = [
   "connected",
   "connection",
@@ -82,18 +117,47 @@ const NARRATOR_AGGREGATE_KEYWORDS = [
   "common narrators",
 ];
 const GRADE_KEYWORDS = ["grade", "graded", "sahih", "hasan", "daif", "dhaif", "weak", "authentic"];
-const ATTRIBUTION_KEYWORDS = ["marfu", "marfū", "mawquf", "maqtu", "maqṭu", "mursal"];
+const ATTRIBUTION_KEYWORDS = ["attribution", "marfu", "marfū", "mawquf", "maqtu", "maqṭu", "mursal"];
+const NARRATION_LEVEL_KEYWORDS = [
+  "narration level",
+  "level of narration",
+  "mutawatir",
+  "mashhur",
+  "aziz",
+  "gharib",
+  "fard",
+];
+const TRANSMISSION_METHOD_KEYWORDS = [
+  "transmission method",
+  "method of transmission",
+  "tariq",
+  "turuq",
+];
+const VARIANT_KEYWORDS = ["variant", "variants", "across sources", "other sources", "different sources"];
+const IDENTIFIER_KEYWORDS = [
+  "identifier",
+  "identifier scheme",
+  "scheme key",
+  "reference id",
+  "reference number",
+];
+const DEBUG_LOG = process.env.RAG_DEBUG_LOG === "true";
+
+function logRagDebug(event: string, payload: Record<string, unknown>) {
+  if (!DEBUG_LOG) return;
+  console.info(`[rag] ${event}`, payload);
+}
 
 function buildCitation(hadith: HadithInsight): RagCitation {
   return {
     hadithId: Number(hadith.id),
-    displayNumber: hadith.details.displayNumber ?? null,
+    displayNumber: String(hadith.details.hadithNumber),
     source: hadith.details.source,
   };
 }
 
 function formatChainAnswer(hadith: HadithInsight): string {
-  const label = hadith.details.displayLabel ?? `${hadith.details.source} ${hadith.details.displayNumber ?? hadith.id}`;
+  const label = formatHadithLabel(hadith);
   if (!hadith.chain.length) {
     return `I don't have chain data stored for ${label} yet.`;
   }
@@ -104,13 +168,17 @@ function formatChainAnswer(hadith: HadithInsight): string {
 function formatVariantsAnswer(
   hadith: HadithInsight,
   variants: Array<{ hadithId: number; displayNumber: string; source: string; similarityReason: string }>,
+  variantMap?: Map<number, HadithInsight>,
 ): string {
-  const label = `${hadith.details.source} ${hadith.details.displayNumber ?? hadith.id}`;
+  const label = formatHadithLabel(hadith);
   if (!variants.length) {
     return `I don't see linked variants in the graph for ${label}.`;
   }
   const items = variants.slice(0, 10).map((variant) => {
-    return `${variant.source} ${variant.displayNumber} (${variant.similarityReason})`;
+    const mapped = variantMap?.get(variant.hadithId);
+    const number = mapped?.details.hadithNumber ?? variant.displayNumber;
+    const source = mapped?.details.source ?? variant.source;
+    return `${source} ${number} (${variant.similarityReason})`;
   });
   return `I found these linked variants for ${label}: ${items.join("; ")}.`;
 }
@@ -133,7 +201,7 @@ function formatNarratorNetworkAnswer(
 }
 
 function formatNarratorChainDetails(hadith: HadithInsight): string {
-  const label = hadith.details.displayLabel ?? `${hadith.details.source} ${hadith.details.displayNumber ?? hadith.id}`;
+  const label = formatHadithLabel(hadith);
   if (!hadith.chain.length) {
     return `I don't have chain data stored for ${label} yet.`;
   }
@@ -152,7 +220,7 @@ function formatListAnswer(hadiths: HadithInsight[], sourceLabel?: string | null)
   if (!hadiths.length) return SAFE_FALLBACK;
   const prefix = sourceLabel ? `from ${sourceLabel}` : "from your collection";
   const items = hadiths.map((hadith, index) => {
-    const label = `${hadith.details.source} ${hadith.details.displayNumber ?? hadith.id}`;
+    const label = formatHadithLabel(hadith);
     const snippet = hadith.matn.split("\n").map((line) => line.trim()).find(Boolean) ?? hadith.matn;
     const text = snippet.length > 180 ? `${snippet.slice(0, 180)}…` : snippet;
     return `${index + 1}. ${text} (${label})`;
@@ -160,7 +228,12 @@ function formatListAnswer(hadiths: HadithInsight[], sourceLabel?: string | null)
   return `I found ${hadiths.length} ${hadiths.length === 1 ? "hadith" : "hadiths"} ${prefix}: ${items.join(" ")}`;
 }
 
-async function fetchListHadithIds(sourceId: number | null, limit: number): Promise<number[]> {
+async function fetchListHadithIds(
+  sourceId: number | null,
+  limit: number,
+  bookIds?: number[] | null,
+  chapterIds?: number[] | null,
+): Promise<number[]> {
   const client = await getClient();
   try {
     const { rows } = await client.query<{ id: number }>(
@@ -169,10 +242,17 @@ async function fetchListHadithIds(sourceId: number | null, limit: number): Promi
         FROM hadith
         WHERE deleted_at IS NULL
           AND ($1::int IS NULL OR source_id = $1)
+          AND ($2::int[] IS NULL OR book_id = ANY($2))
+          AND ($3::int[] IS NULL OR chapter_id = ANY($3))
         ORDER BY id
-        LIMIT $2
+        LIMIT $4
       `,
-      [sourceId, Math.min(Math.max(1, limit), 20)],
+      [
+        sourceId,
+        bookIds?.length ? bookIds : null,
+        chapterIds?.length ? chapterIds : null,
+        Math.min(Math.max(1, limit), 20),
+      ],
     );
     return rows.map((row) => row.id);
   } finally {
@@ -233,6 +313,16 @@ function buildRetrievalScores(results: RagResult[]) {
   }));
 }
 
+type AttributeIntent = {
+  wantsAttribute: boolean;
+  wantsGrade: boolean;
+  wantsAttribution: boolean;
+  wantsChainType: boolean;
+  wantsNarrationLevel: boolean;
+  wantsTransmissionMethod: boolean;
+  wantsIdentifiers: boolean;
+};
+
 function isGradeQuestion(question: string): boolean {
   const lower = question.toLowerCase();
   if (!GRADE_KEYWORDS.some((keyword) => lower.includes(keyword))) return false;
@@ -245,37 +335,82 @@ function isAttributionQuestion(question: string): boolean {
   return /\b(is|attribution|marfu|marfū|mawquf|maqtu|maqṭu|mursal)\b/i.test(question);
 }
 
-function formatGradeAnswer(hadiths: HadithInsight[]): string {
-  const items = hadiths.map((hadith) => {
-    const primary = hadith.gradedGrades?.find((grade) => grade.isPrimary) ?? hadith.gradedGrades?.[0];
-    const gradeTitle = primary?.grade?.title ?? hadith.details.grading ?? null;
-    const scholar = primary?.scholar?.name ?? null;
-    const label = `${hadith.details.source} ${hadith.details.displayNumber ?? hadith.id}`;
-    if (!gradeTitle) return `${label} doesn’t have a stored grading.`;
-    return scholar
-      ? `${label} is graded ${gradeTitle} (reported by ${scholar}).`
-      : `${label} is graded ${gradeTitle}.`;
-  });
-  if (items.length === 1) return items[0];
-  return `Here’s the grading info I have: ${items.join(" ")}`;
+function detectAttributeIntent(question: string): AttributeIntent {
+  const lower = question.toLowerCase();
+  const wantsGrade = isGradeQuestion(question);
+  const wantsAttribution = isAttributionQuestion(question);
+  const wantsChainType = CHAIN_TYPE_KEYWORDS.some((keyword) => lower.includes(keyword));
+  const wantsNarrationLevel = NARRATION_LEVEL_KEYWORDS.some((keyword) => lower.includes(keyword));
+  const wantsTransmissionMethod = TRANSMISSION_METHOD_KEYWORDS.some((keyword) => lower.includes(keyword));
+  const wantsIdentifiers = IDENTIFIER_KEYWORDS.some((keyword) => lower.includes(keyword));
+  const wantsAttribute =
+    wantsGrade ||
+    wantsAttribution ||
+    wantsChainType ||
+    wantsNarrationLevel ||
+    wantsTransmissionMethod ||
+    wantsIdentifiers;
+  return {
+    wantsAttribute,
+    wantsGrade,
+    wantsAttribution,
+    wantsChainType,
+    wantsNarrationLevel,
+    wantsTransmissionMethod,
+    wantsIdentifiers,
+  };
 }
 
-function formatAttributionAnswer(hadiths: HadithInsight[]): string {
+function formatAttributeAnswer(hadiths: HadithInsight[], intent: AttributeIntent): string {
   const items = hadiths.map((hadith) => {
-    const label = `${hadith.details.source} ${hadith.details.displayNumber ?? hadith.id}`;
-    const attribution = hadith.sourceTypeDetails?.[0]?.title ?? hadith.sourceTypes?.[0] ?? null;
-    const chainType = hadith.chainTypeDetails?.[0]?.title ?? hadith.chainTypes?.[0] ?? null;
-    const narration = hadith.narrationLevelDetail?.title ?? hadith.narrationLevel ?? null;
-    const parts = [
-      attribution ? `Attribution: ${attribution}` : null,
-      chainType ? `Chain type: ${chainType}` : null,
-      narration ? `Narration level: ${narration}` : null,
-    ].filter(Boolean);
-    if (!parts.length) return `${label} doesn’t have stored attribution data.`;
-    return `${label} is listed as ${parts.join(" · ")}.`;
+    const label = `${hadith.details.source} ${hadith.details.hadithNumber}`;
+    const parts: string[] = [];
+    if (intent.wantsGrade) {
+      const primary = hadith.gradedGrades?.find((grade) => grade.isPrimary) ?? hadith.gradedGrades?.[0];
+      const gradeTitle = primary?.grade?.title ?? hadith.details.grading ?? null;
+      const scholar = primary?.scholar?.name ?? null;
+      if (gradeTitle) {
+        parts.push(`Grade: ${gradeTitle}${scholar ? ` (by ${scholar})` : ""}`);
+      } else {
+        parts.push("Grade: not stored");
+      }
+    }
+    if (intent.wantsAttribution) {
+      const attribution = hadith.sourceTypeDetails?.[0]?.title ?? hadith.sourceTypes?.[0] ?? null;
+      parts.push(attribution ? `Attribution: ${attribution}` : "Attribution: not stored");
+    }
+    if (intent.wantsChainType) {
+      const chainType = hadith.chainTypeDetails?.[0]?.title ?? hadith.chainTypes?.[0] ?? null;
+      parts.push(chainType ? `Chain type: ${chainType}` : "Chain type: not stored");
+    }
+    if (intent.wantsNarrationLevel) {
+      const narration = hadith.narrationLevelDetail?.title ?? hadith.narrationLevel ?? null;
+      parts.push(narration ? `Narration level: ${narration}` : "Narration level: not stored");
+    }
+    if (intent.wantsTransmissionMethod) {
+      const methods = Array.from(
+        new Set(
+          hadith.chain
+            .map((node) => node.transmissionMethodDetail?.title)
+            .filter((value): value is string => Boolean(value)),
+        ),
+      );
+      parts.push(methods.length ? `Transmission method: ${methods.join(", ")}` : "Transmission method: not stored");
+    }
+    if (intent.wantsIdentifiers) {
+      const identifiers = hadith.identifiers?.map((id) => {
+        const suffix = id.isPrimary ? " (primary)" : "";
+        return `${id.schemeKey}:${id.identifier}${suffix}`;
+      });
+      parts.push(identifiers?.length ? `Identifiers: ${identifiers.join(", ")}` : "Identifiers: not stored");
+    }
+    if (!parts.length) {
+      return `${label} does not have stored attribute data.`;
+    }
+    return `${label}: ${parts.join(" · ")}`;
   });
   if (items.length === 1) return items[0];
-  return `Here’s the attribution info I have: ${items.join(" ")}`;
+  return `Here is what I have: ${items.join(" ")}`;
 }
 
 async function mergeContextResults(results: RagResult[], contextIds: number[]): Promise<RagResult[]> {
@@ -328,9 +463,18 @@ function extractNarratorDetailName(question: string): string | null {
   const patterns = [
     /tell me more about\s+([^?.!]+?)(?:[?.!]|$)/i,
     /tell me about\s+([^?.!]+?)(?:[?.!]|$)/i,
+    /details about\s+([^?.!]+?)(?:[?.!]|$)/i,
+    /details of\s+([^?.!]+?)(?:[?.!]|$)/i,
+    /i want details about\s+([^?.!]+?)(?:[?.!]|$)/i,
+    /i want details of\s+([^?.!]+?)(?:[?.!]|$)/i,
     /who is\s+([^?.!]+?)(?:[?.!]|$)/i,
+    /info about\s+([^?.!]+?)(?:[?.!]|$)/i,
+    /info on\s+([^?.!]+?)(?:[?.!]|$)/i,
+    /information about\s+([^?.!]+?)(?:[?.!]|$)/i,
     /information on\s+([^?.!]+?)(?:[?.!]|$)/i,
     /details on\s+([^?.!]+?)(?:[?.!]|$)/i,
+    /biography of\s+([^?.!]+?)(?:[?.!]|$)/i,
+    /bio of\s+([^?.!]+?)(?:[?.!]|$)/i,
   ];
   for (const pattern of patterns) {
     const match = question.match(pattern);
@@ -343,11 +487,57 @@ function extractNarratorDetailName(question: string): string | null {
   return null;
 }
 
+function looksLikeNarratorName(question: string): string | null {
+  const trimmed = question.trim();
+  if (!trimmed) return null;
+  if (trimmed.length > 80) return null;
+  if (/\d/.test(trimmed)) return null;
+  if (/[,;:.!?]/.test(trimmed)) return null;
+  const lower = trimmed.toLowerCase();
+  const tokens = trimmed.split(/\s+/).filter(Boolean);
+  const blockers = [
+    "hadith",
+    "narrator",
+    "narrators",
+    "chain",
+    "isnad",
+    "sanad",
+    "variant",
+    "variants",
+    "grade",
+    "graded",
+    "attribution",
+    "network",
+    "connected",
+    "compare",
+    "list",
+    "show",
+    "give",
+    "provide",
+    "continue",
+    "conversation",
+    "chat",
+    "context",
+    "details",
+    "info",
+    "information",
+    "who",
+    "what",
+    "why",
+    "how",
+  ];
+  if (blockers.some((token) => lower.includes(token))) return null;
+  const nameConnector = /(^|\s)(abu|umm|ibn|bin|bint|abd|al)(\s|-|$)/;
+  if (!nameConnector.test(lower) && tokens.length <= 2) return null;
+  if (tokens.length > 8) return null;
+  return trimmed;
+}
+
 function formatHadithOptions(matches: HadithInsight[], label: string) {
   const items = matches.slice(0, 6).map((match) => {
-    return `${match.details.source} ${match.details.displayNumber ?? match.id} (ID ${match.id})`;
+    return `${match.details.source} ${match.details.hadithNumber}`;
   });
-  return `I found multiple matches for ${label}: ${items.join("; ")}. Which one should I use? Please share the hadith id.`;
+  return `I found multiple matches for ${label}: ${items.join("; ")}. Which one should I use? Please share the source name and hadith number.`;
 }
 
 function extractTopicTerms(question: string): string[] {
@@ -371,6 +561,110 @@ function detectListIntent(question: string): { wantsList: boolean; count?: numbe
   const hasHadithNoun = LIST_NOUNS.some((noun) => lower.includes(noun));
   const wantsList = Boolean((hasListVerb && hasHadithNoun) || countMatch);
   return { wantsList, count };
+}
+
+function extractQuotedMatn(question: string): string | null {
+  const match = question.match(/["“”]([^"“”]{6,})["“”]/);
+  const text = match?.[1]?.trim();
+  return text && text.length >= 6 ? text : null;
+}
+
+function extractHadithIdsFromQuestion(question: string): number[] {
+  const ids = new Set<number>();
+  const patterns = [
+    /\bhadith\s*(?:id|#|no\.?|number)?\s*[:#]?\s*(\d+)\b/gi,
+  ];
+  patterns.forEach((pattern) => {
+    for (const match of question.matchAll(pattern)) {
+      const raw = match[1];
+      const value = Number(raw);
+      if (Number.isFinite(value) && value > 0) ids.add(Math.trunc(value));
+    }
+  });
+  return Array.from(ids);
+}
+
+function extractComparisonNumbers(question: string): number[] {
+  const lower = question.toLowerCase();
+  if (!COMPARE_KEYWORDS.some((keyword) => lower.includes(keyword))) return [];
+  const matches = question.match(/\b\d{1,5}\b/g) ?? [];
+  const values = matches.map((match) => Number(match)).filter((value) => Number.isFinite(value) && value > 0);
+  return Array.from(new Set(values));
+}
+
+type ComparisonSignal = {
+  wantsCompare: boolean;
+  hadithIds: number[];
+  matnQuery?: string | null;
+  count: number;
+};
+
+function detectComparisonIntent(
+  question: string,
+  matnFilter?: string | null,
+  countHint?: number,
+  sourceNumberCount = 0,
+  numberCount = 0,
+): ComparisonSignal {
+  const lower = question.toLowerCase();
+  const hasCompareKeyword = COMPARE_KEYWORDS.some((keyword) => lower.includes(keyword));
+  const hasChainKeyword = CHAIN_KEYWORDS.some((keyword) => lower.includes(keyword));
+  const hasMatnKeyword = lower.includes("matn") || lower.includes("wording") || lower.includes("text");
+  const hadithIds = extractHadithIdsFromQuestion(question);
+  const matnQuery = matnFilter ?? extractQuotedMatn(question);
+  const hasSourcePair = sourceNumberCount >= 2;
+  const wantsCompare =
+    (hadithIds.length >= 2 && hasCompareKeyword) ||
+    (matnQuery && (hasCompareKeyword || hasMatnKeyword)) ||
+    (hasCompareKeyword && (hasChainKeyword || hasMatnKeyword || hasSourcePair || numberCount >= 2));
+  return {
+    wantsCompare,
+    hadithIds,
+    matnQuery,
+    count: clampCount(countHint ?? 2, 2),
+  };
+}
+
+function formatHadithLabel(hadith: HadithInsight): string {
+  return `${hadith.details.source} ${hadith.details.hadithNumber}`;
+}
+
+function formatMatnSnippet(hadith: HadithInsight): string {
+  const snippet = hadith.matn.split("\n").map((line) => line.trim()).find(Boolean) ?? hadith.matn;
+  return snippet.length > 180 ? `${snippet.slice(0, 180)}…` : snippet;
+}
+
+function formatChainText(hadith: HadithInsight): string {
+  if (!hadith.chain.length) return "No chain data stored.";
+  return hadith.chain.map((node) => node.name).join(" -> ");
+}
+
+function formatComparisonPairs(
+  pairs: Array<{ a: HadithInsight; b: HadithInsight }>,
+  descriptor = "of near-identical matn with different chains",
+): string {
+  if (!pairs.length) return SAFE_FALLBACK;
+  const sections = pairs.map((pair, index) => {
+    const labelA = formatHadithLabel(pair.a);
+    const labelB = formatHadithLabel(pair.b);
+    const chainDiff = compareChains(pair.a, pair.b);
+    const diffNote = chainDiff.different
+      ? chainDiff.onlyA.length || chainDiff.onlyB.length
+        ? `Chain differences — only in ${labelA}: ${chainDiff.onlyA.join(", ") || "none"}; only in ${labelB}: ${
+            chainDiff.onlyB.join(", ") || "none"
+          }.`
+        : "Chains differ in order or length."
+      : "Chains appear identical in the stored data.";
+    return [
+      `Pair ${index + 1}:`,
+      `${labelA} — ${formatMatnSnippet(pair.a)}`,
+      `Chain: ${formatChainText(pair.a)}`,
+      `${labelB} — ${formatMatnSnippet(pair.b)}`,
+      `Chain: ${formatChainText(pair.b)}`,
+      diffNote,
+    ].join("\n");
+  });
+  return `Here ${pairs.length === 1 ? "is" : "are"} ${pairs.length} pair${pairs.length === 1 ? "" : "s"} ${descriptor}:\n${sections.join("\n\n")}`;
 }
 
 function extractSourceQueryFromQuestion(question: string): string | null {
@@ -432,6 +726,8 @@ async function fetchListHadithIdsWithTopic(
   sourceId: number | null,
   limit: number,
   topicTerms: string[],
+  bookIds?: number[] | null,
+  chapterIds?: number[] | null,
 ): Promise<number[]> {
   const client = await getClient();
   try {
@@ -445,17 +741,25 @@ async function fetchListHadithIdsWithTopic(
         LEFT JOIN chapter c ON c.id = h.chapter_id
         WHERE h.deleted_at IS NULL
           AND ($1::int IS NULL OR h.source_id = $1)
+          AND ($2::int[] IS NULL OR h.book_id = ANY($2))
+          AND ($3::int[] IS NULL OR h.chapter_id = ANY($3))
           AND (
-            m.text_en ILIKE ANY($2)
-            OR b.name ILIKE ANY($2)
-            OR c.name ILIKE ANY($2)
-            OR h.location ILIKE ANY($2)
-            OR h.sanad ILIKE ANY($2)
+            m.text_en ILIKE ANY($4)
+            OR b.name ILIKE ANY($4)
+            OR c.name ILIKE ANY($4)
+            OR h.location ILIKE ANY($4)
+            OR h.sanad ILIKE ANY($4)
           )
         ORDER BY h.id
-        LIMIT $3
+        LIMIT $5
       `,
-      [sourceId, patterns, Math.min(Math.max(1, limit), 20)],
+      [
+        sourceId,
+        bookIds?.length ? bookIds : null,
+        chapterIds?.length ? chapterIds : null,
+        patterns,
+        Math.min(Math.max(1, limit), 20),
+      ],
     );
     return rows.map((row) => row.id);
   } finally {
@@ -563,6 +867,9 @@ export async function POST(request: NextRequest) {
           ? [filters.contextHadithId]
           : [];
     const contextHadithId = contextHadithIds[0];
+    const contextOnly = contextHadithIds.length > 0;
+    const contextSet = new Set(contextHadithIds);
+    const attributeIntent = detectAttributeIntent(question);
     let parsedSourceNumbers = parseSourceNumbersFromQuestion(question);
     if (!parsedSourceNumbers.length) {
       const mentionedSources = await findSourcesMentionedInQuestion(question);
@@ -595,12 +902,55 @@ export async function POST(request: NextRequest) {
         ? heuristicIntent.depth
         : undefined;
     const hasSourceNumber = Boolean(parsedSourceNumber);
-    const hasExplicitHadithSignal = Boolean(hasSourceNumber || heuristicHadithId);
-    const explicitHadithId = hasSourceNumber
-      ? resolvedSourceNumber?.hadithId
-      : heuristicHadithId ?? resolvedSourceNumber?.hadithId;
-    const narratorDetailName = extractNarratorDetailName(question);
+    const requestedHadithNumber = intentHadithId ?? heuristicHadithId;
+    const hasUnscopedNumber = Boolean(requestedHadithNumber && !hasSourceNumber);
+    const fallbackUnique = hasUnscopedNumber
+      ? await findUniqueHadithIdByNumber(requestedHadithNumber!)
+      : null;
+    const hasExplicitHadithSignal = Boolean(hasSourceNumber || requestedHadithNumber);
+    const explicitHadithId =
+      (hasSourceNumber ? resolvedSourceNumber?.hadithId : undefined) ?? fallbackUnique?.hadithId;
+    const explicitHadithIdOutsideContext =
+      contextOnly && explicitHadithId ? !contextSet.has(explicitHadithId) : false;
+    const narratorDetailName = extractNarratorDetailName(question) ?? looksLikeNarratorName(question);
     const listSignal = detectListIntent(question);
+    const comparisonNumbers = extractComparisonNumbers(question);
+    const comparisonSignal = detectComparisonIntent(
+      question,
+      structuredFilters.matn,
+      listSignal.count,
+      parsedSourceNumbers.length,
+      comparisonNumbers.length,
+    );
+    const hasAttributeFilters = Boolean(
+      structuredFilters.tag ||
+        structuredFilters.grade ||
+        structuredFilters.scholar ||
+        structuredFilters.identifier ||
+        structuredFilters.attribution ||
+        structuredFilters.chainType ||
+        structuredFilters.narrationLevel ||
+        structuredFilters.transmissionMethod ||
+        structuredFilters.narrator ||
+        structuredFilters.sanad,
+    );
+    const augmentedProfile = getAugmentedEmbeddingProfile();
+    const embeddingProfile =
+      augmentedProfile && (attributeIntent.wantsAttribute || hasAttributeFilters)
+        ? augmentedProfile
+        : DEFAULT_EMBEDDING_PROFILE;
+
+    logRagDebug("intent", {
+      intent: intentType,
+      useRouter,
+      contextOnly,
+      attributeIntent,
+      hasAttributeFilters,
+      embeddingProfile: embeddingProfile.label,
+      structuredFilters,
+      fallbackUniqueHadith: fallbackUnique?.hadithId ?? null,
+      narratorDetailName: narratorDetailName ?? null,
+    });
 
     const isContextualQuestion = (value: string) => {
       const lower = value.toLowerCase();
@@ -623,18 +973,303 @@ export async function POST(request: NextRequest) {
       Boolean(hasExplicitHadithSignal) || Boolean(intentNarratorId) || Boolean(narratorDetailName);
     const contextualFallback = Boolean(contextHadithId && !hasExplicitReference && isContextualQuestion(question));
     const shouldUseContext =
+      contextOnly ||
       contextualFallback ||
       (useRouter ? Boolean(routerDecision?.useContext && contextHadithId && !hasExplicitReference) : contextualFallback);
     const shouldForceHadith = Boolean(shouldUseContext || hasExplicitHadithSignal || explicitHadithId);
     const shouldAllowHadithIntent = Boolean(shouldUseContext || hasExplicitHadithSignal);
-    const narratorAggregateSignal = isNarratorAggregateQuestion(question);
-    const intentOverride = narratorAggregateSignal ? "narrator-aggregate" : intentType;
+    const narratorAggregateSignal = isNarratorAggregateQuestion(question) && !narratorDetailName;
+    const forceVariantsIntent =
+      !comparisonSignal.wantsCompare && VARIANT_KEYWORDS.some((keyword) => question.toLowerCase().includes(keyword));
+    const forceChainIntent =
+      !comparisonSignal.wantsCompare && CHAIN_KEYWORDS.some((keyword) => question.toLowerCase().includes(keyword));
+    const intentOverride = narratorAggregateSignal
+      ? "narrator-aggregate"
+      : forceVariantsIntent
+        ? "variants"
+        : forceChainIntent
+          ? "chain"
+          : intentType;
     const effectiveIntentType =
       intentOverride === "hadith" && !shouldAllowHadithIntent ? "semantic" : intentOverride;
 
-    const shouldHandleList = (effectiveIntentType === "list" && useRouter) || listSignal.wantsList;
-    if (shouldHandleList && !shouldForceHadith) {
+    if (comparisonSignal.wantsCompare) {
+      const buildPairsWithDifferentChains = (hadiths: HadithInsight[], limit: number) => {
+        const pairs: Array<{ a: HadithInsight; b: HadithInsight }> = [];
+        for (let i = 0; i < hadiths.length; i += 1) {
+          for (let j = i + 1; j < hadiths.length; j += 1) {
+            const a = hadiths[i];
+            const b = hadiths[j];
+            if (!a || !b) continue;
+            const diff = compareChains(a, b);
+            if (!diff.different) continue;
+            pairs.push({ a, b });
+            if (pairs.length >= limit) return pairs;
+          }
+        }
+        return pairs;
+      };
+
+      const resolvedComparePairs = parsedSourceNumbers.length
+        ? await Promise.all(parsedSourceNumbers.map((match) => resolveSourceNumberMatch(match)))
+        : [];
+      const resolvedCompareIds = Array.from(
+        new Set(
+          resolvedComparePairs
+            .filter((pair): pair is NonNullable<typeof pair> => Boolean(pair))
+            .map((pair) => pair.hadithId),
+        ),
+      );
+      const resolvedCompareFallback = comparisonNumbers.length
+        ? await Promise.all(
+            comparisonNumbers.map((value) => findUniqueHadithIdByNumber(value)),
+          )
+        : [];
+      const resolvedCompareFallbackIds = Array.from(
+        new Set(
+          resolvedCompareFallback
+            .filter((row): row is NonNullable<typeof row> => Boolean(row))
+            .map((row) => row.hadithId),
+        ),
+      );
+
+      let pairs: Array<{ a: HadithInsight; b: HadithInsight }> = [];
+      if (contextOnly) {
+        const scopedIds = contextHadithIds;
+        if (scopedIds.length >= 2) {
+          const hadiths = await loadHadithInsights(scopedIds);
+          pairs = buildPairsWithDifferentChains(hadiths, comparisonSignal.count);
+        } else {
+          await logRagInteraction({
+            question,
+            filters,
+            retrievedIds: [],
+            response: CONTEXT_ONLY_MESSAGE,
+            citations: [],
+            retrievalMode: "context-only",
+          });
+          return NextResponse.json({ answer: CONTEXT_ONLY_MESSAGE, citations: [] });
+        }
+      } else if (resolvedCompareIds.length >= 2) {
+        const ids = resolvedCompareIds.slice(0, comparisonSignal.count * 2);
+        const hadiths = await loadHadithInsights(ids);
+        pairs = buildPairsWithDifferentChains(hadiths, comparisonSignal.count);
+      } else if (resolvedCompareFallbackIds.length >= 2) {
+        const ids = resolvedCompareFallbackIds.slice(0, comparisonSignal.count * 2);
+        const hadiths = await loadHadithInsights(ids);
+        pairs = buildPairsWithDifferentChains(hadiths, comparisonSignal.count);
+      } else if (comparisonNumbers.length >= 2) {
+        await logRagInteraction({
+          question,
+          filters,
+          retrievedIds: [],
+          response: REQUIRE_COMPARE_SOURCE_MESSAGE,
+          citations: [],
+          retrievalMode: "compare-missing-source",
+        });
+        return NextResponse.json({ answer: REQUIRE_COMPARE_SOURCE_MESSAGE, citations: [] });
+      } else if (comparisonSignal.hadithIds.length >= 2) {
+        await logRagInteraction({
+          question,
+          filters,
+          retrievedIds: [],
+          response: REQUIRE_COMPARE_SOURCE_MESSAGE,
+          citations: [],
+          retrievalMode: "compare-missing-source",
+        });
+        return NextResponse.json({ answer: REQUIRE_COMPARE_SOURCE_MESSAGE, citations: [] });
+      } else if (comparisonSignal.matnQuery) {
+        const matches = await findHadithIdsByMatnSimilarity(
+          comparisonSignal.matnQuery,
+          Math.max(6, comparisonSignal.count * 3),
+          MATN_SIMILARITY_THRESHOLD,
+        );
+        const ids = matches.map((match) => match.id);
+        const hadiths = await loadHadithInsights(ids);
+        pairs = buildPairsWithDifferentChains(hadiths, comparisonSignal.count);
+      } else {
+        const pairsByPrefix = await findMatnPairsByPrefix(Math.max(1, comparisonSignal.count));
+        const ids = Array.from(new Set(pairsByPrefix.flat()));
+        const hadiths = await loadHadithInsights(ids);
+        const map = new Map(hadiths.map((hadith) => [Number(hadith.id), hadith]));
+        pairs = pairsByPrefix
+          .map(([aId, bId]) => {
+            const a = map.get(aId);
+            const b = map.get(bId);
+            if (!a || !b) return null;
+            if (!compareChains(a, b).different) return null;
+            return { a, b };
+          })
+          .filter((pair): pair is { a: HadithInsight; b: HadithInsight } => Boolean(pair));
+      }
+
+      if (!pairs.length) {
+        await logRagInteraction({
+          question,
+          filters,
+          retrievedIds: [],
+          response: SAFE_FALLBACK,
+          citations: [],
+        });
+        return NextResponse.json({ answer: SAFE_FALLBACK, citations: [] });
+      }
+
+      const ids = pairs.flatMap((pair) => [Number(pair.a.id), Number(pair.b.id)]);
+      const citations = pairs.flatMap((pair) => [buildCitation(pair.a), buildCitation(pair.b)]);
+      const isSimilarityDriven =
+        Boolean(comparisonSignal.matnQuery) ||
+        (!contextOnly &&
+          !resolvedCompareIds.length &&
+          !resolvedCompareFallbackIds.length &&
+          !comparisonNumbers.length &&
+          !comparisonSignal.hadithIds.length &&
+          !parsedSourceNumbers.length);
+      const comparisonDescriptor = isSimilarityDriven
+        ? "of near-identical matn with different chains"
+        : "comparing matn and chains";
+      const response = formatComparisonPairs(pairs, comparisonDescriptor);
+      await logRagInteraction({
+        question,
+        filters,
+        retrievedIds: ids,
+        response,
+        citations,
+      });
+      return NextResponse.json({ answer: response, citations });
+    }
+
+    if (attributeIntent.wantsAttribute) {
+      if (contextOnly && explicitHadithId && !contextSet.has(explicitHadithId)) {
+        await logRagInteraction({
+          question,
+          filters,
+          retrievedIds: [],
+          response: CONTEXT_ONLY_MESSAGE,
+          citations: [],
+          retrievalMode: "attribute-context",
+        });
+        return NextResponse.json({ answer: CONTEXT_ONLY_MESSAGE, citations: [] });
+      }
+      if (hasUnscopedNumber && !contextOnly && !fallbackUnique) {
+        await logRagInteraction({
+          question,
+          filters,
+          retrievedIds: [],
+          response: REQUIRE_SOURCE_MESSAGE,
+          citations: [],
+          retrievalMode: "attribute-missing-source",
+        });
+        return NextResponse.json({ answer: REQUIRE_SOURCE_MESSAGE, citations: [] });
+      }
+
+      let ids: number[] = [];
+      if (contextOnly) {
+        ids = contextHadithIds.slice(0, Math.min(contextHadithIds.length, Math.max(1, limit ?? 5)));
+      } else if (explicitHadithId) {
+        ids = [explicitHadithId];
+      } else if (resolvedSourceNumber?.hadithId) {
+        ids = [resolvedSourceNumber.hadithId];
+      } else if (fallbackUnique?.hadithId) {
+        ids = [fallbackUnique.hadithId];
+      } else {
+        const candidates = await searchHadithIdsByQuery({
+          text: question,
+          filters: structuredFilters,
+          limit: 5,
+        });
+        if (candidates.length === 1) {
+          ids = candidates;
+        } else if (candidates.length > 1) {
+          const options = await getHadithByIds(candidates);
+          const response = formatHadithOptions(options, "that description");
+          await logRagInteraction({
+            question,
+            filters,
+            retrievedIds: candidates,
+            response,
+            citations: [],
+            retrievalMode: "attribute-select",
+          });
+          return NextResponse.json({ answer: response, citations: [] });
+        }
+      }
+
+      if (!ids.length) {
+        const response = contextOnly ? REQUIRE_CONTEXT_MESSAGE : REQUIRE_ID_MESSAGE;
+        await logRagInteraction({
+          question,
+          filters,
+          retrievedIds: [],
+          response,
+          citations: [],
+          retrievalMode: "attribute-missing",
+        });
+        return NextResponse.json({ answer: response, citations: [] });
+      }
+
+      const hadiths = await getHadithByIds(ids);
+      if (!hadiths.length) {
+        await logRagInteraction({
+          question,
+          filters,
+          retrievedIds: ids,
+          response: SAFE_FALLBACK,
+          citations: [],
+          retrievalMode: "attribute-empty",
+        });
+        return NextResponse.json({ answer: SAFE_FALLBACK, citations: [] });
+      }
+
+      const response = formatAttributeAnswer(hadiths, attributeIntent);
+      const citations = hadiths.map((hadith) => buildCitation(hadith));
+      logRagDebug("attribute", { ids, intent: attributeIntent, contextOnly });
+      await logRagInteraction({
+        question,
+        filters,
+        retrievedIds: ids,
+        response,
+        citations,
+        retrievalMode: contextOnly ? "attribute-context" : "attribute-direct",
+      });
+      return NextResponse.json({ answer: response, citations });
+    }
+
+    const shouldHandleList =
+      ((effectiveIntentType === "list" && useRouter) || listSignal.wantsList) &&
+      !comparisonSignal.wantsCompare &&
+      !attributeIntent.wantsAttribute;
+    if (shouldHandleList && (!shouldForceHadith || contextOnly)) {
       const requestedCount = clampCount(routerDecision?.count ?? listSignal.count ?? limit ?? 5, limit ?? 5);
+      if (contextOnly) {
+        const ids = contextHadithIds.slice(0, requestedCount);
+        const hadiths = await getHadithByIds(ids);
+        if (!hadiths.length) {
+          await logRagInteraction({
+            question,
+            filters,
+            retrievedIds: [],
+            response: SAFE_FALLBACK,
+            citations: [],
+            retrievalMode: "context-list",
+          });
+          return NextResponse.json({ answer: SAFE_FALLBACK, citations: [] });
+        }
+        const citations = hadiths.map((hadith) => buildCitation(hadith));
+        const response = formatListAnswer(hadiths, "the selected context");
+        await logRagInteraction({
+          question,
+          filters,
+          retrievedIds: ids,
+          response,
+          citations,
+          retrievalMode: "context-list",
+        });
+        return NextResponse.json({
+          answer: response,
+          citations,
+          retrieved: ids.map((id) => ({ hadithId: id })),
+        });
+      }
       const sourceQuery = routerDecision?.source ?? extractSourceQueryFromQuestion(question);
       let sourceMatch: { id: number; name: string } | null = null;
       if (sourceQuery) {
@@ -651,10 +1286,52 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ answer: SOURCE_NOT_FOUND, citations: [] });
         }
       }
+      const sourceId = sourceMatch?.id ?? filters.sourceId ?? null;
+      let bookIds = filters.bookId ? [filters.bookId] : null;
+      let chapterIds = filters.chapterId ? [filters.chapterId] : null;
+
+      const bookQuery = structuredFilters.book ?? extractBookQueryFromQuestion(question);
+      if (!bookIds && bookQuery) {
+        const matches = await findBooksByName(bookQuery, 10);
+        const scoped = sourceId ? matches.filter((match) => match.sourceId === sourceId) : matches;
+        if (!scoped.length) {
+          await logRagInteraction({
+            question,
+            filters,
+            retrievedIds: [],
+            response: BOOK_NOT_FOUND,
+            citations: [],
+          });
+          return NextResponse.json({ answer: BOOK_NOT_FOUND, citations: [] });
+        }
+        bookIds = scoped.map((match) => match.id);
+      }
+
+      const chapterQuery = structuredFilters.chapter ?? extractChapterQueryFromQuestion(question);
+      if (!chapterIds && chapterQuery) {
+        const matches = await findChaptersByName(chapterQuery, 10);
+        const scopedByBook = bookIds
+          ? matches.filter((match) => match.bookId && bookIds?.includes(match.bookId))
+          : matches;
+        const scoped = sourceId ? scopedByBook.filter((match) => match.sourceId === sourceId) : scopedByBook;
+        if (!scoped.length) {
+          await logRagInteraction({
+            question,
+            filters,
+            retrievedIds: [],
+            response: CHAPTER_NOT_FOUND,
+            citations: [],
+          });
+          return NextResponse.json({ answer: CHAPTER_NOT_FOUND, citations: [] });
+        }
+        chapterIds = scoped.map((match) => match.id);
+      }
       const topicQuery = extractTopicQuery(question);
       const topicTerms = topicQuery ? [] : extractTopicTerms(question);
       const listFilters = {
         ...structuredFilters,
+        ...(bookQuery ? { book: bookQuery } : {}),
+        ...(chapterQuery ? { chapter: chapterQuery } : {}),
         ...(sourceMatch?.name ? { source: sourceMatch.name } : sourceQuery ? { source: sourceQuery } : {}),
       };
       let ids: number[] = [];
@@ -671,10 +1348,16 @@ export async function POST(request: NextRequest) {
           limit: requestedCount,
         });
         if (!ids.length) {
-          ids = await fetchListHadithIdsWithTopic(sourceMatch?.id ?? null, requestedCount, topicTerms);
+          ids = await fetchListHadithIdsWithTopic(
+            sourceId,
+            requestedCount,
+            topicTerms,
+            bookIds,
+            chapterIds,
+          );
         }
       } else {
-        ids = await fetchListHadithIds(sourceMatch?.id ?? null, requestedCount);
+        ids = await fetchListHadithIds(sourceId, requestedCount, bookIds, chapterIds);
       }
       if (!ids.length) {
         await logRagInteraction({
@@ -703,7 +1386,18 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    if (effectiveIntentType === "narrator-aggregate") {
+    if (effectiveIntentType === "narrator-aggregate" && !narratorDetailName) {
+      if (contextOnly) {
+        await logRagInteraction({
+          question,
+          filters,
+          retrievedIds: [],
+          response: CONTEXT_ONLY_MESSAGE,
+          citations: [],
+          retrievalMode: "context-only",
+        });
+        return NextResponse.json({ answer: CONTEXT_ONLY_MESSAGE, citations: [] });
+      }
       const requestedCount = clampCount(
         routerDecision?.count ?? extractTopCount(question) ?? limit ?? 5,
         5,
@@ -840,8 +1534,20 @@ export async function POST(request: NextRequest) {
             .map((pair) => pair.hadithId),
         ),
       );
-      if (resolvedIds.length) {
-        const baseResults = await retrieveHadithByIds(resolvedIds);
+      const scopedIds = contextOnly ? resolvedIds.filter((id) => contextSet.has(id)) : resolvedIds;
+      if (contextOnly && resolvedIds.length && !scopedIds.length) {
+        await logRagInteraction({
+          question,
+          filters,
+          retrievedIds: [],
+          response: CONTEXT_ONLY_MESSAGE,
+          citations: [],
+          retrievalMode: "context-only",
+        });
+        return NextResponse.json({ answer: CONTEXT_ONLY_MESSAGE, citations: [] });
+      }
+      if (scopedIds.length) {
+        const baseResults = await retrieveHadithByIds(scopedIds);
         if (!baseResults.length) {
           await logRagInteraction({
             question,
@@ -880,76 +1586,36 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (isGradeQuestion(question)) {
-      if (!contextHadithIds.length) {
-        await logRagInteraction({
-          question,
-          filters,
-          retrievedIds: [],
-          response: REQUIRE_CONTEXT_MESSAGE,
-          citations: [],
-        });
-        return NextResponse.json({ answer: REQUIRE_CONTEXT_MESSAGE, citations: [] });
-      }
-      const hadiths = await getHadithByIds(contextHadithIds.map((id) => Number(id)));
-      if (!hadiths.length) {
-        await logRagInteraction({
-          question,
-          filters,
-          retrievedIds: [],
-          response: SAFE_FALLBACK,
-          citations: [],
-        });
-        return NextResponse.json({ answer: SAFE_FALLBACK, citations: [] });
-      }
-      const response = formatGradeAnswer(hadiths);
-      const citations = hadiths.map((hadith) => buildCitation(hadith));
-      await logRagInteraction({
-        question,
-        filters,
-        retrievedIds: hadiths.map((hadith) => Number(hadith.id)),
-        response,
-        citations,
-      });
-      return NextResponse.json({ answer: response, citations });
-    }
-
-    if (isAttributionQuestion(question)) {
-      if (!contextHadithIds.length) {
-        await logRagInteraction({
-          question,
-          filters,
-          retrievedIds: [],
-          response: REQUIRE_CONTEXT_MESSAGE,
-          citations: [],
-        });
-        return NextResponse.json({ answer: REQUIRE_CONTEXT_MESSAGE, citations: [] });
-      }
-      const hadiths = await getHadithByIds(contextHadithIds.map((id) => Number(id)));
-      if (!hadiths.length) {
-        await logRagInteraction({
-          question,
-          filters,
-          retrievedIds: [],
-          response: SAFE_FALLBACK,
-          citations: [],
-        });
-        return NextResponse.json({ answer: SAFE_FALLBACK, citations: [] });
-      }
-      const response = formatAttributionAnswer(hadiths);
-      const citations = hadiths.map((hadith) => buildCitation(hadith));
-      await logRagInteraction({
-        question,
-        filters,
-        retrievedIds: hadiths.map((hadith) => Number(hadith.id)),
-        response,
-        citations,
-      });
-      return NextResponse.json({ answer: response, citations });
-    }
-
     if (effectiveIntentType === "chain") {
-      let hadithId = intentHadithId ?? (shouldUseContext ? contextHadithId : undefined);
+      if (explicitHadithIdOutsideContext) {
+        await logRagInteraction({
+          question,
+          filters,
+          retrievedIds: [],
+          response: CONTEXT_ONLY_MESSAGE,
+          citations: [],
+          retrievalMode: "context-only",
+        });
+        return NextResponse.json({ answer: CONTEXT_ONLY_MESSAGE, citations: [] });
+      }
+      if (hasUnscopedNumber && !contextOnly && !fallbackUnique) {
+        await logRagInteraction({
+          question,
+          filters,
+          retrievedIds: [],
+          response: REQUIRE_SOURCE_MESSAGE,
+          citations: [],
+          retrievalMode: "chain-missing-source",
+        });
+        return NextResponse.json({ answer: REQUIRE_SOURCE_MESSAGE, citations: [] });
+      }
+      let hadithId = shouldUseContext ? contextHadithId : undefined;
+      if (!hadithId && resolvedSourceNumber?.hadithId) {
+        hadithId = resolvedSourceNumber.hadithId;
+      }
+      if (!hadithId && fallbackUnique?.hadithId) {
+        hadithId = fallbackUnique.hadithId;
+      }
       if (!hadithId) {
         const candidates = await searchHadithIdsByQuery({
           text: question,
@@ -1005,7 +1671,35 @@ export async function POST(request: NextRequest) {
     }
 
     if (effectiveIntentType === "variants") {
-      let hadithId = intentHadithId ?? (shouldUseContext ? contextHadithId : undefined);
+      if (explicitHadithIdOutsideContext) {
+        await logRagInteraction({
+          question,
+          filters,
+          retrievedIds: [],
+          response: CONTEXT_ONLY_MESSAGE,
+          citations: [],
+          retrievalMode: "context-only",
+        });
+        return NextResponse.json({ answer: CONTEXT_ONLY_MESSAGE, citations: [] });
+      }
+      if (hasUnscopedNumber && !contextOnly && !fallbackUnique) {
+        await logRagInteraction({
+          question,
+          filters,
+          retrievedIds: [],
+          response: REQUIRE_SOURCE_MESSAGE,
+          citations: [],
+          retrievalMode: "variants-missing-source",
+        });
+        return NextResponse.json({ answer: REQUIRE_SOURCE_MESSAGE, citations: [] });
+      }
+      let hadithId = shouldUseContext ? contextHadithId : undefined;
+      if (!hadithId && resolvedSourceNumber?.hadithId) {
+        hadithId = resolvedSourceNumber.hadithId;
+      }
+      if (!hadithId && fallbackUnique?.hadithId) {
+        hadithId = fallbackUnique.hadithId;
+      }
       if (!hadithId) {
         const candidates = await searchHadithIdsByQuery({
           text: question,
@@ -1059,7 +1753,10 @@ export async function POST(request: NextRequest) {
         });
         return NextResponse.json({ answer: SAFE_FALLBACK, citations: [] });
       }
-      const response = formatVariantsAnswer(hadith, variantsResult.variants);
+      const variantIds = variantsResult.variants.map((variant) => variant.hadithId);
+      const variantHadiths = variantIds.length ? await getHadithByIds(variantIds) : [];
+      const variantMap = new Map(variantHadiths.map((variant) => [Number(variant.id), variant]));
+      const response = formatVariantsAnswer(hadith, variantsResult.variants, variantMap);
       const citations = [buildCitation(hadith)];
       await logRagInteraction({
         question,
@@ -1072,18 +1769,30 @@ export async function POST(request: NextRequest) {
     }
 
     if (narratorDetailName && !isNarratorNetworkQuestion(question)) {
-      let detail = await getNarratorDetailsByName(narratorDetailName);
-      if (!detail) {
-        const matches = await findNarratorsByName(narratorDetailName);
+      let detail: Awaited<ReturnType<typeof getNarratorDetailsById>> | null = null;
+      if (contextOnly) {
+        if (!contextHadithId) {
+          await logRagInteraction({
+            question,
+            filters,
+            retrievedIds: [],
+            response: CONTEXT_ONLY_MESSAGE,
+            citations: [],
+            retrievalMode: "context-only",
+          });
+          return NextResponse.json({ answer: CONTEXT_ONLY_MESSAGE, citations: [] });
+        }
+        const matches = await findNarratorsByNameInHadith(narratorDetailName, contextHadithId);
         if (matches.length > 1) {
           const options = matches.map((match) => `${match.name} (ID ${match.id})`).join(", ");
-          const response = `I found multiple narrators matching "${narratorDetailName}": ${options}. Please specify the narrator id.`;
+          const response = `I found multiple narrators matching "${narratorDetailName}" in this hadith: ${options}. Please specify the narrator id.`;
           await logRagInteraction({
             question,
             filters,
             retrievedIds: matches.map((match) => match.id),
             response,
             citations: [],
+            retrievalMode: "context-only",
           });
           return NextResponse.json({ answer: response, citations: [] });
         }
@@ -1091,21 +1800,52 @@ export async function POST(request: NextRequest) {
           detail = await getNarratorDetailsById(matches[0].id);
         }
         if (!detail) {
-          const aliasMatches = await findNarratorsByAlias(narratorDetailName);
-          if (aliasMatches.length > 1) {
-            const options = aliasMatches.map((match) => `${match.name} (ID ${match.id})`).join(", ");
+          await logRagInteraction({
+            question,
+            filters,
+            retrievedIds: [],
+            response: CONTEXT_ONLY_MESSAGE,
+            citations: [],
+            retrievalMode: "context-only",
+          });
+          return NextResponse.json({ answer: CONTEXT_ONLY_MESSAGE, citations: [] });
+        }
+      } else {
+        detail = await getNarratorDetailsByName(narratorDetailName);
+        if (!detail) {
+          const matches = await findNarratorsByName(narratorDetailName);
+          if (matches.length > 1) {
+            const options = matches.map((match) => `${match.name} (ID ${match.id})`).join(", ");
             const response = `I found multiple narrators matching "${narratorDetailName}": ${options}. Please specify the narrator id.`;
             await logRagInteraction({
               question,
               filters,
-              retrievedIds: aliasMatches.map((match) => match.id),
+              retrievedIds: matches.map((match) => match.id),
               response,
               citations: [],
             });
             return NextResponse.json({ answer: response, citations: [] });
           }
-          if (aliasMatches.length === 1) {
-            detail = await getNarratorDetailsById(aliasMatches[0].id);
+          if (matches.length === 1) {
+            detail = await getNarratorDetailsById(matches[0].id);
+          }
+          if (!detail) {
+            const aliasMatches = await findNarratorsByAlias(narratorDetailName);
+            if (aliasMatches.length > 1) {
+              const options = aliasMatches.map((match) => `${match.name} (ID ${match.id})`).join(", ");
+              const response = `I found multiple narrators matching "${narratorDetailName}": ${options}. Please specify the narrator id.`;
+              await logRagInteraction({
+                question,
+                filters,
+                retrievedIds: aliasMatches.map((match) => match.id),
+                response,
+                citations: [],
+              });
+              return NextResponse.json({ answer: response, citations: [] });
+            }
+            if (aliasMatches.length === 1) {
+              detail = await getNarratorDetailsById(aliasMatches[0].id);
+            }
           }
         }
       }
@@ -1123,6 +1863,17 @@ export async function POST(request: NextRequest) {
     }
 
     if (effectiveIntentType === "narrator-network") {
+      if (contextOnly && (intentNarratorId || intentNarratorName)) {
+        await logRagInteraction({
+          question,
+          filters,
+          retrievedIds: [],
+          response: CONTEXT_ONLY_MESSAGE,
+          citations: [],
+          retrievalMode: "context-only",
+        });
+        return NextResponse.json({ answer: CONTEXT_ONLY_MESSAGE, citations: [] });
+      }
       const depth = intentDepth ?? 2;
       let narratorId = intentNarratorId;
       let narratorName = intentNarratorName;
@@ -1215,19 +1966,73 @@ export async function POST(request: NextRequest) {
     }
 
     if (effectiveIntentType === "hadith" || shouldUseContext || shouldForceHadith) {
+      if (explicitHadithIdOutsideContext) {
+        await logRagInteraction({
+          question,
+          filters,
+          retrievedIds: [],
+          response: CONTEXT_ONLY_MESSAGE,
+          citations: [],
+          retrievalMode: "context-only",
+        });
+        return NextResponse.json({ answer: CONTEXT_ONLY_MESSAGE, citations: [] });
+      }
+      if (hasUnscopedNumber && !contextOnly && !fallbackUnique) {
+        await logRagInteraction({
+          question,
+          filters,
+          retrievedIds: [],
+          response: REQUIRE_SOURCE_MESSAGE,
+          citations: [],
+          retrievalMode: "hadith-missing-source",
+        });
+        return NextResponse.json({ answer: REQUIRE_SOURCE_MESSAGE, citations: [] });
+      }
+      if (contextOnly && !hasExplicitHadithSignal && !requestedHadithNumber && !hasSourceNumber) {
+        const baseResults = await retrieveHadithByIds(contextHadithIds);
+        if (!baseResults.length) {
+          await logRagInteraction({
+            question,
+            filters,
+            retrievedIds: [],
+            response: SAFE_FALLBACK,
+            citations: [],
+            retrievalMode: "context-only",
+          });
+          return NextResponse.json({ answer: SAFE_FALLBACK, citations: [] });
+        }
+        const detailIds = buildContextDetailIds(baseResults, contextHadithIds, MAX_CONTEXT_DETAILS);
+        const hadithDetails = await getHadithByIds(detailIds);
+        const hadithMap = new Map(hadithDetails.map((item) => [Number(item.id), item]));
+        const graphMap = await loadGraphContext(detailIds, MAX_GRAPH_CONTEXT);
+        const context = buildRagContext(baseResults, hadithMap, graphMap);
+        const answer = await generateRagAnswer({ question, results: baseResults, context });
+        const graph = await buildAnswerGraph(answer.citations);
+        await logRagInteraction({
+          question,
+          filters,
+          retrievedIds: baseResults.map((r) => r.hadithId),
+          modelUsed: answer.modelUsed,
+          promptTokens: answer.usage?.promptTokens,
+          completionTokens: answer.usage?.completionTokens,
+          totalTokens: answer.usage?.totalTokens,
+          response: answer.answer,
+          citations: answer.citations,
+          retrievalMode: "context-only",
+        });
+        return NextResponse.json({
+          answer: answer.answer,
+          citations: answer.citations,
+          graph,
+          retrieved: baseResults,
+        });
+      }
       let resolvedHadithId: number | undefined;
       if (hasSourceNumber) {
         resolvedHadithId = resolvedSourceNumber?.hadithId;
       }
       if (!resolvedHadithId) {
-        resolvedHadithId =
-          effectiveIntentType === "hadith"
-            ? hasExplicitHadithSignal
-              ? heuristicHadithId ?? intentHadithId
-              : undefined
-            : shouldUseContext
-              ? contextHadithId!
-              : undefined;
+        resolvedHadithId = shouldUseContext ? contextHadithId! : fallbackUnique?.hadithId;
       }
       if (!resolvedHadithId && !hasSourceNumber && resolvedSourceNumber?.hadithId) {
         resolvedHadithId = resolvedSourceNumber.hadithId;
@@ -1245,8 +2050,8 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ answer: SOURCE_NOT_FOUND, citations: [] });
         }
         if (sources.length > 1) {
-          const options = sources.map((source) => `${source.name} (ID ${source.id})`).join(", ");
-          const response = `I found multiple sources matching "${parsedSourceNumber.sourceQuery}": ${options}. Please specify the source id.`;
+          const options = sources.map((source) => source.name).join(", ");
+          const response = `I found multiple sources matching "${parsedSourceNumber.sourceQuery}": ${options}. Please specify the source name.`;
           await logRagInteraction({
             question,
             filters,
@@ -1362,22 +2167,74 @@ export async function POST(request: NextRequest) {
     });
     const seedIds = Array.from(new Set([...(contextHadithIds ?? []), ...seedCandidates]));
 
-    const hybridResults = await retrieveHadithForQuestionHybrid({
+    let activeProfile = embeddingProfile;
+    let hybridResults = await retrieveHadithForQuestionHybrid({
       question,
       limit,
-      model: process.env.EMBEDDING_MODEL,
+      model: activeProfile.providerModel,
+      storageModel: activeProfile.storageModel,
+      kgModel: DEFAULT_EMBEDDING_PROFILE.providerModel,
+      kgStorageModel: DEFAULT_EMBEDDING_PROFILE.storageModel,
       filters,
       includeProvenance: true,
       seedHadithIds: seedIds,
     });
-    let retrievalMode: "hybrid" | "pg" = "hybrid";
-    const results =
+    let retrievalMode = activeProfile.label === "augmented" ? "hybrid-augmented" : "hybrid";
+    let results =
       hybridResults.results.length > 0
         ? hybridResults.results
-        : await retrieveHadithForQuestion({ question, ...filters, limit });
+        : await retrieveHadithForQuestion({
+            question,
+            ...filters,
+            limit,
+            model: activeProfile.providerModel,
+            storageModel: activeProfile.storageModel,
+          });
     if (hybridResults.results.length === 0 && results.length > 0) {
-      retrievalMode = "pg";
+      retrievalMode = activeProfile.label === "augmented" ? "pg-augmented" : "pg";
     }
+
+    if (!results.length && activeProfile.label === "augmented") {
+      const fallbackProfile = DEFAULT_EMBEDDING_PROFILE;
+      const fallbackHybrid = await retrieveHadithForQuestionHybrid({
+        question,
+        limit,
+        model: fallbackProfile.providerModel,
+        storageModel: fallbackProfile.storageModel,
+        kgModel: DEFAULT_EMBEDDING_PROFILE.providerModel,
+        kgStorageModel: DEFAULT_EMBEDDING_PROFILE.storageModel,
+        filters,
+        includeProvenance: true,
+        seedHadithIds: seedIds,
+      });
+      let fallbackMode = "hybrid-fallback";
+      let fallbackResults =
+        fallbackHybrid.results.length > 0
+          ? fallbackHybrid.results
+          : await retrieveHadithForQuestion({
+              question,
+              ...filters,
+              limit,
+              model: fallbackProfile.providerModel,
+              storageModel: fallbackProfile.storageModel,
+            });
+      if (fallbackHybrid.results.length === 0 && fallbackResults.length > 0) {
+        fallbackMode = "pg-fallback";
+      }
+      if (fallbackResults.length) {
+        activeProfile = fallbackProfile;
+        hybridResults = fallbackHybrid;
+        results = fallbackResults;
+        retrievalMode = fallbackMode;
+      }
+    }
+
+    logRagDebug("retrieval", {
+      mode: retrievalMode,
+      resultCount: results.length,
+      seedCount: seedIds.length,
+      embeddingProfile: activeProfile.label,
+    });
 
     if (!results.length) {
       const structuredIds = await searchHadithIdsByQuery({

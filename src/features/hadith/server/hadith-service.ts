@@ -252,7 +252,7 @@ function mapHadithRow(
   const gradeInfo = primaryGrade?.grade;
   const gradingLabel = primaryGrade?.grade?.title ?? DEFAULT_GRADE;
   const gradedBy = mapGradedBy(gradedGrades, row.author_name, row.author_lifespan);
-  const displayNumber = row.display_number ?? String(row.number);
+  const displayNumber = String(row.number);
   const narrationLevelDetail = buildLookupDetail(
     row.narration_level_id,
     row.narration_level_name,
@@ -420,7 +420,7 @@ function normalizeLabel(value?: string | null) {
     .trim();
 }
 
-function mapNarrationLevelSlug(value?: string | null): NarrationLevel {
+function mapNarrationLevelSlug(value?: string | null): NarrationLevel | undefined {
   const normalized = normalizeLabel(value);
   switch (normalized) {
     case "mutawatir":
@@ -432,8 +432,9 @@ function mapNarrationLevelSlug(value?: string | null): NarrationLevel {
     case "gharib":
       return "gharib";
     case "fard":
-    default:
       return "fard";
+    default:
+      return undefined;
   }
 }
 

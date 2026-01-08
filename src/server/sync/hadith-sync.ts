@@ -41,7 +41,7 @@ import {
   linkChainAttribution,
 } from "@/server/graph/mappers";
 import { GraphNode, GraphRelationship } from "@/server/graph/types";
-import { embedHadithBatch } from "@/server/rag/embeddings";
+import { DEFAULT_EMBEDDING_PROFILE, embedHadithBatch, getEmbeddingProfiles } from "@/server/rag/embeddings";
 
 /**
  * Delta sync flow:
@@ -63,7 +63,7 @@ const addRel = (rels: RelMap, rel: GraphRelationship) => {
   if (!rels.has(key)) rels.set(key, rel);
 };
 
-const DEFAULT_EMBEDDING_MODEL = process.env.EMBEDDING_MODEL || "text-embedding-3-small";
+const DEFAULT_EMBEDDING_MODEL = DEFAULT_EMBEDDING_PROFILE.storageModel;
 
 const parseEmbedding = (value: unknown): number[] | null => {
   if (!value) return null;
@@ -802,7 +802,10 @@ export async function processHadithSyncBatch(limit = 50, options: SyncBatchOptio
     for (const row of rows) {
       try {
         if (row.needs_embedding) {
-          await embedHadithBatch([row.hadith_id]);
+          const profiles = getEmbeddingProfiles();
+          for (const profile of profiles) {
+            await embedHadithBatch([row.hadith_id], profile);
+          }
         }
         if (row.needs_graph || row.needs_embedding) {
           await syncGraphForHadith(row.hadith_id);

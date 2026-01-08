@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { embedAllMissingHadith } from "@/server/rag/embeddings";
+import { embedAllMissingHadith, getEmbeddingProfiles } from "@/server/rag/embeddings";
 
 /**
  * RAG embedding backfill
@@ -10,11 +10,16 @@ import { embedAllMissingHadith } from "@/server/rag/embeddings";
  *
  * Run: npm run rag:backfill
  * Env: OPENAI_API_KEY (required), EMBEDDING_MODEL (optional, defaults to text-embedding-3-small)
+ * Optional: EMBEDDING_AUGMENTED_MODEL + EMBEDDING_AUGMENTED_STORAGE_KEY (enable augmented embeddings)
  */
 async function main() {
-  const model = process.env.EMBEDDING_MODEL || "text-embedding-3-small";
-  console.log(`[rag-backfill] Starting backfill for model=${model}`);
-  await embedAllMissingHadith(model, undefined, { progress: true });
+  const profiles = getEmbeddingProfiles();
+  for (const profile of profiles) {
+    console.log(
+      `[rag-backfill] Starting backfill for ${profile.label} (provider=${profile.providerModel}, storage=${profile.storageModel})`,
+    );
+    await embedAllMissingHadith(profile, undefined, { progress: true });
+  }
   console.log("[rag-backfill] Completed");
 }
 
