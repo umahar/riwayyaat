@@ -106,8 +106,10 @@ export function parseSourceNumbersFromQuestion(question: string): SourceNumberMa
     }
   }
 
-  const sourceFirst = question.match(/\b(?:in|from)\s+([^?.!]+?)\s*(?:hadith\s*)?(?:no\.?|#)?\s*(\d+)\b/i);
-  if (sourceFirst?.[1] && sourceFirst?.[2]) {
+  const sourceFirstPattern = /\b(?:in|from)\s+([^?.!]+?)\s*(?:hadith\s*)?(?:no\.?|#)?\s*(\d+)\b/gi;
+  for (const sourceFirst of question.matchAll(sourceFirstPattern)) {
+    if (!sourceFirst?.[1] || !sourceFirst?.[2]) continue;
+    if (/\bbook\s+\d+\b/i.test(sourceFirst[0])) continue;
     const match = buildMatch(sourceFirst[1], sourceFirst[2], hintFromQuestion);
     if (match) {
       const key = `${match.sourceQuery.toLowerCase()}::${match.number}`;
@@ -198,6 +200,7 @@ export function buildSourceNumberMatchesFromSources(
     for (const match of numberMatches) {
       const raw = match?.[1];
       if (!raw) continue;
+      if (new RegExp(`\\bbook\\s+${escapeRegExp(raw)}\\b`, "i").test(segment)) continue;
       const number = Number(raw);
       if (!Number.isFinite(number) || number <= 0) continue;
       if (match.index != null && isCountToken(segment, match.index)) continue;
@@ -218,6 +221,7 @@ export function buildSourceNumberMatchesFromSources(
     for (const match of numberMatches) {
       const raw = match?.[1];
       if (!raw) continue;
+      if (new RegExp(`\\bbook\\s+${escapeRegExp(raw)}\\b`, "i").test(normalized)) continue;
       const number = Number(raw);
       if (!Number.isFinite(number) || number <= 0) continue;
       if (match.index != null && isCountToken(normalized, match.index)) continue;

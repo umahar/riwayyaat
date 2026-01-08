@@ -58,6 +58,43 @@ type SearchParams = {
 };
 
 const MIN_QUERY_LENGTH = 3;
+const SYNONYM_MAP: Record<string, string[]> = {
+  war: ["battle", "combat", "fighting", "expedition", "jihad", "ghazwa"],
+};
+
+function normalizeSearchText(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/["“”]/g, "")
+    .replace(/[^a-z0-9\s]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function buildWordBoundaryRegex(terms: string[] | string): string {
+  const list = Array.isArray(terms) ? terms : [terms];
+  const escaped = list.map((term) => escapeRegex(term)).filter(Boolean);
+  if (!escaped.length) return "";
+  const body = escaped.length > 1 ? `(?:${escaped.join("|")})` : escaped[0];
+  return `\\\\m${body}\\\\M`;
+}
+
+function expandSynonyms(tokens: string[]): string[] {
+  const expanded = new Set<string>();
+  tokens.forEach((token) => {
+    if (!token) return;
+    expanded.add(token);
+    const synonyms = SYNONYM_MAP[token];
+    if (synonyms?.length) {
+      synonyms.forEach((synonym) => expanded.add(synonym));
+    }
+  });
+  return Array.from(expanded);
+}
 
 function pushFilterClause(
   clauses: string[],
@@ -116,31 +153,67 @@ export async function searchHadithIdsByQuery(params: SearchParams): Promise<numb
   pushFilterClause(clauses, values, filters.matn, "(m.text_en ILIKE $$ OR m.text_ar ILIKE $$ OR m.summary ILIKE $$)");
 
   if (params.text && params.text.trim().length >= MIN_QUERY_LENGTH) {
-    const text = params.text.trim();
-    values.push(text);
+    const rawText = params.text.trim();
+    const normalized = normalizeSearchText(rawText);
+    const tokens = normalized ? normalized.split(" ").filter(Boolean) : [];
+    const isSingleToken = tokens.length === 1;
+    const expandedTokens = expandSynonyms(tokens);
+    const tsQueryText =
+      isSingleToken && expandedTokens.length > 1
+        ? expandedTokens.join(" OR ")
+        : rawText;
+    values.push(tsQueryText);
     const tsIdx = values.length;
-    values.push(`%${text}%`);
-    const likeIdx = values.length;
-    clauses.push(
-      `(
-        m.matn_search @@ websearch_to_tsquery('english', $${tsIdx})
-        OR s.source_search @@ websearch_to_tsquery('english', $${tsIdx})
-        OR b.book_search @@ websearch_to_tsquery('english', $${tsIdx})
-        OR c.chapter_search @@ websearch_to_tsquery('english', $${tsIdx})
-        OR n.narrator_search @@ websearch_to_tsquery('english', $${tsIdx})
-        OR t.tag_search @@ websearch_to_tsquery('english', $${tsIdx})
-        OR g.grade_search @@ websearch_to_tsquery('english', $${tsIdx})
-        OR sc.scholar_search @@ websearch_to_tsquery('english', $${tsIdx})
-        OR m.text_en ILIKE $${likeIdx}
-        OR m.text_ar ILIKE $${likeIdx}
-        OR m.summary ILIKE $${likeIdx}
-        OR h.sanad ILIKE $${likeIdx}
-        OR h.location ILIKE $${likeIdx}
-        OR hi.scheme_key ILIKE $${likeIdx}
-        OR hi.identifier ILIKE $${likeIdx}
-        OR hi.notes ILIKE $${likeIdx}
-      )`,
-    );
+
+    let likeIdx: number | null = null;
+    let regexIdx: number | null = null;
+
+    if (!isSingleToken) {
+      values.push(`%${rawText}%`);
+      likeIdx = values.length;
+    } else if (expandedTokens.length) {
+      const regex = buildWordBoundaryRegex(expandedTokens);
+      if (regex) {
+        values.push(regex);
+        regexIdx = values.length;
+      }
+    }
+
+    const textClauses = [
+      `m.matn_search @@ websearch_to_tsquery('english', $${tsIdx})`,
+      `s.source_search @@ websearch_to_tsquery('english', $${tsIdx})`,
+      `b.book_search @@ websearch_to_tsquery('english', $${tsIdx})`,
+      `c.chapter_search @@ websearch_to_tsquery('english', $${tsIdx})`,
+      `n.narrator_search @@ websearch_to_tsquery('english', $${tsIdx})`,
+      `t.tag_search @@ websearch_to_tsquery('english', $${tsIdx})`,
+      `g.grade_search @@ websearch_to_tsquery('english', $${tsIdx})`,
+      `sc.scholar_search @@ websearch_to_tsquery('english', $${tsIdx})`,
+    ];
+    if (likeIdx) {
+      textClauses.push(
+        `m.text_en ILIKE $${likeIdx}`,
+        `m.text_ar ILIKE $${likeIdx}`,
+        `m.summary ILIKE $${likeIdx}`,
+        `h.sanad ILIKE $${likeIdx}`,
+        `h.location ILIKE $${likeIdx}`,
+        `hi.scheme_key ILIKE $${likeIdx}`,
+        `hi.identifier ILIKE $${likeIdx}`,
+        `hi.notes ILIKE $${likeIdx}`,
+      );
+    }
+    if (regexIdx) {
+      textClauses.push(
+        `m.text_en ~* $${regexIdx}`,
+        `m.text_ar ~* $${regexIdx}`,
+        `m.summary ~* $${regexIdx}`,
+        `h.sanad ~* $${regexIdx}`,
+        `h.location ~* $${regexIdx}`,
+        `b.name ~* $${regexIdx}`,
+        `c.name ~* $${regexIdx}`,
+        `t.name ~* $${regexIdx}`,
+      );
+    }
+    clauses.push(`(${textClauses.join(" OR ")})`);
   }
 
   const whereClause = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";

@@ -63,6 +63,31 @@ export async function findBooksByName(name: string, limit = 5): Promise<BookMatc
   }
 }
 
+export async function findBooksByNumber(
+  bookNumber: number,
+  sourceId?: number | null,
+  limit = 5,
+): Promise<BookMatch[]> {
+  const client = await getClient();
+  try {
+    const { rows } = await client.query<BookMatch>(
+      `
+        SELECT b.id, b.name, b.source_id AS "sourceId", s.name AS "sourceName"
+        FROM book b
+        LEFT JOIN source s ON s.id = b.source_id
+        WHERE b.number = $1
+          AND ($2::int IS NULL OR b.source_id = $2)
+        ORDER BY b.name
+        LIMIT $3
+      `,
+      [bookNumber, sourceId ?? null, Math.max(1, Math.min(limit, 10))],
+    );
+    return rows;
+  } finally {
+    client.release();
+  }
+}
+
 export async function findChaptersByName(name: string, limit = 5): Promise<ChapterMatch[]> {
   const client = await getClient();
   try {
