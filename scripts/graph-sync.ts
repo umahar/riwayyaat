@@ -71,6 +71,55 @@ const addRel = (rels: RelMap, rel: GraphRelationship) => {
   if (!rels.has(key)) rels.set(key, rel);
 };
 
+function formatDuration(ms: number) {
+  if (!Number.isFinite(ms) || ms < 0) return "unknown";
+  const totalSeconds = Math.max(0, Math.round(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
+}
+
+function createProgress(label: string, total: number) {
+  const useInline = Boolean(process.stdout.isTTY);
+  let lastLength = 0;
+  const startedAt = Date.now();
+  const render = (current: number, done = false) => {
+    const elapsedMs = Date.now() - startedAt;
+    const pct = total > 0 ? Math.min(100, Math.floor((current / total) * 100)) : 100;
+    const averageMs = current > 0 ? elapsedMs / current : 0;
+    const remaining = Math.max(total - current, 0);
+    const etaMs = averageMs * remaining;
+    const line = `[graph-sync] ${label} ${current}/${total} (${pct}%) elapsed ${formatDuration(
+      elapsedMs,
+    )} eta ${formatDuration(etaMs)}`;
+    if (!useInline) {
+      console.log(line);
+      return;
+    }
+    const padded = line.padEnd(lastLength, " ");
+    lastLength = padded.length;
+    process.stdout.write(`\r${padded}`);
+    if (done) process.stdout.write("\n");
+  };
+  return {
+    update(current: number) {
+      render(current, false);
+    },
+    done(current: number) {
+      render(current, true);
+    },
+  };
+}
+
+function resolveChunkSize(primary: string, fallback: number) {
+  const raw = process.env[primary] ?? process.env.GRAPH_SYNC_CHUNK_SIZE;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+}
+
 async function clearGraph() {
   const driver = getDriver();
   const session = driver.session({ defaultAccessMode: neo4j.session.WRITE });
@@ -85,17 +134,33 @@ async function mergeNodes(nodesByLabel: Map<string, GraphNode[]>) {
   const driver = getDriver();
   const session = driver.session({ defaultAccessMode: neo4j.session.WRITE });
   try {
-    for (const [label, nodes] of nodesByLabel.entries()) {
-      if (!nodes.length) continue;
-      await session.run(
-        `
-          UNWIND $nodes AS node
-          MERGE (n:${label} {key: node.key})
-          SET n += node.properties
-        `,
-        { nodes },
-      );
+    const entries = Array.from(nodesByLabel.entries());
+    const totalNodes = entries.reduce((sum, [, nodes]) => sum + nodes.length, 0);
+    const chunkSize = resolveChunkSize("GRAPH_SYNC_NODE_CHUNK_SIZE", 500);
+    const progress = createProgress("Nodes merged", totalNodes);
+    let processedNodes = 0;
+    if (totalNodes === 0) {
+      progress.done(0);
+      return;
     }
+    progress.update(0);
+    for (const [label, nodes] of entries) {
+      if (!nodes.length) continue;
+      for (let index = 0; index < nodes.length; index += chunkSize) {
+        const chunk = nodes.slice(index, index + chunkSize);
+        await session.run(
+          `
+            UNWIND $nodes AS node
+            MERGE (n:${label} {key: node.key})
+            SET n += node.properties
+          `,
+          { nodes: chunk },
+        );
+        processedNodes += chunk.length;
+        progress.update(processedNodes);
+      }
+    }
+    progress.done(processedNodes);
   } finally {
     await session.close();
   }
@@ -105,19 +170,35 @@ async function mergeRelationships(relsByType: Map<string, GraphRelationship[]>) 
   const driver = getDriver();
   const session = driver.session({ defaultAccessMode: neo4j.session.WRITE });
   try {
-    for (const [type, rels] of relsByType.entries()) {
-      if (!rels.length) continue;
-      await session.run(
-        `
-          UNWIND $rels AS rel
-          MATCH (from {key: rel.from})
-          MATCH (to {key: rel.to})
-          MERGE (from)-[r:${type}]->(to)
-          SET r += coalesce(rel.properties, {})
-        `,
-        { rels },
-      );
+    const entries = Array.from(relsByType.entries());
+    const totalRels = entries.reduce((sum, [, rels]) => sum + rels.length, 0);
+    const chunkSize = resolveChunkSize("GRAPH_SYNC_REL_CHUNK_SIZE", 500);
+    const progress = createProgress("Relationships merged", totalRels);
+    let processedRels = 0;
+    if (totalRels === 0) {
+      progress.done(0);
+      return;
     }
+    progress.update(0);
+    for (const [type, rels] of entries) {
+      if (!rels.length) continue;
+      for (let index = 0; index < rels.length; index += chunkSize) {
+        const chunk = rels.slice(index, index + chunkSize);
+        await session.run(
+          `
+            UNWIND $rels AS rel
+            MATCH (from {key: rel.from})
+            MATCH (to {key: rel.to})
+            MERGE (from)-[r:${type}]->(to)
+            SET r += coalesce(rel.properties, {})
+          `,
+          { rels: chunk },
+        );
+        processedRels += chunk.length;
+        progress.update(processedRels);
+      }
+    }
+    progress.done(processedRels);
   } finally {
     await session.close();
   }
@@ -589,6 +670,12 @@ async function main() {
 
   const { nodes, rels } = await loadAndMap();
   console.log(`[graph-sync] Mapped ${nodes.length} nodes and ${rels.length} relationships`);
+  console.log(
+    `[graph-sync] Chunk sizes (override with GRAPH_SYNC_CHUNK_SIZE): nodes=${resolveChunkSize(
+      "GRAPH_SYNC_NODE_CHUNK_SIZE",
+      500,
+    )}, rels=${resolveChunkSize("GRAPH_SYNC_REL_CHUNK_SIZE", 500)}`,
+  );
 
   const nodesByLabel = nodes.reduce<Map<string, GraphNode[]>>((acc, node) => {
     const list = acc.get(node.label) ?? [];

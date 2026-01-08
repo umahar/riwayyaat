@@ -23,6 +23,21 @@ type EmbeddingRow = {
   model: string;
 };
 
+type EmbedAllOptions = {
+  progress?: boolean;
+};
+
+function formatDuration(ms: number) {
+  if (!Number.isFinite(ms) || ms < 0) return "unknown";
+  const totalSeconds = Math.max(0, Math.round(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
+}
+
 function getOpenAI(): OpenAI {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -132,6 +147,7 @@ async function embedTexts(texts: HadithText[], model: string): Promise<Embedding
 }
 
 export async function embedHadithBatch(hadithIds: number[], model = DEFAULT_EMBEDDING_MODEL) {
+  let embeddedCount = 0;
   // Chunk inputs to keep OpenAI payloads reasonable.
   for (let i = 0; i < hadithIds.length; i += BATCH_SIZE) {
     const slice = hadithIds.slice(i, i + BATCH_SIZE);
@@ -139,17 +155,41 @@ export async function embedHadithBatch(hadithIds: number[], model = DEFAULT_EMBE
     if (!texts.length) continue;
     const embeddings = await embedTexts(texts, model);
     await saveEmbeddings(embeddings);
+    embeddedCount += embeddings.length;
     // optional: log progress
     // console.log(`[embed] saved ${embeddings.length} embeddings`);
   }
+  return embeddedCount;
 }
 
 export async function embedAllMissingHadith(
   model = DEFAULT_EMBEDDING_MODEL,
   batchSize = BATCH_SIZE,
+  options: EmbedAllOptions = {},
 ) {
   const client = await getClient();
   try {
+    const showProgress = Boolean(options.progress);
+    let totalMissing = 0;
+    if (showProgress) {
+      const total = await client.query<{ count: string }>(
+        `
+          SELECT COUNT(*) AS count
+          FROM hadith h
+          JOIN matn m ON m.id = h.matn_id
+          LEFT JOIN hadith_embedding he
+            ON he.hadith_id = h.id AND he.model = $1
+          WHERE he.id IS NULL
+            AND h.deleted_at IS NULL
+            AND length(trim(coalesce(m.text_en, ''))) > 0
+        `,
+        [model],
+      );
+      totalMissing = Number(total.rows[0]?.count ?? 0);
+      console.log(`[rag-backfill] Missing ${totalMissing} embeddings (batch size ${batchSize})`);
+    }
+    const startedAt = Date.now();
+    let processed = 0;
     // Find hadith missing embeddings for this model.
     // Idempotent: re-run will only process gaps.
     while (true) {
@@ -157,10 +197,12 @@ export async function embedAllMissingHadith(
         `
           SELECT h.id
           FROM hadith h
+          JOIN matn m ON m.id = h.matn_id
           LEFT JOIN hadith_embedding he
             ON he.hadith_id = h.id AND he.model = $1
           WHERE he.id IS NULL
             AND h.deleted_at IS NULL
+            AND length(trim(coalesce(m.text_en, ''))) > 0
           ORDER BY h.id
           LIMIT $2
         `,
@@ -168,7 +210,17 @@ export async function embedAllMissingHadith(
       );
       if (!rows.length) break;
       const ids = rows.map((r) => r.id);
-      await embedHadithBatch(ids, model);
+      const embedded = await embedHadithBatch(ids, model);
+      if (showProgress) {
+        processed += embedded;
+        const elapsedMs = Date.now() - startedAt;
+        const averageMs = processed > 0 ? elapsedMs / processed : 0;
+        const remaining = Math.max(totalMissing - processed, 0);
+        const etaMs = averageMs * remaining;
+        console.log(
+          `[rag-backfill] ${processed}/${totalMissing} embedded, remaining ${remaining}, eta ${formatDuration(etaMs)}`,
+        );
+      }
     }
   } finally {
     client.release();

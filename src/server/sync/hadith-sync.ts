@@ -729,9 +729,47 @@ async function syncGraphForHadith(hadithId: number) {
   }
 }
 
-export async function processHadithSyncBatch(limit = 50) {
+type SyncBatchOptions = {
+  progress?: boolean;
+};
+
+function formatDuration(ms: number) {
+  if (!Number.isFinite(ms) || ms < 0) return "unknown";
+  const totalSeconds = Math.max(0, Math.round(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
+}
+
+export async function processHadithSyncBatch(limit = 50, options: SyncBatchOptions = {}) {
   const client = await getClient();
   try {
+    const showProgress = Boolean(options.progress);
+    const useInline = showProgress && Boolean(process.stdout.isTTY);
+    let lastLineLength = 0;
+    const writeProgress = (line: string, done = false) => {
+      if (!showProgress) return;
+      if (!useInline) {
+        console.log(line);
+        return;
+      }
+      const padded = line.padEnd(lastLineLength, " ");
+      lastLineLength = padded.length;
+      process.stdout.write(`\r${padded}`);
+      if (done) process.stdout.write("\n");
+    };
+
+    let queueTotal = 0;
+    if (showProgress) {
+      const totalResult = await client.query<{ count: string }>(
+        "SELECT COUNT(*) AS count FROM hadith_sync_queue WHERE needs_graph = true OR needs_embedding = true",
+      );
+      queueTotal = Number(totalResult.rows[0]?.count ?? 0);
+    }
+
     const { rows } = await client.query<{
       id: number;
       hadith_id: number;
@@ -747,6 +785,19 @@ export async function processHadithSyncBatch(limit = 50) {
       `,
       [limit],
     );
+
+    const batchTotal = rows.length;
+    if (showProgress) {
+      const scope =
+        queueTotal > batchTotal
+          ? `Batch ${batchTotal} (queue ${queueTotal})`
+          : `Queue ${queueTotal || batchTotal}`;
+      console.log(`[hadith-sync] ${scope}`);
+    }
+
+    const startedAt = Date.now();
+    let processed = 0;
+    let failed = 0;
 
     for (const row of rows) {
       try {
@@ -767,8 +818,29 @@ export async function processHadithSyncBatch(limit = 50) {
           [row.id],
         );
       } catch (err) {
+        failed += 1;
         console.error("[hadith-sync] failed for hadith", row.hadith_id, err);
         // Leave the row pending; will retry next run.
+      } finally {
+        processed += 1;
+        if (showProgress) {
+          const elapsedMs = Date.now() - startedAt;
+          const averageMs = processed > 0 ? elapsedMs / processed : 0;
+          const remainingBatch = Math.max(batchTotal - processed, 0);
+          const etaMs = averageMs * remainingBatch;
+          const scopeLabel = queueTotal > batchTotal ? "batch" : "queue";
+          const queueRemaining =
+            queueTotal > 0 ? Math.max(queueTotal - processed, 0) : remainingBatch;
+          const queueSuffix =
+            queueTotal > batchTotal ? `, queue remaining ${queueRemaining}` : "";
+          const failureSuffix = failed ? ` (${failed} failed)` : "";
+          writeProgress(
+            `[hadith-sync] ${processed}/${batchTotal} done${failureSuffix}, remaining ${remainingBatch}, eta (${scopeLabel}) ${formatDuration(
+              etaMs,
+            )}${queueSuffix}`,
+            processed >= batchTotal,
+          );
+        }
       }
     }
   } finally {

@@ -42,7 +42,8 @@ type HadithRow = {
   debug_notes: string;
 };
 
-const DATA_PATH = path.join(process.cwd(), "scrapped-data", "bukhari_hadiths_20260107_013449.jsonl");
+const DATA_PATH = path.join(process.cwd(), "bukhari_hadiths_2026-01-07_22-24-12.jsonl");
+const FAILED_PATH = path.join(process.cwd(), "bukhari_failed_or_review_2026-01-07_22-24-12.jsonl");
 const TARGET_IDS: number[] = [];
 const IMPORT_IDS = process.env.IMPORT_IDS
   ? process.env.IMPORT_IDS.split(",")
@@ -62,6 +63,7 @@ const caches = {
   gradeByName: new Map<string, number>(),
   scholarByName: new Map<string, number>(),
 };
+const SKIP_IDENTIFIER_SCHEMES = new Set(["arabic_no_tashkeel"]);
 
 function splitList(value: string): string[] {
   return value
@@ -149,6 +151,24 @@ function readRows(filePath: string): HadithRow[] {
     .split(/\r?\n/)
     .filter(Boolean)
     .map((line) => JSON.parse(line) as HadithRow);
+}
+
+function clearCaches() {
+  Object.values(caches).forEach((cache) => cache.clear());
+}
+
+function readFailedIds(filePath: string): Set<number> {
+  if (!fs.existsSync(filePath)) return new Set();
+  const raw = fs.readFileSync(filePath, "utf8");
+  const ids = new Set<number>();
+  raw
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .forEach((line) => {
+      const parsed = JSON.parse(line) as { id?: number };
+      if (Number.isFinite(parsed.id)) ids.add(parsed.id!);
+    });
+  return ids;
 }
 
 async function getOrCreateAuthor(client: PoolClient, name: string, lifespan: string | null) {
@@ -487,13 +507,35 @@ async function ensureHadithIdentifier(
   isPrimary = false,
 ) {
   if (identifier === null || identifier === undefined) return;
+  if (SKIP_IDENTIFIER_SCHEMES.has(schemeKey)) return;
   const value = String(identifier);
   if (!value.trim()) return;
-  const existing = await client.query<{ id: number }>(
-    "SELECT id FROM hadith_identifier WHERE hadith_id = $1 AND scheme_key = $2 AND identifier = $3",
+  const existing = await client.query<{ id: number; is_primary: boolean }>(
+    "SELECT id, is_primary FROM hadith_identifier WHERE hadith_id = $1 AND scheme_key = $2 AND identifier = $3",
     [hadithId, schemeKey, value],
   );
-  if (existing.rowCount) return;
+  if (existing.rowCount) {
+    if (isPrimary && !existing.rows[0].is_primary) {
+      const primary = await client.query<{ id: number }>(
+        "SELECT id FROM hadith_identifier WHERE hadith_id = $1 AND scheme_key = $2 AND is_primary = true",
+        [hadithId, schemeKey],
+      );
+      if (primary.rowCount && primary.rows[0].id !== existing.rows[0].id) {
+        await client.query("UPDATE hadith_identifier SET is_primary = false WHERE id = $1", [primary.rows[0].id]);
+      }
+      await client.query("UPDATE hadith_identifier SET is_primary = true WHERE id = $1", [existing.rows[0].id]);
+    }
+    return;
+  }
+  if (isPrimary) {
+    const primary = await client.query<{ id: number }>(
+      "SELECT id FROM hadith_identifier WHERE hadith_id = $1 AND scheme_key = $2 AND is_primary = true",
+      [hadithId, schemeKey],
+    );
+    if (primary.rowCount) {
+      await client.query("UPDATE hadith_identifier SET is_primary = false WHERE id = $1", [primary.rows[0].id]);
+    }
+  }
   await client.query(
     "INSERT INTO hadith_identifier (hadith_id, scheme_key, identifier, is_primary) VALUES ($1, $2, $3, $4)",
     [hadithId, schemeKey, value, isPrimary],
@@ -620,14 +662,16 @@ async function enqueueHadithSync(client: PoolClient, hadithId: number) {
 
 async function main() {
   const rows = readRows(DATA_PATH);
+  const failedIds = readFailedIds(FAILED_PATH);
   const selected =
     IMPORT_IDS.length > 0 ? rows.filter((row) => IMPORT_IDS.includes(row.id)) : rows;
+  const filtered = failedIds.size ? selected.filter((row) => !failedIds.has(row.id)) : selected;
   if (IMPORT_IDS.length > 0 && selected.length !== IMPORT_IDS.length) {
     const found = new Set(selected.map((row) => row.id));
     const missing = IMPORT_IDS.filter((id) => !found.has(id));
     throw new Error(`Missing expected ids: ${missing.join(", ")}`);
   }
-  if (selected.length === 0) {
+  if (filtered.length === 0) {
     throw new Error("No hadith rows selected for import.");
   }
 
@@ -637,7 +681,7 @@ async function main() {
     await client.query("BEGIN");
     let successCount = 0;
     const failedIds: number[] = [];
-    for (const row of selected) {
+    for (const row of filtered) {
       const savepoint = `sp_${row.id}`;
       await client.query(`SAVEPOINT ${savepoint}`);
       try {
@@ -694,13 +738,14 @@ async function main() {
       } catch (error) {
         await client.query(`ROLLBACK TO SAVEPOINT ${savepoint}`);
         await client.query(`RELEASE SAVEPOINT ${savepoint}`);
+        clearCaches();
         failedIds.push(row.id);
         console.warn("[import] skipped row", { id: row.id, error });
       }
     }
     await client.query("COMMIT");
     const failureNote = failedIds.length ? `; failed ids: ${failedIds.join(", ")}` : "";
-    console.log(`[import] imported ${successCount}/${selected.length} hadith rows${failureNote}`);
+    console.log(`[import] imported ${successCount}/${filtered.length} hadith rows${failureNote}`);
   } catch (error) {
     await client.query("ROLLBACK");
     console.error("[import] failed", error);

@@ -12,7 +12,7 @@ import { processHadithSyncBatch } from "@/server/sync/hadith-sync";
 async function main() {
   const limit = process.env.SYNC_LIMIT ? Number(process.env.SYNC_LIMIT) : 50;
   console.log(`[hadith-sync] Processing up to ${limit} pending items...`);
-  await processHadithSyncBatch(Number.isFinite(limit) && limit > 0 ? limit : 50);
+  await processHadithSyncBatch(Number.isFinite(limit) && limit > 0 ? limit : 50, { progress: true });
   console.log("[hadith-sync] Done");
 }
 

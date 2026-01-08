@@ -14,7 +14,7 @@ import { embedAllMissingHadith } from "@/server/rag/embeddings";
 async function main() {
   const model = process.env.EMBEDDING_MODEL || "text-embedding-3-small";
   console.log(`[rag-backfill] Starting backfill for model=${model}`);
-  await embedAllMissingHadith(model);
+  await embedAllMissingHadith(model, undefined, { progress: true });
   console.log("[rag-backfill] Completed");
 }
 
