@@ -96,9 +96,9 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
 
   const scopedHadithData = useMemo(() => {
     if (showAllHadiths || !resultHadithIds) return hadithData;
-    const ids = new Set(resultHadithIds);
+    const ids = new Set([...resultHadithIds, ...contextHadithIds]);
     return hadithData.filter((hadith) => ids.has(hadith.id));
-  }, [hadithData, resultHadithIds, showAllHadiths]);
+  }, [hadithData, resultHadithIds, showAllHadiths, contextHadithIds]);
 
   const hadithMap = useMemo(() => {
     return scopedHadithData.reduce<Record<string, HadithInsight>>((acc, hadith) => {
@@ -344,8 +344,8 @@ export function ChatWorkspace({ initialPrompt, onNewChat }: ChatWorkspaceProps) 
       contextHadithIds.map((id) => {
         const hadith = hadithMap[id];
         const label = hadith
-          ? `${hadith.details.source} — ${hadith.details.displayNumber ?? hadith.id}`
-          : `Hadith ID ${id}`;
+          ? `${hadith.details.source} — ${hadith.details.displayNumber ?? hadith.details.hadithNumber ?? hadith.id}`
+          : `Hadith (internal ID) ${id}`;
         return { id, label };
       }),
     [contextHadithIds, hadithMap],
