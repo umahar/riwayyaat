@@ -99,19 +99,19 @@ export async function findNarratorsByNameInHadith(
     if (!patterns.length) return [];
     const { rows } = await client.query<NarratorMatch>(
       `
-        SELECT DISTINCT n.id, n.name
+        SELECT DISTINCT n.id, n.name, length(n.name) AS name_len
         FROM narrator n
         JOIN chain_narrator cn ON cn.narrator_id = n.id
         JOIN hadith_chain hc ON hc.id = cn.chain_id
         LEFT JOIN narrator_alias na ON na.narrator_id = n.id
         WHERE hc.hadith_id = $1
           AND (n.name ILIKE ANY($2) OR na.alias ILIKE ANY($2))
-        ORDER BY length(n.name), n.name
+        ORDER BY name_len, n.name
         LIMIT $3
       `,
       [hadithId, patterns, Math.max(1, Math.min(limit, 10))],
     );
-    return rows;
+    return rows.map((row) => ({ id: row.id, name: row.name }));
   } finally {
     client.release();
   }

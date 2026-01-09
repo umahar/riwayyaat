@@ -75,7 +75,7 @@ const REQUIRE_CONTEXT_MESSAGE =
 const HADITH_NOT_FOUND_MESSAGE =
   "I couldn't find that number under the specified source. Please double-check the source and number.";
 const CONTEXT_ONLY_MESSAGE =
-  "This chat is scoped to the selected hadith. Clear the context to search globally.";
+  "There is no info for that within this context of selected hadiths.";
 const MAX_CONTEXT_DETAILS = 3;
 const MAX_STRUCTURED_RESULTS = 12;
 const MAX_GRAPH_CONTEXT = 2;
@@ -957,8 +957,8 @@ export async function POST(request: NextRequest) {
       : null;
     const heuristicIntent = inferRagIntent(question);
     const heuristicHadithId = "hadithId" in heuristicIntent ? heuristicIntent.hadithId : undefined;
-    const routerDecision = await routeRagIntent({ question, contextHadithId });
-    const useRouter = Boolean(routerDecision && (routerDecision.confidence ?? 1) >= 0.55);
+    const routerDecision = contextOnly ? null : await routeRagIntent({ question, contextHadithId });
+    const useRouter = !contextOnly && Boolean(routerDecision && (routerDecision.confidence ?? 1) >= 0.55);
     const intentType = useRouter ? routerDecision!.intent : heuristicIntent.type;
     const explicitHadithIds = extractHadithIdsFromQuestion(question);
     const hasExplicitHadithNumber = Boolean(parsedSourceNumbers.length || explicitHadithIds.length);
@@ -3016,6 +3016,57 @@ export async function POST(request: NextRequest) {
         citations: answer.citations,
         graph,
         retrieved: results,
+      });
+    }
+
+    if (contextOnly) {
+      const contextResults = await retrieveHadithByIds(contextHadithIds);
+      if (!contextResults.length) {
+        await logRagInteraction({
+          question,
+          filters,
+          retrievedIds: [],
+          response: CONTEXT_ONLY_MESSAGE,
+          citations: [],
+          retrievalMode: "context-only",
+        });
+        return NextResponse.json({ answer: CONTEXT_ONLY_MESSAGE, citations: [] });
+      }
+      const detailIds = buildContextDetailIds(contextResults, contextHadithIds, MAX_CONTEXT_DETAILS);
+      const hadithDetails = await getHadithByIds(detailIds);
+      const hadithMap = new Map(hadithDetails.map((item) => [Number(item.id), item]));
+      const graphMap = await loadGraphContext(detailIds, MAX_GRAPH_CONTEXT);
+      const context = buildRagContext(contextResults, hadithMap, graphMap);
+      const answer = await generateRagAnswer({ question, results: contextResults, context });
+      if (!answer.citations.length) {
+        await logRagInteraction({
+          question,
+          filters,
+          retrievedIds: contextResults.map((r) => r.hadithId),
+          response: CONTEXT_ONLY_MESSAGE,
+          citations: [],
+          retrievalMode: "context-only",
+        });
+        return NextResponse.json({ answer: CONTEXT_ONLY_MESSAGE, citations: [] });
+      }
+      const graph = await buildAnswerGraph(answer.citations);
+      await logRagInteraction({
+        question,
+        filters,
+        retrievedIds: contextResults.map((r) => r.hadithId),
+        modelUsed: answer.modelUsed,
+        promptTokens: answer.usage?.promptTokens,
+        completionTokens: answer.usage?.completionTokens,
+        totalTokens: answer.usage?.totalTokens,
+        response: answer.answer,
+        citations: answer.citations,
+        retrievalMode: "context-only",
+      });
+      return NextResponse.json({
+        answer: answer.answer,
+        citations: answer.citations,
+        graph,
+        retrieved: contextResults,
       });
     }
 
