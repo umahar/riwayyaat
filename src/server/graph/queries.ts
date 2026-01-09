@@ -73,6 +73,16 @@ export async function fetchChainGraph(hadithId: number) {
 export async function fetchVariants(hadithId: number) {
   const session = getSession({ defaultAccessMode: "READ" });
   try {
+    const baseCheck = await session.run(
+      `
+        MATCH (h:Hadith {pgId: $hadithId})
+        RETURN h.pgId AS id
+        LIMIT 1
+      `,
+      { hadithId },
+    );
+    const baseExists = baseCheck.records.length > 0;
+
     const matnVariants = await session.run(
       `
         MATCH (h:Hadith {pgId: $hadithId})-[:HAS_MATN]->(m:Matn)<-[:HAS_MATN]-(v:Hadith)
@@ -82,16 +92,30 @@ export async function fetchVariants(hadithId: number) {
       { hadithId },
     );
 
-    const narratorVariants = await session.run(
-      `
-        MATCH (h:Hadith {pgId: $hadithId})-[:HAS_CHAIN]->(:Chain)-[:STEP]->(n:Narrator)
-        MATCH (v:Hadith)-[:HAS_CHAIN]->(:Chain)-[:STEP]->(n)
-        WHERE v.pgId <> h.pgId
-        RETURN DISTINCT v.pgId AS id, v.displayNumber AS displayNumber, v.sourceName AS source
-        LIMIT 20
-      `,
-      { hadithId },
-    );
+    const runNarratorVariants = async (minShared: number) =>
+      session.run(
+        `
+          MATCH (h:Hadith {pgId: $hadithId})-[:HAS_CHAIN]->(:Chain)-[s:STEP]->(n:Narrator)
+          WHERE n.name IS NOT NULL
+            AND NOT toLower(n.name) CONTAINS "prophet"
+            AND NOT toLower(coalesce(s.role, "")) CONTAINS "prophet"
+          WITH h, collect(DISTINCT n) AS narrators
+          UNWIND narrators AS n
+          MATCH (v:Hadith)-[:HAS_CHAIN]->(:Chain)-[:STEP]->(n)
+          WHERE v.pgId <> h.pgId
+          WITH v, count(DISTINCT n) AS sharedCount
+          WHERE sharedCount >= $minShared
+          RETURN v.pgId AS id, v.displayNumber AS displayNumber, v.sourceName AS source, sharedCount AS sharedCount
+          ORDER BY sharedCount DESC, id ASC
+          LIMIT 20
+        `,
+        { hadithId, minShared },
+      );
+
+    let narratorVariants = await runNarratorVariants(2);
+    if (narratorVariants.records.length === 0) {
+      narratorVariants = await runNarratorVariants(1);
+    }
 
     const seen = new Set<number>();
     const variants: Array<{ hadithId: number; displayNumber: string; source: string; similarityReason: string }> = [];
@@ -122,7 +146,7 @@ export async function fetchVariants(hadithId: number) {
 
     return {
       variants,
-      hasMatch: matnVariants.records.length > 0 || narratorVariants.records.length > 0,
+      hasMatch: baseExists,
     };
   } finally {
     await session.close();
