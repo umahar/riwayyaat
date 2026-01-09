@@ -25,10 +25,11 @@ export const siteConfig = {
     { label: "Research partners", value: "40+" },
   ],
   examplePrompts: [
-    "Trace every sanad variant for the Hadith of Intentions and highlight key narrators.",
+    "Show Sahih al-Bukhari Hadith 1 with its full isnad and matn.",
     "Compare Sahih al-Bukhari 136 and Sahih al-Bukhari 203.",
-    "Show reliability notes for narrators linking Imam Malik to Anas ibn Malik.",
+    "Explain the hadith where knowledge is taken away, and show its chain.",
     "Summarize commentaries on the hadith about mercy between spouses.",
+    "Show all unique transmission paths for the hadith about ablution invalidation.",
   ],
 };
 

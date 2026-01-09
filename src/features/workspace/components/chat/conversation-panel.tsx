@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { workspaceCopy } from "@/content/text";
 import { ChatError, ChatMessage } from "@/features/workspace/hooks/use-rag-chat";
+import { GraphData } from "@/features/workspace/hooks/use-graph";
 import { AnswerGraphModal } from "@/features/workspace/components/chat/answer-graph-modal";
 
 type ConversationPanelProps = {
@@ -38,7 +39,11 @@ export function ConversationPanel({
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const shouldAutoScrollRef = useRef(true);
   const [activeGraph, setActiveGraph] = useState<ChatMessage["graph"] | null>(null);
+  const [graphCache, setGraphCache] = useState<Record<string, GraphData>>({});
+  const [graphLoadingId, setGraphLoadingId] = useState<string | null>(null);
+  const [graphErrors, setGraphErrors] = useState<Record<string, string>>({});
   const [isComposing, setIsComposing] = useState(false);
+  const showTimestamps = false;
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -56,6 +61,42 @@ export function ConversationPanel({
     const threshold = 48;
     const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
     shouldAutoScrollRef.current = distanceFromBottom <= threshold;
+  };
+
+  const fetchAnswerGraph = async (hadithIds: number[]) => {
+    const response = await fetch("/api/graph/answer", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hadithIds }),
+    });
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => ({}))) as { error?: string };
+      throw new Error(payload.error || `Request failed (${response.status})`);
+    }
+    return (await response.json()) as GraphData;
+  };
+
+  const handleGraphClick = async (message: ChatMessage) => {
+    const cached = graphCache[message.id];
+    const existing = message.graph ?? cached ?? null;
+    if (existing) {
+      setActiveGraph(existing);
+      return;
+    }
+    const hadithIds = message.citations?.map((citation) => citation.hadithId).filter(Number.isFinite) ?? [];
+    if (!hadithIds.length) return;
+    setGraphLoadingId(message.id);
+    setGraphErrors((prev) => ({ ...prev, [message.id]: "" }));
+    try {
+      const graph = await fetchAnswerGraph(hadithIds);
+      setGraphCache((prev) => ({ ...prev, [message.id]: graph }));
+      setActiveGraph(graph);
+    } catch (err) {
+      console.error("[conversation] Unable to load answer graph", err);
+      setGraphErrors((prev) => ({ ...prev, [message.id]: "Graph unavailable for these citations." }));
+    } finally {
+      setGraphLoadingId((current) => (current === message.id ? null : current));
+    }
   };
 
   useEffect(() => {
@@ -113,6 +154,8 @@ export function ConversationPanel({
             ? `Only ${citationCount} of ${requestedCount} matching hadiths were found.`
             : null;
           const isContextualUser = message.role === "user" && (message.contextHadithIds?.length ?? 0) > 0;
+          const graphError = graphErrors[message.id];
+          const graphLoading = graphLoadingId === message.id;
           return (
           <article
             key={message.id}
@@ -142,9 +185,9 @@ export function ConversationPanel({
                     <button
                       type="button"
                       className="rounded-full border border-[var(--border-soft)] bg-[var(--surface-card)] px-2 py-1 text-xs text-[var(--text-primary)] shadow-sm transition hover:-translate-y-0.5"
-                      title="View graph"
-                      onClick={() => setActiveGraph(message.graph ?? null)}
-                      disabled={!message.graph}
+                      title={graphLoading ? "Loading graph…" : "View graph"}
+                      onClick={() => void handleGraphClick(message)}
+                      disabled={graphLoading}
                     >
                       <svg
                         aria-hidden="true"
@@ -175,11 +218,14 @@ export function ConversationPanel({
                   </div>
                 ) : null}
                 {shortfallLabel ? <p className="text-[var(--text-muted)]">{shortfallLabel}</p> : null}
+                {graphError ? <p className="text-[var(--text-muted)]">{graphError}</p> : null}
               </div>
             )}
-            <span className="mt-1 text-xs text-[var(--text-subtle)]">
-              {message.role === "user" ? copy.userLabel : copy.assistantLabel} · {message.timestamp}
-            </span>
+            {showTimestamps ? (
+              <span className="mt-1 text-xs text-[var(--text-subtle)]">
+                {message.role === "user" ? copy.userLabel : copy.assistantLabel} · {message.timestamp}
+              </span>
+            ) : null}
           </article>
         );
         })}
